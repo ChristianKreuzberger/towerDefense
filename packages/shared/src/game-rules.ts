@@ -7,6 +7,8 @@ export const DEFAULT_TOWER_HEALTH = 100;
 export const BUILDABLE_CELL_THRESHOLD = 0.3;
 export const BASE_WALL_COST = 25;
 export const WALL_COST_GROWTH = 1.2;
+export const BASE_TOWER_UPGRADE_COST = 50;
+export const TOWER_UPGRADE_COST_GROWTH = 1.6;
 
 export const GAME_RULES = {
   minPlayers: MIN_PLAYERS,
@@ -18,5 +20,7 @@ export const GAME_RULES = {
   defaultTowerHealth: DEFAULT_TOWER_HEALTH,
   buildableCellThreshold: BUILDABLE_CELL_THRESHOLD,
   baseWallCost: BASE_WALL_COST,
-  wallCostGrowth: WALL_COST_GROWTH
+  wallCostGrowth: WALL_COST_GROWTH,
+  baseTowerUpgradeCost: BASE_TOWER_UPGRADE_COST,
+  towerUpgradeCostGrowth: TOWER_UPGRADE_COST_GROWTH
 } as const;

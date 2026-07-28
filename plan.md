@@ -68,7 +68,12 @@ Acceptance checks:
 4. Extend Step 2 with deterministic map generation + tower placement validation (buildable cells/overlap). [Done]
 5. Add path-safety validation for placements and tests for blocked-path rejection. [Done]
 6. Add wall placement command contracts + simulation handling with path-safety enforcement. [Done]
-7. Next: add tower upgrade command contracts + simulation economy handling. [Next]
+7. Add tower upgrade command contracts + simulation economy handling. [Done]
+8. Add tower target-mode command contracts + simulation state handling. [Done]
+9. Add ready-for-wave command contracts + simulation readiness state handling. [Done]
+10. Add deterministic wave lifecycle scaffolding (wave-start/wave-end events and empty creature tick loop). [Done]
+11. Implement deterministic creature spawn schedule and non-damaging movement tick within wave phase. [Done]
+12. Next: add deterministic tower-to-creature targeting selection pass (no damage yet), producing reproducible target assignment snapshots/events each wave tick. [Next]
 
 ## Non-Goals For This Kickoff
 

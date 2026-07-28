@@ -1,8 +1,13 @@
 import { getMapCell, type GameMap } from "./map-types.js";
-import type { Tower } from "./tower-types.js";
+import { TOWER_TARGET_MODES, type Tower, type TowerTargetMode } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 import type { TowerPlacement, CommandRejectReason } from "./match-types.js";
-import { BASE_WALL_COST, WALL_COST_GROWTH } from "./game-rules.js";
+import {
+  BASE_TOWER_UPGRADE_COST,
+  BASE_WALL_COST,
+  TOWER_UPGRADE_COST_GROWTH,
+  WALL_COST_GROWTH
+} from "./game-rules.js";
 
 export interface TowerPlacementValidationResult {
   valid: boolean;
@@ -254,6 +259,23 @@ function validateWallPathSafety(
 
 export function getWallCost(existingWallCount: number): number {
   return Math.floor(BASE_WALL_COST * WALL_COST_GROWTH ** existingWallCount);
+}
+
+export function getTowerUpgradeCost(currentTowerLevel: number): number {
+  return Math.floor(BASE_TOWER_UPGRADE_COST * TOWER_UPGRADE_COST_GROWTH ** currentTowerLevel);
+}
+
+export function isValidTowerUpgradeTarget(
+  towerId: string,
+  playerId: string,
+  existingTowers: Tower[]
+): boolean {
+  const tower = existingTowers.find((entry) => entry.id === towerId);
+  return tower ? tower.playerId === playerId : false;
+}
+
+export function isValidTowerTargetMode(mode: string): mode is TowerTargetMode {
+  return (TOWER_TARGET_MODES as readonly string[]).includes(mode);
 }
 
 export function isValidWallPlacement(

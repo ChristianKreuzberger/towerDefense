@@ -5,6 +5,7 @@ import { createMatch } from "./match-simulation.js";
 import {
   MAX_PLAYERS,
   WIN_SCORE,
+  getTowerUpgradeCost,
   getWallCost,
   isValidTowerPlacement,
   isValidWallPlacement,
@@ -36,6 +37,30 @@ function getSecondBuildableCoordinate(
   const cell = map.cells.find((entry) => entry.buildable && (entry.x !== first.x || entry.y !== first.y));
   assert.ok(cell, "expected at least one additional buildable cell");
   return { x: cell.x, y: cell.y };
+}
+
+function createSinglePlayerWaveSimulation(seed: number): ReturnType<typeof createMatch> {
+  const towerCoordinate = getBuildableCoordinate(seed);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed
+  });
+
+  const placeTower = simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+  assert.equal(placeTower.accepted, true);
+
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
+  return simulation;
 }
 
 test("generates deterministic maps for identical seeds", () => {
@@ -103,7 +128,7 @@ test("enforces one tower placement per player", () => {
     y: 3
   });
   assert.equal(second.accepted, false);
-  assert.equal(second.reason, "placement-phase-not-active");
+  assert.equal(second.reason, "tower-already-placed");
 });
 
 test("rejects placement on non-buildable cells", () => {
@@ -180,7 +205,8 @@ test("rejects placements that newly block left-to-right path connectivity", () =
       y: 0,
       health: 100,
       maxHealth: 100,
-      level: 1
+      level: 1,
+      targetMode: "first"
     },
     {
       id: "t-2",
@@ -189,7 +215,8 @@ test("rejects placements that newly block left-to-right path connectivity", () =
       y: 2,
       health: 100,
       maxHealth: 100,
-      level: 1
+      level: 1,
+      targetMode: "first"
     }
   ];
 
@@ -224,7 +251,8 @@ test("allows placements when an alternate path remains", () => {
       y: 0,
       health: 100,
       maxHealth: 100,
-      level: 1
+      level: 1,
+      targetMode: "first"
     }
   ];
 
@@ -258,7 +286,8 @@ test("rejects wall placements that block all paths to a live tower", () => {
       y: 1,
       health: 100,
       maxHealth: 100,
-      level: 1
+      level: 1,
+      targetMode: "first"
     }
   ];
 
@@ -307,6 +336,12 @@ test("places wall in wave phase and deducts wall cost", () => {
   });
   assert.equal(placeTower.accepted, true);
 
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
   const awardedPoints = 40;
   simulation.awardPoints("p1", awardedPoints);
 
@@ -339,6 +374,12 @@ test("rejects wall placement when player has insufficient points", () => {
   });
   assert.equal(placeTower.accepted, true);
 
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
   const placeWall = simulation.applyCommand({
     type: "place-wall",
     playerId: "p1",
@@ -349,7 +390,351 @@ test("rejects wall placement when player has insufficient points", () => {
   assert.equal(placeWall.reason, "insufficient-points");
 });
 
-test("keeps placement phase until every player has placed a tower", () => {
+test("upgrades tower in wave phase and deducts deterministic cost", () => {
+  const towerCoordinate = getBuildableCoordinate(10);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 10
+  });
+
+  const placeTower = simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+  assert.equal(placeTower.accepted, true);
+
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
+  const startingUpgradeCost = getTowerUpgradeCost(1);
+  simulation.awardPoints("p1", startingUpgradeCost);
+
+  const upgrade = simulation.applyCommand({
+    type: "upgrade-tower",
+    playerId: "p1",
+    towerId: "tower-p1"
+  });
+  assert.equal(upgrade.accepted, true);
+
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.towers[0]?.level, 2);
+  assert.equal(snapshot.players[0]?.points, 0);
+});
+
+test("rejects tower upgrade when player has insufficient points", () => {
+  const towerCoordinate = getBuildableCoordinate(11);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 11
+  });
+
+  const placeTower = simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+  assert.equal(placeTower.accepted, true);
+
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
+  const upgrade = simulation.applyCommand({
+    type: "upgrade-tower",
+    playerId: "p1",
+    towerId: "tower-p1"
+  });
+  assert.equal(upgrade.accepted, false);
+  assert.equal(upgrade.reason, "insufficient-points");
+});
+
+test("rejects tower upgrade for invalid target ownership", () => {
+  const firstTower = getBuildableCoordinate(12);
+  const secondTower = getSecondBuildableCoordinate(12, firstTower);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed: 12
+  });
+
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: firstTower.x,
+    y: firstTower.y
+  });
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p2",
+    x: secondTower.x,
+    y: secondTower.y
+  });
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p2"
+  });
+
+  simulation.awardPoints("p2", getTowerUpgradeCost(1));
+  const invalidOwnership = simulation.applyCommand({
+    type: "upgrade-tower",
+    playerId: "p2",
+    towerId: "tower-p1"
+  });
+  assert.equal(invalidOwnership.accepted, false);
+  assert.equal(invalidOwnership.reason, "invalid-upgrade-target");
+
+  const unknownTower = simulation.applyCommand({
+    type: "upgrade-tower",
+    playerId: "p2",
+    towerId: "tower-missing"
+  });
+  assert.equal(unknownTower.accepted, false);
+  assert.equal(unknownTower.reason, "invalid-upgrade-target");
+});
+
+test("updates tower target mode in wave phase", () => {
+  const towerCoordinate = getBuildableCoordinate(13);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 13
+  });
+
+  const placeTower = simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+  assert.equal(placeTower.accepted, true);
+
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
+  const result = simulation.applyCommand({
+    type: "set-target-mode",
+    playerId: "p1",
+    towerId: "tower-p1",
+    mode: "strongest"
+  });
+  assert.equal(result.accepted, true);
+
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.towers[0]?.targetMode, "strongest");
+});
+
+test("marks player ready for wave during placement phase", () => {
+  const towerCoordinate = getBuildableCoordinate(16);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 16
+  });
+
+  const placeTower = simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+  assert.equal(placeTower.accepted, true);
+  assert.equal(simulation.getSnapshot().phase, "placement");
+
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+
+  assert.equal(ready.accepted, true);
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.players[0]?.readyForWave, true);
+  assert.equal(snapshot.allPlayersReadyForWave, true);
+  assert.equal(snapshot.phase, "wave");
+});
+
+test("rejects ready-for-wave for unknown player and duplicate readiness", () => {
+  const firstTower = getBuildableCoordinate(17);
+  const secondTower = getSecondBuildableCoordinate(17, firstTower);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed: 17
+  });
+
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: firstTower.x,
+    y: firstTower.y
+  });
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p2",
+    x: secondTower.x,
+    y: secondTower.y
+  });
+
+  const unknownPlayer = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "missing"
+  });
+  assert.equal(unknownPlayer.accepted, false);
+  assert.equal(unknownPlayer.reason, "unknown-player");
+
+  const firstReady = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(firstReady.accepted, true);
+
+  const duplicateReady = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(duplicateReady.accepted, false);
+  assert.equal(duplicateReady.reason, "player-already-ready-for-wave");
+});
+
+test("rejects ready-for-wave when readiness phase is not active", () => {
+  const towerCoordinate = getBuildableCoordinate(19);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 19
+  });
+
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+
+  const result = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, "ready-phase-not-active");
+});
+
+test("rejects ready-for-wave before player has placed a tower", () => {
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 18
+  });
+
+  const result = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, "tower-not-placed");
+});
+
+test("rejects target mode updates for invalid target ownership", () => {
+  const firstTower = getBuildableCoordinate(14);
+  const secondTower = getSecondBuildableCoordinate(14, firstTower);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed: 14
+  });
+
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: firstTower.x,
+    y: firstTower.y
+  });
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p2",
+    x: secondTower.x,
+    y: secondTower.y
+  });
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p2"
+  });
+
+  const invalidOwnership = simulation.applyCommand({
+    type: "set-target-mode",
+    playerId: "p2",
+    towerId: "tower-p1",
+    mode: "nearest"
+  });
+  assert.equal(invalidOwnership.accepted, false);
+  assert.equal(invalidOwnership.reason, "invalid-target-mode-target");
+
+  const unknownTower = simulation.applyCommand({
+    type: "set-target-mode",
+    playerId: "p2",
+    towerId: "tower-missing",
+    mode: "nearest"
+  });
+  assert.equal(unknownTower.accepted, false);
+  assert.equal(unknownTower.reason, "invalid-target-mode-target");
+});
+
+test("rejects unsupported tower target mode", () => {
+  const towerCoordinate = getBuildableCoordinate(15);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 15
+  });
+
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+
+  const invalidMode = simulation.applyCommand({
+    type: "set-target-mode",
+    playerId: "p1",
+    towerId: "tower-p1",
+    mode: "furthest" as unknown as "first"
+  });
+  assert.equal(invalidMode.accepted, false);
+  assert.equal(invalidMode.reason, "invalid-target-mode");
+});
+
+test("keeps placement phase until every player has placed and readied for wave", () => {
   const map = generateMap(1);
   const buildableCells = map.cells.filter((cell) => cell.buildable);
   assert.ok(buildableCells.length >= 2, "expected at least two buildable cells for the test");
@@ -374,14 +759,148 @@ test("keeps placement phase until every player has placed a tower", () => {
   assert.equal(simulation.getSnapshot().phase, "placement");
 
   simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(simulation.getSnapshot().allPlayersReadyForWave, false);
+  assert.equal(simulation.getSnapshot().phase, "placement");
+
+  simulation.applyCommand({
     type: "place-tower",
     playerId: "p2",
     x: secondCell.x,
     y: secondCell.y
   });
+  assert.equal(simulation.getSnapshot().phase, "placement");
+
+  simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p2"
+  });
   const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.allPlayersReadyForWave, true);
   assert.equal(snapshot.phase, "wave");
   assert.equal(snapshot.towers.length, 2);
+});
+
+test("records wave-start event when readiness transitions into wave", () => {
+  const towerCoordinate = getBuildableCoordinate(20);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 20
+  });
+
+  simulation.applyCommand({
+    type: "place-tower",
+    playerId: "p1",
+    x: towerCoordinate.x,
+    y: towerCoordinate.y
+  });
+
+  const ready = simulation.applyCommand({
+    type: "ready-for-wave",
+    playerId: "p1"
+  });
+  assert.equal(ready.accepted, true);
+
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.phase, "wave");
+  assert.equal(snapshot.wave, 1);
+  assert.equal(snapshot.waveTick, 0);
+  assert.deepEqual(snapshot.events, [{ type: "wave-start", wave: 1, tick: 0 }]);
+});
+
+test("spawns creatures on deterministic wave ticks", () => {
+  const simulation = createSinglePlayerWaveSimulation(21);
+
+  for (let tick = 0; tick < 50 && simulation.getSnapshot().phase === "wave"; tick += 1) {
+    const result = simulation.applyCommand({ type: "advance-wave" });
+    assert.equal(result.accepted, true);
+  }
+
+  const snapshot = simulation.getSnapshot();
+  const spawnEvents = snapshot.events.filter((event) => event.type === "creature-spawned");
+  assert.equal(spawnEvents.length, 3);
+  assert.deepEqual(
+    spawnEvents.map((event) => event.tick),
+    [1, 3, 5]
+  );
+  assert.deepEqual(
+    spawnEvents.map((event) => event.creatureId),
+    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3"]
+  );
+});
+
+test("moves creatures forward by one path index on each wave tick", () => {
+  const simulation = createSinglePlayerWaveSimulation(23);
+
+  simulation.applyCommand({ type: "advance-wave" });
+  let snapshot = simulation.getSnapshot();
+  const firstCreatureAfterTickOne = snapshot.creatures.find((creature) => creature.id === "wave-1-creature-1");
+  const spawnEventTickOne = snapshot.events.find(
+    (event) => event.type === "creature-spawned" && event.creatureId === "wave-1-creature-1" && event.tick === 1
+  );
+  assert.ok(spawnEventTickOne);
+
+  if (!firstCreatureAfterTickOne) {
+    const firstCreatureExitTickOne = snapshot.events.find(
+      (event) => event.type === "creature-exited" && event.creatureId === "wave-1-creature-1" && event.tick === 1
+    );
+    assert.ok(firstCreatureExitTickOne);
+    return;
+  }
+
+  assert.equal(firstCreatureAfterTickOne.spawnTick, 1);
+  assert.ok(firstCreatureAfterTickOne.pathIndex >= 0);
+
+  simulation.applyCommand({ type: "advance-wave" });
+  snapshot = simulation.getSnapshot();
+  const firstCreatureAfterTickTwo = snapshot.creatures.find((creature) => creature.id === "wave-1-creature-1");
+  const firstCreatureExitTickTwo = snapshot.events.find(
+    (event) => event.type === "creature-exited" && event.creatureId === "wave-1-creature-1"
+  );
+
+  if (firstCreatureAfterTickTwo) {
+    assert.equal(firstCreatureAfterTickTwo.pathIndex, 1);
+  } else {
+    assert.ok(firstCreatureExitTickTwo);
+    assert.equal(firstCreatureExitTickTwo.tick, 2);
+  }
+});
+
+test("ends wave only after spawn schedule completes and all creatures exit", () => {
+  const simulation = createSinglePlayerWaveSimulation(24);
+
+  for (let tick = 0; tick < 200 && simulation.getSnapshot().phase === "wave"; tick += 1) {
+    const result = simulation.applyCommand({ type: "advance-wave" });
+    assert.equal(result.accepted, true);
+  }
+
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.phase, "placement");
+  assert.equal(snapshot.wave, 2);
+  assert.equal(snapshot.waveTick, 0);
+  assert.equal(snapshot.players[0]?.readyForWave, false);
+
+  const spawnEvents = snapshot.events.filter((event) => event.type === "creature-spawned");
+  const exitEvents = snapshot.events.filter((event) => event.type === "creature-exited");
+  const waveEndEvent = snapshot.events.find((event) => event.type === "wave-end");
+
+  assert.equal(spawnEvents.length, 3);
+  assert.equal(exitEvents.length, 3);
+  assert.ok(waveEndEvent);
+  assert.ok(waveEndEvent.tick >= 5);
+});
+
+test("rejects advance-wave when wave phase is not active", () => {
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 22
+  });
+
+  const result = simulation.applyCommand({ type: "advance-wave" });
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, "wave-phase-not-active");
 });
 
 test("ends match when a player reaches 1000 points", () => {

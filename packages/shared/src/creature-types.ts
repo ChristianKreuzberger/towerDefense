@@ -6,5 +6,7 @@ export interface Creature {
   hp: number;
   x: number;
   y: number;
+  pathIndex: number;
+  spawnTick: number;
   targetTowerId: string;
 }
