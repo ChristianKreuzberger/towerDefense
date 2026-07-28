@@ -1,0 +1,73 @@
+# Implementation Kickoff Plan
+
+Date: 2026-07-28
+
+This plan starts implementation while preserving the project constraints in [AGENTS.md](AGENTS.md) and the specs in [spec](spec/README.md).
+
+## Step 1: Foundation Scaffold (Start Now)
+
+Goal: establish the monorepo structure and baseline tooling so client/server/simulation work can begin in parallel.
+
+Scope:
+- Create workspace structure from [spec/04-technical-architecture.md](spec/04-technical-architecture.md):
+  - apps/client
+  - apps/server
+  - packages/shared
+  - packages/simulation
+  - packages/transport
+- Initialize root TypeScript workspace settings and package manager workspaces.
+- Add baseline scripts for build, typecheck, lint placeholders, and test placeholders.
+- Add strict TS configs to keep deterministic logic safe.
+- Keep transport adapter local-only for MVP.
+
+Deliverables:
+- Root workspace config files (package manager + TS project refs).
+- Package skeletons for each app/package with minimal entry points.
+- Basic README notes for how to run typecheck/build.
+
+Acceptance checks:
+- Monorepo installs dependencies successfully.
+- Workspace typecheck runs without errors.
+- No online networking runtime enabled.
+
+## Step 2: Deterministic Simulation Contract Slice
+
+Goal: implement the first vertical contract between shared types and simulation core for match bootstrap.
+
+Scope:
+- Define shared domain types/constants for:
+  - Match setup (1 to 8 players, names)
+  - Mandatory one-tower placement phase
+  - Win threshold (1000 points)
+- Implement simulation package interfaces:
+  - createMatch(setup)
+  - applyCommand(command)
+  - getSnapshot()
+- Add local transport adapter interface and local in-memory implementation.
+- Add initial deterministic tests for:
+  - setup validation
+  - fixed rules (no tower-vs-tower attacks represented in model)
+  - win condition threshold constant usage
+
+Deliverables:
+- Shared types and validation schema stubs.
+- Simulation core skeleton with deterministic state transitions.
+- Local transport adapter stub wired to simulation.
+- First passing test suite for contract behavior.
+
+Acceptance checks:
+- Tests pass deterministically on repeated runs.
+- Simulation can create a match and return a stable initial snapshot.
+- Rule constraints from [spec/02-gameplay-rules.md](spec/02-gameplay-rules.md) are encoded in types/contracts.
+
+## Immediate Execution Order
+
+1. Execute Step 1 scaffolding in this session. [Done]
+2. Validate build/typecheck baseline. [Done]
+3. Start Step 2 with shared contracts and deterministic tests. [In progress]
+
+## Non-Goals For This Kickoff
+
+- No online transport implementation.
+- No final UI polish.
+- No balance tuning beyond constants required for contracts.

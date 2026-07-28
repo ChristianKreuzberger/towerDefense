@@ -14,8 +14,8 @@ A multiplayer tower-defense game for the browser, designed for local offline pla
 
 ## Project Status
 
-Planning and specification phase.
-Implementation has not started yet.
+Implementation has started with a monorepo foundation scaffold.
+Current focus: strict TypeScript workspace setup and deterministic simulation contracts.
 
 ## Start Here
 
@@ -43,3 +43,34 @@ Implementation has not started yet.
 1. Update specs before changing behavior.
 2. Keep rule changes consistent across related spec files.
 3. Maintain deterministic simulation rules for future networking compatibility.
+
+## Local Development
+
+Prerequisites:
+- Node.js 20+
+- npm 10+
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run workspace typecheck:
+
+```bash
+npm run typecheck
+```
+
+Run workspace build:
+
+```bash
+npm run build
+```
+
+Workspace layout:
+- `apps/client`
+- `apps/server`
+- `packages/shared`
+- `packages/simulation`
+- `packages/transport`

@@ -1,0 +1,21 @@
+{
+  "name": "tower-defense",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run -ws --if-present build",
+    "typecheck": "npm run -ws --if-present typecheck",
+    "test": "npm run -ws --if-present test",
+    "clean": "npm run -ws --if-present clean",
+    "dev:client": "npm --workspace @tower-defense/client run dev",
+    "dev:server": "npm --workspace @tower-defense/server run dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.6.3"
+  }
+}
