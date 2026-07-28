@@ -66,7 +66,9 @@ Acceptance checks:
 2. Validate build/typecheck baseline. [Done]
 3. Start Step 2 with shared contracts and deterministic tests. [In progress]
 4. Extend Step 2 with deterministic map generation + tower placement validation (buildable cells/overlap). [Done]
-5. Next: add path-safety validation hook for placements and tests for blocked-path rejection. [Next]
+5. Add path-safety validation for placements and tests for blocked-path rejection. [Done]
+6. Add wall placement command contracts + simulation handling with path-safety enforcement. [Done]
+7. Next: add tower upgrade command contracts + simulation economy handling. [Next]
 
 ## Non-Goals For This Kickoff
 

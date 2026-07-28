@@ -9,7 +9,10 @@ import {
   type PlayerState,
   type SimulationCommand,
   type Tower,
+  type Wall,
+  getWallCost,
   isValidTowerPlacement,
+  isValidWallPlacement,
   WIN_SCORE
 } from "@tower-defense/shared";
 
@@ -20,6 +23,7 @@ interface InternalMatchState {
   wave: number;
   map: GameMap;
   towers: Tower[];
+  walls: Wall[];
   creatures: Creature[];
   players: PlayerState[];
   winnerId?: string;
@@ -40,6 +44,7 @@ export class MatchSimulation {
       wave: 1,
       map: generateMap(setup.seed),
       towers: [],
+      walls: [],
       creatures: [],
       players: setup.players.map((player) => ({
         id: player.id,
@@ -99,6 +104,39 @@ export class MatchSimulation {
       return { accepted: true };
     }
 
+    if (command.type === "place-wall") {
+      if (this.state.phase !== "wave") {
+        return { accepted: false, reason: "wall-phase-not-active" };
+      }
+
+      const player = this.state.players.find((entry) => entry.id === command.playerId);
+      if (!player) {
+        return { accepted: false, reason: "unknown-player" };
+      }
+
+      const wallCost = getWallCost(this.state.walls.length);
+      if (player.points < wallCost) {
+        return { accepted: false, reason: "insufficient-points" };
+      }
+
+      const validation = isValidWallPlacement(command, this.state.walls, this.state.towers, this.state.map);
+      if (!validation.valid) {
+        return validation.reason
+          ? { accepted: false, reason: validation.reason }
+          : { accepted: false };
+      }
+
+      player.points -= wallCost;
+      this.state.walls.push({
+        id: `wall-${this.state.walls.length + 1}`,
+        playerId: command.playerId,
+        x: command.x,
+        y: command.y
+      });
+
+      return { accepted: true };
+    }
+
     return { accepted: false, reason: "unsupported-command" };
   }
 
@@ -126,6 +164,7 @@ export class MatchSimulation {
         cells: this.state.map.cells.map((cell) => ({ ...cell }))
       },
       towers: this.state.towers.map((tower) => ({ ...tower })),
+      walls: this.state.walls.map((wall) => ({ ...wall })),
       creatures: this.state.creatures.map((creature) => ({ ...creature })),
       players: this.state.players.map((player) => ({ ...player })),
       ...(this.state.winnerId ? { winnerId: this.state.winnerId } : {})

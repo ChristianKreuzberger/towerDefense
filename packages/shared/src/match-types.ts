@@ -1,6 +1,7 @@
 import type { Creature } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
 import type { Tower } from "./tower-types.js";
+import type { Wall } from "./wall-types.js";
 
 export interface PlayerSetup {
   id: string;
@@ -33,6 +34,7 @@ export interface MatchSnapshot {
   wave: number;
   map: GameMap;
   towers: Tower[];
+  walls: Wall[];
   creatures: Creature[];
   players: PlayerState[];
   winnerId?: string;
@@ -43,10 +45,13 @@ export type CommandRejectReason =
   | "placement-phase-not-active"
   | "unknown-player"
   | "tower-already-placed"
+  | "wall-phase-not-active"
   | "out-of-bounds"
   | "cell-not-buildable"
   | "tower-overlap"
+  | "wall-overlap"
   | "path-blocked"
+  | "insufficient-points"
   | "unsupported-command";
 
 export interface CommandResult {
@@ -57,6 +62,12 @@ export interface CommandResult {
 export type SimulationCommand =
   | {
       type: "place-tower";
+      playerId: string;
+      x: number;
+      y: number;
+    }
+  | {
+      type: "place-wall";
       playerId: string;
       x: number;
       y: number;
