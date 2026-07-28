@@ -65,6 +65,8 @@ Acceptance checks:
 1. Execute Step 1 scaffolding in this session. [Done]
 2. Validate build/typecheck baseline. [Done]
 3. Start Step 2 with shared contracts and deterministic tests. [In progress]
+4. Extend Step 2 with deterministic map generation + tower placement validation (buildable cells/overlap). [Done]
+5. Next: add path-safety validation hook for placements and tests for blocked-path rejection. [Next]
 
 ## Non-Goals For This Kickoff
 

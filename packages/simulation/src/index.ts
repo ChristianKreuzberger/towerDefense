@@ -1,6 +1,7 @@
 import { PROJECT_NAME } from "@tower-defense/shared";
 
 export * from "./match-simulation.js";
+export * from "./procedural-map.js";
 
 export interface SimulationBootstrap {
   hostMode: "local";
