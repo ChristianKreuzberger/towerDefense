@@ -1,0 +1,33 @@
+Tower Defense Balance Report
+schemaVersion=1
+matchSeed=777
+snapshots=2
+
+=== Wave 1 (export=1, tick=6) ===
+DPS proxy: 0.50 dmg/tick (dealt=3, ticks=6)
+Kills by archetype: runner=0 swarm=1 armored=0 tank=0 (defeated=1, spawned=3, exited=2)
+Damage intake: towers=3 walls=0
+Repairs: towers=3 walls=0
+Economy delta: awarded=8 spentWalls=0 spentUpgrades=0 net=8
+Players:
+- p1 (Alpha) status=active delta=8 total=8 ending=8 towerLv=1 towerHp=100 walls=0 wallHp=0
+
+=== Wave 2 (export=2, tick=8) ===
+DPS proxy: 0.50 dmg/tick (dealt=4, ticks=8)
+Kills by archetype: runner=0 swarm=1 armored=0 tank=0 (defeated=1, spawned=4, exited=3)
+Damage intake: towers=6 walls=0
+Repairs: towers=6 walls=0
+Economy delta: awarded=8 spentWalls=0 spentUpgrades=0 net=8
+Players:
+- p1 (Alpha) status=active delta=8 total=16 ending=16 towerLv=1 towerHp=100 walls=0 wallHp=0
+
+=== Cumulative Summary ===
+Waves completed: 2
+DPS proxy: 0.50 dmg/tick (dealt=7, ticks=14)
+Kills by archetype: runner=0 swarm=2 armored=0 tank=0
+Damage intake totals: towers=9 walls=0
+Repairs totals: towers=9 walls=0
+Economy totals: awarded=16 spentWalls=0 spentUpgrades=0 net=16 ending=16
+Structures: livingTowers=1 livingWalls=0 towerHp=100 wallHp=0 pathWearTotal=0
+Players (final):
+- p1 (Alpha) status=active delta=8 total=16 ending=16 towerLv=1 towerHp=100 walls=0 wallHp=0

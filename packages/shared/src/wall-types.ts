@@ -3,4 +3,6 @@ export interface Wall {
   playerId: string;
   x: number;
   y: number;
+  health: number;
+  maxHealth: number;
 }

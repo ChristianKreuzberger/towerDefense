@@ -1,0 +1,842 @@
+{
+  "baseline": {
+    "scenarios": [
+      {
+        "scenarioId": "scenario-b",
+        "envelope": {
+          "balanceAnalysisExports": [
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 2,
+              "wave": 2,
+              "tick": 12,
+              "waveTelemetry": {
+                "wave": 2,
+                "tick": 12,
+                "movementProgressUnits": 240,
+                "movementSteps": 6,
+                "creaturesSpawned": 4,
+                "creaturesDefeated": 3,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 0
+                },
+                "towerDamageDealt": 30,
+                "towerDamageIntake": 8,
+                "wallDamageIntake": 5,
+                "towerRepairApplied": 2,
+                "wallRepairApplied": 3
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 2,
+                "movementProgressUnits": 410,
+                "movementSteps": 10,
+                "creaturesSpawned": 7,
+                "creaturesDefeated": 5,
+                "creaturesExited": 2,
+                "killsByArchetype": {
+                  "runner": 2,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 1
+                },
+                "towerDamageDealt": 55,
+                "towerDamageIntake": 12,
+                "wallDamageIntake": 9,
+                "towerRepairApplied": 3,
+                "wallRepairApplied": 4
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": true,
+                  "awardedPointsThisWave": 4,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 11,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 5,
+                  "endingPoints": 5,
+                  "towerLevel": 1,
+                  "towerHealth": 0,
+                  "wallCount": 0,
+                  "wallHealthTotal": 0
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 8,
+                  "spentOnWallsThisWave": 2,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 5,
+                  "awardedPointsTotal": 20,
+                  "spentOnWallsTotal": 6,
+                  "spentOnUpgradesTotal": 3,
+                  "netPointsTotal": 11,
+                  "endingPoints": 11,
+                  "towerLevel": 2,
+                  "towerHealth": 88,
+                  "wallCount": 1,
+                  "wallHealthTotal": 13
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 12,
+                "spentOnWallsThisWave": 3,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 8,
+                "awardedPointsTotal": 31,
+                "spentOnWallsTotal": 10,
+                "spentOnUpgradesTotal": 5,
+                "netPointsTotal": 16,
+                "endingPoints": 16,
+                "livingTowers": 1,
+                "livingWalls": 1,
+                "totalTowerHealth": 88,
+                "totalWallHealth": 13,
+                "mapPathWearTotal": 6
+              }
+            },
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 1,
+              "wave": 1,
+              "tick": 10,
+              "waveTelemetry": {
+                "wave": 1,
+                "tick": 10,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 1,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 3,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 2,
+                  "awardedPointsTotal": 7,
+                  "spentOnWallsTotal": 3,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 2,
+                  "endingPoints": 2,
+                  "towerLevel": 1,
+                  "towerHealth": 71,
+                  "wallCount": 1,
+                  "wallHealthTotal": 10
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 5,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 12,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 6,
+                  "endingPoints": 6,
+                  "towerLevel": 1,
+                  "towerHealth": 94,
+                  "wallCount": 1,
+                  "wallHealthTotal": 12
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 8,
+                "spentOnWallsThisWave": 2,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 5,
+                "awardedPointsTotal": 19,
+                "spentOnWallsTotal": 7,
+                "spentOnUpgradesTotal": 4,
+                "netPointsTotal": 8,
+                "endingPoints": 8,
+                "livingTowers": 2,
+                "livingWalls": 2,
+                "totalTowerHealth": 165,
+                "totalWallHealth": 22,
+                "mapPathWearTotal": 4
+              }
+            }
+          ]
+        },
+        "reportText": "Tower Defense Balance Report\nschemaVersion=1\nmatchSeed=777\n"
+      },
+      {
+        "scenarioId": "scenario-a",
+        "envelope": {
+          "balanceAnalysisExports": [
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 2,
+              "wave": 2,
+              "tick": 12,
+              "waveTelemetry": {
+                "wave": 2,
+                "tick": 12,
+                "movementProgressUnits": 240,
+                "movementSteps": 6,
+                "creaturesSpawned": 4,
+                "creaturesDefeated": 3,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 0
+                },
+                "towerDamageDealt": 30,
+                "towerDamageIntake": 8,
+                "wallDamageIntake": 5,
+                "towerRepairApplied": 2,
+                "wallRepairApplied": 3
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 2,
+                "movementProgressUnits": 410,
+                "movementSteps": 10,
+                "creaturesSpawned": 7,
+                "creaturesDefeated": 5,
+                "creaturesExited": 2,
+                "killsByArchetype": {
+                  "runner": 2,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 1
+                },
+                "towerDamageDealt": 55,
+                "towerDamageIntake": 12,
+                "wallDamageIntake": 9,
+                "towerRepairApplied": 3,
+                "wallRepairApplied": 4
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": true,
+                  "awardedPointsThisWave": 4,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 11,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 5,
+                  "endingPoints": 5,
+                  "towerLevel": 1,
+                  "towerHealth": 0,
+                  "wallCount": 0,
+                  "wallHealthTotal": 0
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 8,
+                  "spentOnWallsThisWave": 2,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 5,
+                  "awardedPointsTotal": 20,
+                  "spentOnWallsTotal": 6,
+                  "spentOnUpgradesTotal": 3,
+                  "netPointsTotal": 11,
+                  "endingPoints": 11,
+                  "towerLevel": 2,
+                  "towerHealth": 88,
+                  "wallCount": 1,
+                  "wallHealthTotal": 13
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 12,
+                "spentOnWallsThisWave": 3,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 8,
+                "awardedPointsTotal": 31,
+                "spentOnWallsTotal": 10,
+                "spentOnUpgradesTotal": 5,
+                "netPointsTotal": 16,
+                "endingPoints": 16,
+                "livingTowers": 1,
+                "livingWalls": 1,
+                "totalTowerHealth": 88,
+                "totalWallHealth": 13,
+                "mapPathWearTotal": 6
+              }
+            },
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 1,
+              "wave": 1,
+              "tick": 10,
+              "waveTelemetry": {
+                "wave": 1,
+                "tick": 10,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 1,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 3,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 2,
+                  "awardedPointsTotal": 7,
+                  "spentOnWallsTotal": 3,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 2,
+                  "endingPoints": 2,
+                  "towerLevel": 1,
+                  "towerHealth": 71,
+                  "wallCount": 1,
+                  "wallHealthTotal": 10
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 5,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 12,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 6,
+                  "endingPoints": 6,
+                  "towerLevel": 1,
+                  "towerHealth": 94,
+                  "wallCount": 1,
+                  "wallHealthTotal": 12
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 8,
+                "spentOnWallsThisWave": 2,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 5,
+                "awardedPointsTotal": 19,
+                "spentOnWallsTotal": 7,
+                "spentOnUpgradesTotal": 4,
+                "netPointsTotal": 8,
+                "endingPoints": 8,
+                "livingTowers": 2,
+                "livingWalls": 2,
+                "totalTowerHealth": 165,
+                "totalWallHealth": 22,
+                "mapPathWearTotal": 4
+              }
+            }
+          ]
+        },
+        "reportText": "Tower Defense Balance Report\nschemaVersion=1\nmatchSeed=777\n"
+      }
+    ]
+  },
+  "candidate": {
+    "scenarios": [
+      {
+        "scenarioId": "scenario-a",
+        "envelope": {
+          "balanceAnalysisExports": [
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 2,
+              "wave": 2,
+              "tick": 12,
+              "waveTelemetry": {
+                "wave": 2,
+                "tick": 12,
+                "movementProgressUnits": 240,
+                "movementSteps": 6,
+                "creaturesSpawned": 4,
+                "creaturesDefeated": 3,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 0
+                },
+                "towerDamageDealt": 30,
+                "towerDamageIntake": 8,
+                "wallDamageIntake": 5,
+                "towerRepairApplied": 2,
+                "wallRepairApplied": 3
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 2,
+                "movementProgressUnits": 410,
+                "movementSteps": 10,
+                "creaturesSpawned": 7,
+                "creaturesDefeated": 5,
+                "creaturesExited": 2,
+                "killsByArchetype": {
+                  "runner": 2,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 1
+                },
+                "towerDamageDealt": 55,
+                "towerDamageIntake": 12,
+                "wallDamageIntake": 9,
+                "towerRepairApplied": 3,
+                "wallRepairApplied": 4
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": true,
+                  "awardedPointsThisWave": 4,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 11,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 5,
+                  "endingPoints": 5,
+                  "towerLevel": 1,
+                  "towerHealth": 0,
+                  "wallCount": 0,
+                  "wallHealthTotal": 0
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 8,
+                  "spentOnWallsThisWave": 2,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 5,
+                  "awardedPointsTotal": 20,
+                  "spentOnWallsTotal": 6,
+                  "spentOnUpgradesTotal": 3,
+                  "netPointsTotal": 11,
+                  "endingPoints": 11,
+                  "towerLevel": 2,
+                  "towerHealth": 88,
+                  "wallCount": 1,
+                  "wallHealthTotal": 13
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 12,
+                "spentOnWallsThisWave": 3,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 8,
+                "awardedPointsTotal": 31,
+                "spentOnWallsTotal": 10,
+                "spentOnUpgradesTotal": 5,
+                "netPointsTotal": 16,
+                "endingPoints": 16,
+                "livingTowers": 1,
+                "livingWalls": 1,
+                "totalTowerHealth": 88,
+                "totalWallHealth": 13,
+                "mapPathWearTotal": 6
+              }
+            },
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 1,
+              "wave": 1,
+              "tick": 10,
+              "waveTelemetry": {
+                "wave": 1,
+                "tick": 10,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 1,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 3,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 2,
+                  "awardedPointsTotal": 7,
+                  "spentOnWallsTotal": 3,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 2,
+                  "endingPoints": 2,
+                  "towerLevel": 1,
+                  "towerHealth": 71,
+                  "wallCount": 1,
+                  "wallHealthTotal": 10
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 5,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 12,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 6,
+                  "endingPoints": 6,
+                  "towerLevel": 1,
+                  "towerHealth": 94,
+                  "wallCount": 1,
+                  "wallHealthTotal": 12
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 8,
+                "spentOnWallsThisWave": 2,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 5,
+                "awardedPointsTotal": 19,
+                "spentOnWallsTotal": 7,
+                "spentOnUpgradesTotal": 4,
+                "netPointsTotal": 8,
+                "endingPoints": 8,
+                "livingTowers": 2,
+                "livingWalls": 2,
+                "totalTowerHealth": 165,
+                "totalWallHealth": 22,
+                "mapPathWearTotal": 4
+              }
+            }
+          ]
+        },
+        "reportText": "Tower Defense Balance Report\nschemaVersion=1\nmatchSeed=777\n"
+      },
+      {
+        "scenarioId": "scenario-b",
+        "envelope": {
+          "balanceAnalysisExports": [
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 2,
+              "wave": 2,
+              "tick": 12,
+              "waveTelemetry": {
+                "wave": 2,
+                "tick": 12,
+                "movementProgressUnits": 240,
+                "movementSteps": 6,
+                "creaturesSpawned": 4,
+                "creaturesDefeated": 3,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 0
+                },
+                "towerDamageDealt": 30,
+                "towerDamageIntake": 8,
+                "wallDamageIntake": 5,
+                "towerRepairApplied": 2,
+                "wallRepairApplied": 3
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 2,
+                "movementProgressUnits": 410,
+                "movementSteps": 10,
+                "creaturesSpawned": 7,
+                "creaturesDefeated": 5,
+                "creaturesExited": 2,
+                "killsByArchetype": {
+                  "runner": 2,
+                  "swarm": 1,
+                  "armored": 1,
+                  "tank": 1
+                },
+                "towerDamageDealt": 55,
+                "towerDamageIntake": 12,
+                "wallDamageIntake": 9,
+                "towerRepairApplied": 3,
+                "wallRepairApplied": 4
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": true,
+                  "awardedPointsThisWave": 4,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 11,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 5,
+                  "endingPoints": 5,
+                  "towerLevel": 1,
+                  "towerHealth": 0,
+                  "wallCount": 0,
+                  "wallHealthTotal": 0
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 8,
+                  "spentOnWallsThisWave": 2,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 5,
+                  "awardedPointsTotal": 20,
+                  "spentOnWallsTotal": 6,
+                  "spentOnUpgradesTotal": 3,
+                  "netPointsTotal": 11,
+                  "endingPoints": 11,
+                  "towerLevel": 2,
+                  "towerHealth": 88,
+                  "wallCount": 1,
+                  "wallHealthTotal": 13
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 12,
+                "spentOnWallsThisWave": 3,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 8,
+                "awardedPointsTotal": 31,
+                "spentOnWallsTotal": 10,
+                "spentOnUpgradesTotal": 5,
+                "netPointsTotal": 16,
+                "endingPoints": 16,
+                "livingTowers": 1,
+                "livingWalls": 1,
+                "totalTowerHealth": 88,
+                "totalWallHealth": 13,
+                "mapPathWearTotal": 6
+              }
+            },
+            {
+              "schemaVersion": 1,
+              "matchSeed": 777,
+              "exportOrdinal": 1,
+              "wave": 1,
+              "tick": 10,
+              "waveTelemetry": {
+                "wave": 1,
+                "tick": 10,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "cumulativeTelemetry": {
+                "completedWaveCount": 1,
+                "movementProgressUnits": 170,
+                "movementSteps": 4,
+                "creaturesSpawned": 3,
+                "creaturesDefeated": 2,
+                "creaturesExited": 1,
+                "killsByArchetype": {
+                  "runner": 1,
+                  "swarm": 0,
+                  "armored": 0,
+                  "tank": 1
+                },
+                "towerDamageDealt": 25,
+                "towerDamageIntake": 4,
+                "wallDamageIntake": 4,
+                "towerRepairApplied": 1,
+                "wallRepairApplied": 1
+              },
+              "players": [
+                {
+                  "playerId": "p2",
+                  "playerName": "Beta",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 3,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 0,
+                  "netPointsDeltaThisWave": 2,
+                  "awardedPointsTotal": 7,
+                  "spentOnWallsTotal": 3,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 2,
+                  "endingPoints": 2,
+                  "towerLevel": 1,
+                  "towerHealth": 71,
+                  "wallCount": 1,
+                  "wallHealthTotal": 10
+                },
+                {
+                  "playerId": "p1",
+                  "playerName": "Alpha",
+                  "eliminated": false,
+                  "awardedPointsThisWave": 5,
+                  "spentOnWallsThisWave": 1,
+                  "spentOnUpgradesThisWave": 1,
+                  "netPointsDeltaThisWave": 3,
+                  "awardedPointsTotal": 12,
+                  "spentOnWallsTotal": 4,
+                  "spentOnUpgradesTotal": 2,
+                  "netPointsTotal": 6,
+                  "endingPoints": 6,
+                  "towerLevel": 1,
+                  "towerHealth": 94,
+                  "wallCount": 1,
+                  "wallHealthTotal": 12
+                }
+              ],
+              "totals": {
+                "awardedPointsThisWave": 8,
+                "spentOnWallsThisWave": 2,
+                "spentOnUpgradesThisWave": 1,
+                "netPointsDeltaThisWave": 5,
+                "awardedPointsTotal": 19,
+                "spentOnWallsTotal": 7,
+                "spentOnUpgradesTotal": 4,
+                "netPointsTotal": 8,
+                "endingPoints": 8,
+                "livingTowers": 2,
+                "livingWalls": 2,
+                "totalTowerHealth": 165,
+                "totalWallHealth": 22,
+                "mapPathWearTotal": 4
+              }
+            }
+          ]
+        },
+        "reportText": "Tower Defense Balance Report\nschemaVersion=1\nmatchSeed=777\n"
+      }
+    ]
+  }
+}

@@ -12,7 +12,15 @@
     "test": "npm run -ws --if-present test",
     "clean": "npm run -ws --if-present clean",
     "dev:client": "npm --workspace @tower-defense/client run dev",
-    "dev:server": "npm --workspace @tower-defense/server run dev"
+    "dev:server": "npm --workspace @tower-defense/server run dev",
+    "dev:game": "npm run build && npm run dev:server",
+    "baseline:balance:capture": "npm --workspace @tower-defense/simulation run report:baseline:capture",
+    "baseline:balance:report": "npm --workspace @tower-defense/simulation run report:baseline:capture -- --stdout",
+    "baseline:balance:diff": "npm --workspace @tower-defense/simulation run report:baseline:diff",
+    "baseline:balance:diff:stdout": "npm --workspace @tower-defense/simulation run report:baseline:diff:stdout",
+    "baseline:balance:diff:ci": "npm --workspace @tower-defense/simulation run report:baseline:diff:ci",
+    "baseline:balance:verify:ci": "npm run build && npm run baseline:balance:diff:ci",
+    "baseline:balance:refresh:guard": "./scripts/baseline-balance-refresh-guard.sh"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

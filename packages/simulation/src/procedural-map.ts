@@ -24,7 +24,7 @@ export function generateMap(
     for (let x = 0; x < width; x += 1) {
       const hash = hashCoordinates(seed, x, y);
       const normalized = hash / 0xffffffff;
-      cells.push({ x, y, buildable: normalized < BUILDABLE_CELL_THRESHOLD });
+      cells.push({ x, y, buildable: normalized < BUILDABLE_CELL_THRESHOLD, pathWear: 0 });
     }
   }
 

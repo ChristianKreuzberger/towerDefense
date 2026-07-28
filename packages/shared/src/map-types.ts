@@ -2,6 +2,7 @@ export interface MapCell {
   x: number;
   y: number;
   buildable: boolean;
+  pathWear: number;
 }
 
 export interface GameMap {
