@@ -224,6 +224,7 @@ app.innerHTML = `
       <div id="matchEndSummary" class="small"></div>
       <div id="matchEndScores" class="match-end-grid"></div>
       <div class="stack">
+        <button id="rematchBtn" class="primary">Rematch</button>
         <button id="restartBtn" class="primary">Return To Menu</button>
         <button id="closeOverlayBtn">Close</button>
       </div>
@@ -262,6 +263,7 @@ const el = {
   overlay: must<HTMLElement>("matchEndOverlay"),
   overlaySummary: must<HTMLElement>("matchEndSummary"),
   overlayScores: must<HTMLElement>("matchEndScores"),
+  rematchBtn: must<HTMLButtonElement>("rematchBtn"),
   guideOverlay: must<HTMLElement>("guideOverlay"),
   guideCard: must<HTMLElement>("guideCard"),
   guideTitle: must<HTMLElement>("guideTitle"),
@@ -963,6 +965,36 @@ async function startMatchFromMenu(): Promise<void> {
   }
 }
 
+async function rematchWithSamePlayers(): Promise<void> {
+  if (!current) {
+    return;
+  }
+
+  const players = current.players.map((player) => ({ id: player.id, name: player.name }));
+  const payload: MatchSetup = {
+    seed: current.map.seed + 1,
+    players
+  };
+
+  closeOverlay();
+  try {
+    const data = await postJson<ApiStartPayload>("/api/start", payload);
+    if (!data.snapshot) {
+      setStatus("rematch failed: missing snapshot");
+      addFeedback("error", "Rematch failed: missing snapshot");
+      return;
+    }
+
+    setStatus(`rematch-started: seed=${payload.seed}`);
+    addFeedback("info", `Rematch started with seed ${payload.seed}`);
+    applySnapshot(data.snapshot);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to start rematch";
+    setStatus(`error: ${message}`);
+    addFeedback("error", "Rematch failed", undefined, message);
+  }
+}
+
 function selectedPlayerId(): string {
   const value = String(el.playerId.value || "").trim();
   if (!value) {
@@ -1133,6 +1165,9 @@ el.playerId.addEventListener("change", () => {
 });
 
 must<HTMLButtonElement>("closeOverlayBtn").addEventListener("click", closeOverlay);
+el.rematchBtn.addEventListener("click", () => {
+  void rematchWithSamePlayers();
+});
 
 must<HTMLButtonElement>("placeTowerBtn").addEventListener("click", () => {
   const playerId = selectedPlayerId();

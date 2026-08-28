@@ -49,4 +49,44 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
   await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveClass(/repair-pulse/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveAttribute("role", "progressbar");
+
+  const endedSnapshot = JSON.parse(await page.locator("#snapshot").inputValue()) as Record<string, unknown>;
+  endedSnapshot.phase = "ended";
+  endedSnapshot.winnerId = "p1";
+  endedSnapshot.endReason = "score-win";
+  endedSnapshot.players = (endedSnapshot.players as Array<Record<string, unknown>>).map((player) => ({
+    ...player,
+    points: player.id === "p1" ? 1000 : 0
+  }));
+  await page.route("**/api/snapshot", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, snapshot: endedSnapshot })
+    });
+  }, { times: 1 });
+  if (await guideClose.isVisible()) {
+    await guideClose.click();
+  }
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#matchEndOverlay")).toBeVisible();
+  await expect(page.locator("#matchEndSummary")).toContainText("Alpha (p1) secured the win");
+
+  const rematchRequest = page.waitForRequest((request) =>
+    request.url().endsWith("/api/start") && request.method() === "POST"
+  );
+  await page.getByRole("button", { name: "Rematch" }).click();
+  const rematchPayload = JSON.parse((await rematchRequest).postData() ?? "{}") as {
+    seed: number;
+    players: Array<{ id: string; name: string }>;
+  };
+  expect(rematchPayload.seed).toBe(778);
+  expect(rematchPayload.players).toEqual([
+    { id: "p1", name: "Alpha" },
+    { id: "p2", name: "Bravo" }
+  ]);
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+  await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
+  await expect(page.locator("#snapshot")).toHaveValue(/"wave": 1/);
+  await expect(page.locator("#snapshot")).toHaveValue(/"points": 0/);
 });
