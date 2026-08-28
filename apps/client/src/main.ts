@@ -688,8 +688,7 @@ function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
   }
 }
 
-function cellClassFromSnapshot(snapshot: MatchSnapshot, x: number, y: number): string[] {
-  const cell = snapshot.map.cells.find((entry) => entry.x === x && entry.y === y);
+function cellClassFromCell(cell: MatchSnapshot["map"]["cells"][number] | undefined, x: number, y: number): string[] {
   const classes = ["grid-cell"];
 
   if (!cell) {
@@ -728,6 +727,11 @@ function renderBoard(snapshot: MatchSnapshot | null): void {
   const width = snapshot.map.width;
   const height = snapshot.map.height;
 
+  const cellsByKey = new Map<string, MatchSnapshot["map"]["cells"][number]>();
+  for (const cell of snapshot.map.cells) {
+    cellsByKey.set(`${cell.x},${cell.y}`, cell);
+  }
+
   const wallsByCell = new Map<string, string>();
   const towersByCell = new Map<string, { playerId: string; level: number }>();
   const creaturesByCell = new Map<string, CreatureArchetype[]>();
@@ -754,7 +758,7 @@ function renderBoard(snapshot: MatchSnapshot | null): void {
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const key = `${x},${y}`;
-      const classes = cellClassFromSnapshot(snapshot, x, y).join(" ");
+      const classes = cellClassFromCell(cellsByKey.get(key), x, y).join(" ");
       const tower = towersByCell.get(key);
       const wall = wallsByCell.get(key);
       const creatures = creaturesByCell.get(key) ?? [];
