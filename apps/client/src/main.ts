@@ -763,26 +763,26 @@ function renderBoard(snapshot: MatchSnapshot | null): void {
       const markers: string[] = [];
 
       if (wall) {
-        markers.push(`<span class=\"marker wall-marker ${towerColorClass(wall)}\">W</span>`);
+        markers.push(`<span class="marker wall-marker ${towerColorClass(wall)}">W</span>`);
       }
 
       if (tower) {
         markers.push(
-          `<span class=\"marker tower-marker ${towerColorClass(tower.playerId)} level-${Math.min(3, tower.level)}\">T${tower.level}</span>`
+          `<span class="marker tower-marker ${towerColorClass(tower.playerId)} level-${Math.min(3, tower.level)}">T${tower.level}</span>`
         );
       }
 
       if (creatures.length > 0) {
         const archetype = creatures[0] ?? "runner";
-        const extra = creatures.length > 1 ? `<span class=\"stack-count\">+${creatures.length - 1}</span>` : "";
-        markers.push(`<span class=\"marker creature-marker\">${CREATURE_GLYPH[archetype]}${extra}</span>`);
+        const extra = creatures.length > 1 ? `<span class="stack-count">+${creatures.length - 1}</span>` : "";
+        markers.push(`<span class="marker creature-marker">${CREATURE_GLYPH[archetype]}${extra}</span>`);
       }
 
-      cells.push(`<div class=\"${classes}\" data-x=\"${x}\" data-y=\"${y}\">${markers.join("")}</div>`);
+      cells.push(`<div class="${classes}" data-x="${x}" data-y="${y}">${markers.join("")}</div>`);
     }
   }
 
-  el.board.innerHTML = `<div class=\"game-grid\" style=\"--grid-width:${width};\">${cells.join("")}</div>`;
+  el.board.innerHTML = `<div class="game-grid" style="--grid-width:${width};">${cells.join("")}</div>`;
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
   el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active`;
 }
@@ -870,7 +870,7 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
   }
 
   let label = "PLACEMENT PHASE";
-  let sub = phaseSubText(snapshot);
+  const sub = phaseSubText(snapshot);
   el.phaseBanner.className = "phase-banner";
 
   if (snapshot.phase === "wave") {

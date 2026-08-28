@@ -9,6 +9,7 @@
   "scripts": {
     "build": "npm run -ws --if-present build",
     "typecheck": "npm run -ws --if-present typecheck",
+    "lint": "eslint .",
     "test": "npm run -ws --if-present test",
     "test:perf": "npm --workspace @tower-defense/simulation run test:perf",
     "test:e2e": "playwright test",
@@ -26,8 +27,11 @@
     "baseline:balance:refresh:guard": "./scripts/baseline-balance-refresh-guard.sh"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.1",
-    "typescript": "^5.6.3"
+    "eslint": "^9.39.5",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.68.0"
   }
 }

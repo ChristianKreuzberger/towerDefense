@@ -318,43 +318,6 @@ function advanceCurrentWaveUntilComplete(
   }
 }
 
-function advanceUntilWaveComplete(
-  simulation: ReturnType<typeof createMatch>,
-  expectedCompletedWaves: number,
-  maxAdvanceSteps: number,
-  scenarioId: string
-): void {
-  let advanceSteps = 0;
-  while (simulation.getSnapshot().telemetry.completedWaves.length < expectedCompletedWaves) {
-    const snapshot = simulation.getSnapshot();
-
-    if (snapshot.phase === "ended") {
-      throw new Error(`scenario ${scenarioId} ended early before reaching ${expectedCompletedWaves} waves`);
-    }
-
-    if (snapshot.phase === "placement") {
-      for (const player of snapshot.players) {
-        if (player.eliminated || !player.hasPlacedTower || player.readyForWave) {
-          continue;
-        }
-
-        applyCommandOrThrow(
-          simulation,
-          { type: "ready-for-wave", playerId: player.id },
-          `${scenarioId}:auto-ready`
-        );
-      }
-      continue;
-    }
-
-    applyCommandOrThrow(simulation, { type: "advance-wave" }, `${scenarioId}:advance-wave`);
-    advanceSteps += 1;
-    if (advanceSteps > maxAdvanceSteps) {
-      throw new Error(`scenario ${scenarioId} exceeded max advance steps (${maxAdvanceSteps})`);
-    }
-  }
-}
-
 function runScenario(scenario: BaselineScenario, outputDir: string): ScenarioResult {
   const simulation = createMatch({
     players: scenario.players,

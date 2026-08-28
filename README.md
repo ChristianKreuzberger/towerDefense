@@ -62,6 +62,12 @@ Run workspace typecheck:
 npm run typecheck
 ```
 
+Run the repository lint check:
+
+```bash
+npm run lint
+```
+
 Run workspace build:
 
 ```bash
