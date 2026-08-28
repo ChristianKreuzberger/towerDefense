@@ -181,6 +181,24 @@ h3 {
   font-size: 11px;
 }
 
+.tower-hp-bar {
+  height: 6px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #4c8d35, #2a6b46);
+  transition: width 150ms ease;
+}
+
+.tower-hp-bar.repair-pulse {
+  animation: hp-refill 600ms ease-out;
+}
+
+@keyframes hp-refill {
+  0% { box-shadow: inset 0 0 0 2px rgba(255, 241, 118, 0.6); }
+  50% { box-shadow: inset 0 0 0 2px rgba(255, 241, 118, 0.8); }
+  100% { box-shadow: inset 0 0 0 2px rgba(255, 241, 118, 0); }
+}
+
 .player-chip.p1 { border-color: var(--p1); }
 .player-chip.p2 { border-color: var(--p2); }
 .player-chip.p3 { border-color: var(--p3); }

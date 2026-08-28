@@ -565,6 +565,7 @@ function applySnapshot(snapshot: MatchSnapshot): void {
   syncCursorToBuildableCell(current);
   renderBoard(current);
   renderPlayerCards(current);
+  pulseRepairedTowers(newEvents);
   renderPhase(current);
   renderEndOverlay(current);
   renderSnapshot(current);
@@ -591,6 +592,17 @@ function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["ev
     if (event.type === "path-repaired") {
       addFeedback("info", `Path wear repaired on ${event.repairs.length} cell${event.repairs.length === 1 ? "" : "s"}`);
     }
+  }
+}
+
+function pulseRepairedTowers(events: MatchSnapshot["events"]): void {
+  for (const event of events) {
+    if (event.type !== "tower-repaired") {
+      continue;
+    }
+
+    const towerBar = document.querySelector(`[data-tower-id="${event.towerId}"] .tower-hp-bar`);
+    towerBar?.classList.add("repair-pulse");
   }
 }
 
@@ -799,9 +811,12 @@ function renderPlayerCards(snapshot: MatchSnapshot | null): void {
     }
 
     cards.push(
-      `<div class="player-chip ${status} ${colorClass}">` +
+      `<div class="player-chip ${status} ${colorClass}"${tower ? ` data-tower-id="${tower.id}"` : ""}>` +
       `<div class="player-chip-name">${player.name}</div>` +
       `<div class="player-chip-meta">${player.points} pts | ${towerStatus} | ${label}</div>` +
+      (tower
+        ? `<div class="tower-hp-bar" role="progressbar" aria-label="${player.name} tower health" aria-valuemin="0" aria-valuemax="${tower.maxHealth}" aria-valuenow="${tower.health}" style="width: ${(tower.health / tower.maxHealth) * 100}%"></div>`
+        : "") +
       "</div>"
     );
   }

@@ -47,4 +47,6 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
   await expect(page.locator("#phaseSub")).toContainText("Round 1 complete");
   await expect(page.locator("#feedbackQueue")).toContainText("Alpha tower repaired +2 HP (100/100)");
   await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveClass(/repair-pulse/);
+  await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveAttribute("role", "progressbar");
 });
