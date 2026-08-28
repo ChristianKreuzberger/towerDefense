@@ -94,6 +94,8 @@ npm run test:perf
 
 The check measures `advance-wave` tick timings across three waves, reports the 16 ms target, and uses a 100 ms regression ceiling for machine-independent CI validation.
 
+Pull requests and pushes to `main` run the typecheck, unit tests, performance check, production build, browser smoke tests, and deterministic balance drift check in CI.
+
 Quick play loop in browser:
 1. Enter player names and click Start Match.
 2. Pick a player and place each tower on buildable cells shown as . in the board.
