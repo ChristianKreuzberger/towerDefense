@@ -102,6 +102,8 @@ The check measures `advance-wave` tick timings across three waves, reports the 1
 
 Pull requests and pushes to `main` run the typecheck, unit tests, performance check, production build, browser smoke tests, and deterministic balance drift check in CI.
 
+The local server emits structured JSON lifecycle logs for server startup, match creation, wave transitions, match completion, and request failures.
+
 Quick play loop in browser:
 1. Enter player names and click Start Match.
 2. Pick a player and place each tower on buildable cells shown as . in the board.

@@ -13,7 +13,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "pino": "^10.1.0",
     "@tower-defense/simulation": "0.1.0",
-    "@tower-defense/transport": "0.1.0"
+    "@tower-defense/transport": "0.1.0",
+    "pino": "^10.3.1"
   }
 }
