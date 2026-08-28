@@ -1,5 +1,6 @@
 import type { CreatureArchetype, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
+import { createBattlefieldMount } from "./battlefield-scene";
 import "./style.css";
 
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
@@ -157,6 +158,7 @@ app.innerHTML = `
           <div class="small" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
         </div>
         <div id="board" class="board-grid"></div>
+        <div id="phaserBoard" class="phaser-board-mount"></div>
       </section>
 
       <aside class="control-panel card">
@@ -272,6 +274,7 @@ const el = {
   status: must<HTMLElement>("status"),
   feedbackQueue: must<HTMLElement>("feedbackQueue"),
   board: must<HTMLElement>("board"),
+  phaserBoard: must<HTMLElement>("phaserBoard"),
   snapshot: must<HTMLTextAreaElement>("snapshot"),
   battlefieldMeta: must<HTMLElement>("battlefieldMeta")
 };
@@ -283,6 +286,8 @@ function must<T extends HTMLElement>(id: string): T {
   }
   return element as T;
 }
+
+const battlefieldMount = createBattlefieldMount(el.phaserBoard);
 
 function apiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL;
@@ -719,6 +724,8 @@ function towerColorClass(playerId: string): string {
 }
 
 function renderBoard(snapshot: MatchSnapshot | null): void {
+  battlefieldMount.renderMap(snapshot);
+
   if (!snapshot) {
     el.board.innerHTML = "<div class=\"board-empty\">No active match</div>";
     return;
