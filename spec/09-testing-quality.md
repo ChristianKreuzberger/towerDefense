@@ -33,4 +33,5 @@
 ## Non-functional checks
 
 - Basic load simulation for 8-player local matches
-- Memory leak check for repeated map generation and match restarts
+- Repeated map-generation and match-restart stability check (without relying on
+	machine-specific heap thresholds)
