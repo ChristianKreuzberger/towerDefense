@@ -27,7 +27,7 @@ const DEPTH_CURSOR = 4;
 
 const COLOR_CURSOR = 0xfff4a7;
 
-function cellSizeForWidth(width: number): number {
+export function cellSizeForWidth(width: number): number {
   if (width > 40) {
     return 12;
   }

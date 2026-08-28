@@ -92,6 +92,7 @@ Acceptance checks:
 28. Extract host UI into `apps/client` browser app served by Vite while retaining current server APIs and deterministic simulation behavior. [Done]
 29. Add lightweight game-state polling cadence and action feedback queue in client for smoother wave observation and clearer rejected-command handling. [Done]
 30. Add deterministic CI artifact upload/retention for baseline diff JSON + summary text to make PR drift triage faster without reruns. [Done]
+31. Migrate the client battlefield renderer from DOM/CSS grid cells to Phaser 3 (WebGL) per [spec/04-technical-architecture.md](spec/04-technical-architecture.md) presentation layer migration plan; keep menu/HUD as DOM, keep simulation/server contracts untouched, update e2e board selectors. [Done]
 
 ## Non-Goals For This Kickoff
 

@@ -1,7 +1,19 @@
 import type { MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
-import { createBattlefieldMount } from "./battlefield-scene";
+import { cellSizeForWidth, createBattlefieldMount } from "./battlefield-scene";
 import "./style.css";
+
+interface TestBoardHook {
+  findBuildableCell(index?: number): { x: number; y: number } | null;
+  cellSize(): number;
+  cellToPixel(x: number, y: number): { x: number; y: number };
+}
+
+declare global {
+  interface Window {
+    __testBoard?: TestBoardHook;
+  }
+}
 
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
 const PLAYER_COLORS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"] as const;
@@ -1253,3 +1265,35 @@ setStatus("No match yet.");
 setMenuMessage("Create a local match or reconnect to an existing one.");
 hideGuideOverlay();
 void fetchSnapshot({ silentStatus: true });
+
+// Read-only test hook so Playwright can locate buildable cells without DOM grid elements.
+function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {
+  if (!current) {
+    return [];
+  }
+
+  const occupied = new Set<string>();
+  for (const tower of current.towers) {
+    occupied.add(`${tower.x},${tower.y}`);
+  }
+  for (const wall of current.walls) {
+    occupied.add(`${wall.x},${wall.y}`);
+  }
+
+  return current.map.cells
+    .filter((cell) => cell.buildable && !occupied.has(`${cell.x},${cell.y}`))
+    .map((cell) => ({ x: cell.x, y: cell.y }));
+}
+
+window.__testBoard = {
+  findBuildableCell(index = 0): { x: number; y: number } | null {
+    return findBuildableCellsInOrder()[index] ?? null;
+  },
+  cellSize(): number {
+    return cellSizeForWidth(current?.map.width ?? 64);
+  },
+  cellToPixel(x: number, y: number): { x: number; y: number } {
+    const size = cellSizeForWidth(current?.map.width ?? 64);
+    return { x: x * size + size / 2, y: y * size + size / 2 };
+  }
+};

@@ -1,4 +1,32 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+declare global {
+  interface Window {
+    __testBoard?: {
+      findBuildableCell(index?: number): { x: number; y: number } | null;
+      cellSize(): number;
+      cellToPixel(x: number, y: number): { x: number; y: number };
+    };
+  }
+}
+
+async function clickBuildableCell(page: Page): Promise<void> {
+  const pixel = await page.evaluate(() => {
+    const board = window.__testBoard;
+    if (!board) {
+      return null;
+    }
+    const cell = board.findBuildableCell(0);
+    if (!cell) {
+      return null;
+    }
+    return board.cellToPixel(cell.x, cell.y);
+  });
+  if (!pixel) {
+    throw new Error("No buildable cell found via __testBoard hook");
+  }
+  await page.locator("#board canvas").click({ position: { x: pixel.x, y: pixel.y } });
+}
 
 test("completes the local setup flow and starts wave combat", async ({ page }) => {
   await page.goto("/");
@@ -18,14 +46,15 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
     await guideClose.click();
   }
 
-  await page.locator("#board .grid-cell.buildable").first().click();
+  await expect(page.locator("#board canvas")).toBeVisible();
+  await clickBuildableCell(page);
   await expect(page.locator("#snapshot")).toHaveValue(/"hasPlacedTower": true/);
 
   await page.locator("#playerId").selectOption("p2");
   if (await guideClose.isVisible()) {
     await guideClose.click();
   }
-  await page.locator("#board .grid-cell.buildable").nth(1).click();
+  await clickBuildableCell(page);
   await expect(page.locator("#snapshot")).toHaveValue(/"phase": "placement"/);
   await expect(page.locator("#playerCards")).toContainText("Alpha");
   await expect(page.locator("#playerCards")).toContainText("Bravo");
