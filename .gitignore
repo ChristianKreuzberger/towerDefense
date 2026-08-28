@@ -4,3 +4,5 @@ node_modules/
 packages/simulation/artifacts/baselines/balance/baseline-diff.result.json
 *.tsbuildinfo
 npm-debug.log*
+test-results/
+playwright-report/

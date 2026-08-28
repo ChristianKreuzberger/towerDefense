@@ -18,19 +18,28 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
     await guideClose.click();
   }
 
-  await page.getByRole("button", { name: "Place Tower" }).click();
+  await page.locator("#board .grid-cell.buildable").first().click();
   await expect(page.locator("#snapshot")).toHaveValue(/"hasPlacedTower": true/);
 
   await page.locator("#playerId").selectOption("p2");
-  await page.getByRole("button", { name: "Place Tower" }).click();
+  if (await guideClose.isVisible()) {
+    await guideClose.click();
+  }
+  await page.locator("#board .grid-cell.buildable").nth(1).click();
   await expect(page.locator("#snapshot")).toHaveValue(/"phase": "placement"/);
   await expect(page.locator("#playerCards")).toContainText("Alpha");
   await expect(page.locator("#playerCards")).toContainText("Bravo");
 
   await page.locator("#playerId").selectOption("p1");
-  await page.getByRole("button", { name: "Ready For Wave" }).click();
+  if (await guideClose.isVisible()) {
+    await guideClose.click();
+  }
+  await page.locator("#readyBtn").click();
   await page.locator("#playerId").selectOption("p2");
-  await page.getByRole("button", { name: "Ready For Wave" }).click();
+  if (await guideClose.isVisible()) {
+    await guideClose.click();
+  }
+  await page.locator("#readyBtn").click();
 
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
   await expect(page.locator("#snapshot")).toHaveValue(/"phase": "wave"/);
@@ -38,11 +47,14 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
   if (await guideClose.isVisible()) {
     await guideClose.click();
   }
-  await page.getByRole("button", { name: "Advance Wave Tick" }).click();
+  await page.getByRole("button", { name: "Advance Wave Tick" }).click({ force: true });
   await expect(page.locator("#snapshot")).toHaveValue(/"waveTick": 1/);
   await expect(page.locator("#battlefieldMeta")).toContainText("Tick 1");
 
-  await page.getByRole("button", { name: "Advance 30 Ticks" }).click();
+  if (await guideClose.isVisible()) {
+    await guideClose.click();
+  }
+  await page.getByRole("button", { name: "Advance Wave (Auto)" }).click({ force: true });
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
   await expect(page.locator("#phaseSub")).toContainText("Round 1 complete");
   await expect(page.locator("#feedbackQueue")).toContainText("Alpha tower repaired +2 HP (100/100)");

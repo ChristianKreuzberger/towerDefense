@@ -154,7 +154,7 @@ app.innerHTML = `
       <section class="battlefield card">
         <div class="battlefield-header">
           <h3>Battlefield</h3>
-          <div class="small" id="battlefieldMeta">Use arrows to move cursor.</div>
+          <div class="small" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
         </div>
         <div id="board" class="board-grid"></div>
       </section>
@@ -164,17 +164,17 @@ app.innerHTML = `
           <h3>Commander Panel</h3>
           <div class="panel-subtitle">Set your tower, then make the first wave count.</div>
         </div>
-        <div class="command-help">Use the cursor to pick a buildable tile, then press T to place your tower or R to lock in readiness.</div>
+        <div class="command-help">Click a buildable tile on the battlefield to place your tower, then press R to lock in readiness.</div>
         <label>Active Player</label>
         <select id="playerId"></select>
 
         <div class="grid2">
           <div>
-            <label>X</label>
+            <label>Wall X</label>
             <input id="x" type="number" value="0" />
           </div>
           <div>
-            <label>Y</label>
+            <label>Wall Y</label>
             <input id="y" type="number" value="1" />
           </div>
         </div>
@@ -188,13 +188,12 @@ app.innerHTML = `
         </select>
 
         <div class="stack">
-          <button id="placeTowerBtn">Place Tower</button>
           <button id="readyBtn" class="good">Ready For Wave</button>
           <button id="placeWallBtn">Place Wall</button>
           <button id="upgradeBtn">Upgrade Tower</button>
           <button id="modeBtn">Apply Target Mode</button>
           <button id="advanceBtn" class="primary">Advance Wave Tick</button>
-          <button id="autoBtn">Advance 30 Ticks</button>
+          <button id="autoBtn">Advance Wave (Auto)</button>
           <button id="refreshBtn">Refresh Snapshot</button>
           <button id="backToMenuBtn">Back To Menu</button>
         </div>
@@ -452,7 +451,7 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
         key: `place-${activePlayer.id}`,
         tone: "place",
         title: `${activePlayer.name}, claim the opening tower`,
-        body: "Move the cursor with the arrow keys, then place your tower on a buildable tile that keeps the lane open.",
+        body: "Click a buildable tile on the battlefield to place your tower there.",
         actionLabel: "Place Tower Now",
         action: "place-tower"
       };
@@ -541,7 +540,7 @@ function runGuideAction(action: GuideAction): void {
   }
 
   if (action === "place-tower") {
-    must<HTMLButtonElement>("placeTowerBtn").click();
+    placeTowerForSelectedPlayer();
     return;
   }
 
@@ -782,7 +781,8 @@ function renderBoard(snapshot: MatchSnapshot | null): void {
     }
   }
 
-  el.board.innerHTML = `<div class="game-grid" style="--grid-width:${width};">${cells.join("")}</div>`;
+  const cellSize = width > 40 ? 12 : width > 24 ? 16 : 24;
+  el.board.innerHTML = `<div class="game-grid" style="--grid-width:${width};--cell-size:${cellSize}px;">${cells.join("")}</div>`;
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
   el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active`;
 }
@@ -1093,6 +1093,46 @@ function isFormField(target: EventTarget | null): boolean {
   return tag === "input" || tag === "textarea" || tag === "select";
 }
 
+function handleBoardClick(event: MouseEvent): void {
+  if (!current) {
+    return;
+  }
+
+  const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".grid-cell") : null;
+  if (!target) {
+    return;
+  }
+
+  const x = Number(target.dataset.x);
+  const y = Number(target.dataset.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return;
+  }
+
+  el.x.value = String(x);
+  el.y.value = String(y);
+  renderBoard(current);
+
+  const cell = current.map.cells.find((entry) => entry.x === x && entry.y === y);
+  if (!cell || !cell.buildable) {
+    return;
+  }
+
+  const occupied = current.towers.some((tower) => tower.x === x && tower.y === y)
+    || current.walls.some((wall) => wall.x === x && wall.y === y);
+  if (occupied) {
+    return;
+  }
+
+  const playerId = selectedPlayerId();
+  const alreadyHasTower = current.towers.some((tower) => tower.playerId === playerId);
+  if (current.phase === "placement" && !alreadyHasTower) {
+    void sendCommand({ type: "place-tower", playerId, x, y });
+  }
+}
+
+el.board.addEventListener("click", handleBoardClick);
+
 async function sendCommand(command: SimulationCommand): Promise<void> {
   try {
     const data = await postJson<ApiCommandPayload>("/api/command", { command });
@@ -1169,7 +1209,7 @@ el.rematchBtn.addEventListener("click", () => {
   void rematchWithSamePlayers();
 });
 
-must<HTMLButtonElement>("placeTowerBtn").addEventListener("click", () => {
+function placeTowerForSelectedPlayer(): void {
   const playerId = selectedPlayerId();
   const coords = currentCommandCoords(current);
   void sendCommand({
@@ -1178,7 +1218,7 @@ must<HTMLButtonElement>("placeTowerBtn").addEventListener("click", () => {
     x: coords.x,
     y: coords.y
   });
-});
+}
 
 must<HTMLButtonElement>("readyBtn").addEventListener("click", () => {
   void sendCommand({ type: "ready-for-wave", playerId: selectedPlayerId() });
@@ -1223,8 +1263,9 @@ must<HTMLButtonElement>("advanceBtn").addEventListener("click", () => {
 
 must<HTMLButtonElement>("autoBtn").addEventListener("click", async () => {
   try {
-    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks: 30 });
-    setStatus(`advance-many: attempted=30 accepted=${data.acceptedTicks ?? 0} stopped=${data.stoppedReason ?? "none"}`);
+    const attemptedTicks = 200;
+    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks: attemptedTicks });
+    setStatus(`advance-many: attempted=${attemptedTicks} accepted=${data.acceptedTicks ?? 0} stopped=${data.stoppedReason ?? "none"}`);
     addFeedback("info", `Advance-many accepted ${data.acceptedTicks ?? 0} ticks`, "advance-wave", data.stoppedReason);
 
     if (data.snapshot) {
@@ -1253,7 +1294,7 @@ document.addEventListener("keydown", (event) => {
 
   if (key === "t") {
     event.preventDefault();
-    must<HTMLButtonElement>("placeTowerBtn").click();
+    placeTowerForSelectedPlayer();
     return;
   }
 

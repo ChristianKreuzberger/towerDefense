@@ -1,8 +1,8 @@
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 8;
 export const WIN_SCORE = 1000;
-export const DEFAULT_MAP_WIDTH = 12;
-export const DEFAULT_MAP_HEIGHT = 12;
+export const DEFAULT_MAP_WIDTH = 50;
+export const DEFAULT_MAP_HEIGHT = 50;
 export const DEFAULT_TOWER_HEALTH = 100;
 export const BUILDABLE_CELL_THRESHOLD = 0.3;
 export const BASE_WALL_COST = 25;
