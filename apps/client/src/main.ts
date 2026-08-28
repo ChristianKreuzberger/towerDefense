@@ -707,6 +707,11 @@ function towerColorClass(playerId: string): string {
 function updateBattlefield(snapshot: MatchSnapshot | null): void {
   battlefieldMount.renderMap(snapshot);
   battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
+  battlefieldMount.setPlacementContext({
+    phase: snapshot?.phase ?? "placement",
+    playerId: selectedPlayerId(),
+    hasTowerAlready: snapshot ? snapshot.towers.some((tower) => tower.playerId === selectedPlayerId()) : true
+  });
 
   if (!snapshot) {
     el.battlefieldMeta.textContent = "Click a buildable tile to place your tower.";

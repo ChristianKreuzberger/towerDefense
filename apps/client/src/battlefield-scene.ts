@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-import type { Creature, CreatureArchetype, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
+import type { Creature, CreatureArchetype, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
 
 const COLOR_BUILDABLE = 0x3f6b3a;
 const COLOR_PATH = 0xc9a870;
@@ -24,8 +24,14 @@ const DEPTH_WALLS = 1;
 const DEPTH_TOWERS = 2;
 const DEPTH_CREATURES = 3;
 const DEPTH_CURSOR = 4;
+const DEPTH_HOVER = 5;
+const DEPTH_FLASH = 6;
 
 const COLOR_CURSOR = 0xfff4a7;
+const COLOR_HOVER = 0x8be9fd;
+const COLOR_INVALID_FLASH = 0xff4d4d;
+
+const POP_DURATION_MS = 220;
 
 export function cellSizeForWidth(width: number): number {
   if (width > 40) {
@@ -47,34 +53,61 @@ function cellCenter(x: number, y: number, cellSize: number): { cx: number; cy: n
   return { cx: x * cellSize + cellSize / 2, cy: y * cellSize + cellSize / 2 };
 }
 
+export interface PlacementContext {
+  phase: MatchPhase;
+  playerId: string;
+  hasTowerAlready: boolean;
+}
+
+interface TowerVisual {
+  container: Phaser.GameObjects.Container;
+  arc: Phaser.GameObjects.Arc;
+  glow: Phaser.GameObjects.Arc | undefined;
+  label: Phaser.GameObjects.Text;
+}
+
 class BattlefieldScene extends Phaser.Scene {
   private terrain?: Phaser.GameObjects.Graphics;
   private wallsGraphics?: Phaser.GameObjects.Graphics;
-  private towersGraphics?: Phaser.GameObjects.Graphics;
   private creaturesGraphics?: Phaser.GameObjects.Graphics;
-  private towerLabels?: Phaser.GameObjects.Container;
   private creatureLabels?: Phaser.GameObjects.Container;
   private cursorGraphics?: Phaser.GameObjects.Graphics;
+  private hoverGraphics?: Phaser.GameObjects.Graphics;
+  private ghostGraphics?: Phaser.GameObjects.Graphics;
+  private towerVisuals = new Map<string, TowerVisual>();
+  private hasRenderedTowersOnce = false;
   private pendingSnapshot: MatchSnapshot | null = null;
   private cellSize = 24;
   private cursorX: number | null = null;
   private cursorY: number | null = null;
   private pendingCursor: { x: number; y: number } | null = null;
   private onCellClick: ((x: number, y: number) => void) | undefined;
+  private placementContext: PlacementContext | undefined;
+  private cellsByKey = new Map<string, MatchSnapshot["map"]["cells"][number]>();
+  private occupiedCells = new Set<string>();
+  private hoverX: number | null = null;
+  private hoverY: number | null = null;
+  private reducedMotion = false;
 
   constructor() {
     super("battlefield");
   }
 
   create(): void {
+    this.reducedMotion = typeof window !== "undefined"
+      && typeof window.matchMedia === "function"
+      && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     this.terrain = this.add.graphics().setDepth(DEPTH_TERRAIN);
     this.wallsGraphics = this.add.graphics().setDepth(DEPTH_WALLS);
-    this.towersGraphics = this.add.graphics().setDepth(DEPTH_TOWERS);
-    this.towerLabels = this.add.container(0, 0).setDepth(DEPTH_TOWERS);
     this.creaturesGraphics = this.add.graphics().setDepth(DEPTH_CREATURES);
     this.creatureLabels = this.add.container(0, 0).setDepth(DEPTH_CREATURES);
     this.cursorGraphics = this.add.graphics().setDepth(DEPTH_CURSOR);
+    this.hoverGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
+    this.ghostGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
     this.input.on("pointerdown", this.handlePointerDown, this);
+    this.input.on("pointermove", this.handlePointerMove, this);
+    this.game.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     if (this.pendingCursor !== null) {
       this.cursorX = this.pendingCursor.x;
       this.cursorY = this.pendingCursor.y;
@@ -109,13 +142,112 @@ class BattlefieldScene extends Phaser.Scene {
     this.drawCursor();
   }
 
+  setPlacementContext(context: PlacementContext): void {
+    this.placementContext = context;
+    this.drawHoverAndGhost();
+  }
+
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
-    if (!this.onCellClick) {
-      return;
-    }
     const x = Math.floor(pointer.x / this.cellSize);
     const y = Math.floor(pointer.y / this.cellSize);
-    this.onCellClick(x, y);
+    if (!this.isHoverValid(x, y)) {
+      this.playInvalidClickFlash(x, y);
+    }
+    if (this.onCellClick) {
+      this.onCellClick(x, y);
+    }
+  }
+
+  private handlePointerMove = (pointer: Phaser.Input.Pointer): void => {
+    const x = Math.floor(pointer.x / this.cellSize);
+    const y = Math.floor(pointer.y / this.cellSize);
+    this.hoverX = x;
+    this.hoverY = y;
+    this.drawHoverAndGhost();
+  };
+
+  private handlePointerLeave = (): void => {
+    this.hoverX = null;
+    this.hoverY = null;
+    this.drawHoverAndGhost();
+  };
+
+  private isHoverValid(x: number, y: number): boolean {
+    if (!this.placementContext || this.placementContext.phase !== "placement") {
+      return false;
+    }
+    const cell = this.cellsByKey.get(`${x},${y}`);
+    if (!cell || !cell.buildable) {
+      return false;
+    }
+    return !this.occupiedCells.has(`${x},${y}`);
+  }
+
+  private isGhostValid(x: number, y: number): boolean {
+    if (!this.placementContext || this.placementContext.hasTowerAlready) {
+      return false;
+    }
+    return this.isHoverValid(x, y);
+  }
+
+  private drawHoverAndGhost(): void {
+    const hoverGraphics = this.hoverGraphics;
+    const ghostGraphics = this.ghostGraphics;
+    if (!hoverGraphics || !ghostGraphics) {
+      return;
+    }
+    hoverGraphics.clear();
+    ghostGraphics.clear();
+
+    if (this.hoverX === null || this.hoverY === null) {
+      return;
+    }
+    const x = this.hoverX;
+    const y = this.hoverY;
+    if (!this.isHoverValid(x, y)) {
+      return;
+    }
+
+    const cellSize = this.cellSize;
+    hoverGraphics.fillStyle(COLOR_HOVER, 0.18);
+    hoverGraphics.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+    hoverGraphics.lineStyle(2, COLOR_HOVER, 0.85);
+    hoverGraphics.strokeRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2);
+
+    if (this.isGhostValid(x, y) && this.placementContext) {
+      const { cx, cy } = cellCenter(x, y, cellSize);
+      const radius = cellSize * 0.4;
+      const color = colorForPlayer(this.placementContext.playerId);
+      ghostGraphics.fillStyle(color, 0.45);
+      ghostGraphics.fillCircle(cx, cy, radius);
+    }
+  }
+
+  private playInvalidClickFlash(x: number, y: number): void {
+    const cellSize = this.cellSize;
+    const { cx, cy } = cellCenter(x, y, cellSize);
+    const rect = this.add
+      .rectangle(cx, cy, cellSize, cellSize, COLOR_INVALID_FLASH, 0.4)
+      .setDepth(DEPTH_FLASH);
+
+    if (this.reducedMotion) {
+      this.time.delayedCall(120, () => rect.destroy());
+      return;
+    }
+
+    this.tweens.add({
+      targets: rect,
+      x: { from: cx - 4, to: cx + 4 },
+      duration: 40,
+      yoyo: true,
+      repeat: 4
+    });
+    this.tweens.add({
+      targets: rect,
+      alpha: 0,
+      duration: 260,
+      onComplete: () => rect.destroy()
+    });
   }
 
   private drawCursor(): void {
@@ -141,13 +273,18 @@ class BattlefieldScene extends Phaser.Scene {
     }
     graphics.clear();
     this.wallsGraphics?.clear();
-    this.towersGraphics?.clear();
-    this.towerLabels?.removeAll(true);
     this.creaturesGraphics?.clear();
     this.creatureLabels?.removeAll(true);
 
     if (!snapshot) {
+      this.cellsByKey = new Map();
+      this.occupiedCells = new Set();
+      for (const visual of this.towerVisuals.values()) {
+        visual.container.destroy();
+      }
+      this.towerVisuals.clear();
       this.drawCursor();
+      this.drawHoverAndGhost();
       return;
     }
 
@@ -158,6 +295,16 @@ class BattlefieldScene extends Phaser.Scene {
     for (const cell of cells) {
       cellsByKey.set(`${cell.x},${cell.y}`, cell);
     }
+    this.cellsByKey = cellsByKey;
+
+    const occupiedCells = new Set<string>();
+    for (const tower of snapshot.towers) {
+      occupiedCells.add(`${tower.x},${tower.y}`);
+    }
+    for (const wall of snapshot.walls) {
+      occupiedCells.add(`${wall.x},${wall.y}`);
+    }
+    this.occupiedCells = occupiedCells;
 
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
@@ -179,6 +326,7 @@ class BattlefieldScene extends Phaser.Scene {
     this.drawTowers(snapshot.towers, cellSize);
     this.drawCreatures(snapshot.creatures, cellSize);
     this.drawCursor();
+    this.drawHoverAndGhost();
 
     const game = this.game;
     game.scale.resize(width * cellSize, height * cellSize);
@@ -199,33 +347,97 @@ class BattlefieldScene extends Phaser.Scene {
   }
 
   private drawTowers(towers: Tower[], cellSize: number): void {
-    const graphics = this.towersGraphics;
-    const labels = this.towerLabels;
-    if (!graphics || !labels) {
+    const seen = new Set<string>();
+    const radius = cellSize * 0.4;
+
+    const skipPopAnimation = !this.hasRenderedTowersOnce;
+
+    for (const tower of towers) {
+      seen.add(tower.id);
+      let visual = this.towerVisuals.get(tower.id);
+      const isNew = !visual;
+      if (!visual) {
+        visual = this.createTowerVisual(tower, cellSize);
+        this.towerVisuals.set(tower.id, visual);
+      }
+      this.updateTowerVisual(visual, tower, cellSize, radius);
+      if (isNew) {
+        if (skipPopAnimation) {
+          visual.container.setScale(1);
+        } else {
+          this.playTowerPopAnimation(visual.container);
+        }
+      }
+    }
+
+    for (const [id, visual] of this.towerVisuals) {
+      if (!seen.has(id)) {
+        visual.container.destroy();
+        this.towerVisuals.delete(id);
+      }
+    }
+
+    this.hasRenderedTowersOnce = true;
+  }
+
+  private createTowerVisual(tower: Tower, cellSize: number): TowerVisual {
+    const { cx, cy } = cellCenter(tower.x, tower.y, cellSize);
+    const color = colorForPlayer(tower.playerId);
+    const container = this.add.container(cx, cy).setDepth(DEPTH_TOWERS);
+
+    const glow = this.add.circle(0, 0, 1, color, 0);
+    const arc = this.add.circle(0, 0, cellSize * 0.4, color, 1);
+    const label = this.add.text(0, 0, "", {
+      fontSize: `${Math.max(8, Math.floor(cellSize * 0.4))}px`,
+      color: "#ffffff"
+    });
+    label.setOrigin(0.5, 0.5);
+
+    container.add([glow, arc, label]);
+    return { container, arc, glow, label };
+  }
+
+  private updateTowerVisual(visual: TowerVisual, tower: Tower, cellSize: number, radius: number): void {
+    const { cx, cy } = cellCenter(tower.x, tower.y, cellSize);
+    const color = colorForPlayer(tower.playerId);
+    visual.container.setPosition(cx, cy);
+
+    visual.arc.setRadius(radius);
+    visual.arc.setFillStyle(color, 1);
+
+    if (tower.level >= 2 && visual.glow) {
+      const glowAlpha = tower.level >= 3 ? 0.35 : 0.22;
+      const glowRadius = radius * (tower.level >= 3 ? 1.7 : 1.4);
+      visual.glow.setRadius(glowRadius);
+      visual.glow.setFillStyle(color, glowAlpha);
+    } else if (visual.glow) {
+      visual.glow.setFillStyle(color, 0);
+    }
+
+    visual.label.setText(`T${tower.level}`);
+    visual.label.setFontSize(Math.max(8, Math.floor(cellSize * 0.4)));
+  }
+
+  private playTowerPopAnimation(container: Phaser.GameObjects.Container): void {
+    if (this.reducedMotion) {
+      container.setScale(1);
       return;
     }
-    const radius = cellSize * 0.4;
-    for (const tower of towers) {
-      const { cx, cy } = cellCenter(tower.x, tower.y, cellSize);
-      const color = colorForPlayer(tower.playerId);
-
-      if (tower.level >= 2) {
-        const glowAlpha = tower.level >= 3 ? 0.35 : 0.22;
-        const glowRadius = radius * (tower.level >= 3 ? 1.7 : 1.4);
-        graphics.fillStyle(color, glowAlpha);
-        graphics.fillCircle(cx, cy, glowRadius);
+    container.setScale(0);
+    this.tweens.add({
+      targets: container,
+      scale: 1.15,
+      duration: POP_DURATION_MS * 0.6,
+      ease: "Back.Out",
+      onComplete: () => {
+        this.tweens.add({
+          targets: container,
+          scale: 1,
+          duration: POP_DURATION_MS * 0.4,
+          ease: "Sine.InOut"
+        });
       }
-
-      graphics.fillStyle(color, 1);
-      graphics.fillCircle(cx, cy, radius);
-
-      const text = this.add.text(cx, cy, `T${tower.level}`, {
-        fontSize: `${Math.max(8, Math.floor(cellSize * 0.4))}px`,
-        color: "#ffffff"
-      });
-      text.setOrigin(0.5, 0.5);
-      labels.add(text);
-    }
+    });
   }
 
   private drawCreatures(creatures: Creature[], cellSize: number): void {
@@ -280,6 +492,7 @@ export interface BattlefieldMountOptions {
 export interface BattlefieldMount {
   renderMap(snapshot: MatchSnapshot | null): void;
   setCursor(x: number, y: number): void;
+  setPlacementContext(context: PlacementContext): void;
   destroy(): void;
 }
 
@@ -303,6 +516,9 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
     },
     setCursor(x: number, y: number): void {
       scene?.setCursor(x, y);
+    },
+    setPlacementContext(context: PlacementContext): void {
+      scene?.setPlacementContext(context);
     },
     destroy(): void {
       game.destroy(true);
