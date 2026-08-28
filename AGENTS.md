@@ -13,7 +13,10 @@ Core concept:
 
 ## Current Status
 
-Planning phase only. Specs are defined before implementation.
+The offline MVP simulation, local server, Vite client, browser smoke flow,
+performance check, repair feedback, rematch flow, CI quality gates, and
+structured server logging are implemented. The working tree may still contain
+uncommitted implementation changes from the kickoff sequence.
 
 ## Where to Find the Specs
 

@@ -33,7 +33,8 @@ Browser smoke coverage now verifies the local menu-to-wave playable flow.
 
 ## Planned Tech Direction
 
-- Client: Phaser 3 + TypeScript + Vite
+- Client MVP: TypeScript + Vite with DOM/CSS presentation
+- Future presentation upgrade: Phaser 3 + TypeScript + Vite
 - Simulation host: Node.js + TypeScript
 - Shared game logic and schema validation packages
 - Future online adapter: Colyseus (not enabled in MVP)
