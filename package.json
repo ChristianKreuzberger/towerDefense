@@ -10,10 +10,12 @@
     "build": "npm run -ws --if-present build",
     "typecheck": "npm run -ws --if-present typecheck",
     "test": "npm run -ws --if-present test",
+    "test:e2e": "playwright test",
     "clean": "npm run -ws --if-present clean",
     "dev:client": "npm --workspace @tower-defense/client run dev",
     "dev:server": "npm --workspace @tower-defense/server run dev",
     "dev:game": "npm run build && npm run dev:server",
+    "dev:full": "npm run dev:server",
     "baseline:balance:capture": "npm --workspace @tower-defense/simulation run report:baseline:capture",
     "baseline:balance:report": "npm --workspace @tower-defense/simulation run report:baseline:capture -- --stdout",
     "baseline:balance:diff": "npm --workspace @tower-defense/simulation run report:baseline:diff",
@@ -23,6 +25,7 @@
     "baseline:balance:refresh:guard": "./scripts/baseline-balance-refresh-guard.sh"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.10.1",
     "typescript": "^5.6.3"
   }

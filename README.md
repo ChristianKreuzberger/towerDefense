@@ -14,8 +14,8 @@ A multiplayer tower-defense game for the browser, designed for local offline pla
 
 ## Project Status
 
-Implementation has started with a monorepo foundation scaffold.
-Current focus: strict TypeScript workspace setup and deterministic simulation contracts.
+The deterministic simulation, local server, Vite client, balance reports, and baseline drift checks are implemented.
+Browser smoke coverage now verifies the local menu-to-wave playable flow.
 
 ## Start Here
 
@@ -78,6 +78,12 @@ Then open:
 
 ```text
 http://localhost:4173
+```
+
+Run the browser smoke test (the first run may require `npx playwright install chromium`):
+
+```bash
+npm run test:e2e
 ```
 
 Quick play loop in browser:
