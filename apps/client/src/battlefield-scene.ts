@@ -284,8 +284,6 @@ export interface BattlefieldMount {
 }
 
 export function createBattlefieldMount(container: HTMLElement, options: BattlefieldMountOptions = {}): BattlefieldMount {
-  let scene: BattlefieldScene | undefined;
-
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: container,
@@ -295,7 +293,7 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
     scene: []
   });
 
-  scene = new BattlefieldScene();
+  const scene = new BattlefieldScene();
   scene.setOnCellClick(options.onCellClick);
   game.scene.add("battlefield", scene, true);
 
