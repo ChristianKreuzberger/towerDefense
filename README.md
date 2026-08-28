@@ -86,6 +86,14 @@ Run the browser smoke test (the first run may require `npx playwright install ch
 npm run test:e2e
 ```
 
+Run the eight-player simulation performance check:
+
+```bash
+npm run test:perf
+```
+
+The check measures `advance-wave` tick timings across three waves, reports the 16 ms target, and uses a 100 ms regression ceiling for machine-independent CI validation.
+
 Quick play loop in browser:
 1. Enter player names and click Start Match.
 2. Pick a player and place each tower on buildable cells shown as . in the board.

@@ -9,6 +9,7 @@
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
     "test": "node --test dist/*.test.js",
+    "test:perf": "npm run build && node --test dist/match-simulation.perf.test.js",
     "report:balance": "node dist/balance-report.cli.js",
     "report:balance:help": "node dist/balance-report.cli.js --help",
     "report:baseline:capture": "node dist/baseline-report.cli.js",

@@ -10,6 +10,7 @@
     "build": "npm run -ws --if-present build",
     "typecheck": "npm run -ws --if-present typecheck",
     "test": "npm run -ws --if-present test",
+    "test:perf": "npm --workspace @tower-defense/simulation run test:perf",
     "test:e2e": "playwright test",
     "clean": "npm run -ws --if-present clean",
     "dev:client": "npm --workspace @tower-defense/client run dev",
