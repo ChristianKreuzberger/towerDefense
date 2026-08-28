@@ -1,15 +1,9 @@
-import type { CreatureArchetype, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
+import type { MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { createBattlefieldMount } from "./battlefield-scene";
 import "./style.css";
 
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
-const CREATURE_GLYPH: Record<CreatureArchetype, string> = {
-  runner: "R",
-  swarm: "S",
-  armored: "A",
-  tank: "T"
-};
 const PLAYER_COLORS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"] as const;
 
 type ApiErrorPayload = {
@@ -158,7 +152,6 @@ app.innerHTML = `
           <div class="small" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
         </div>
         <div id="board" class="board-grid"></div>
-        <div id="phaserBoard" class="phaser-board-mount"></div>
       </section>
 
       <aside class="control-panel card">
@@ -274,7 +267,6 @@ const el = {
   status: must<HTMLElement>("status"),
   feedbackQueue: must<HTMLElement>("feedbackQueue"),
   board: must<HTMLElement>("board"),
-  phaserBoard: must<HTMLElement>("phaserBoard"),
   snapshot: must<HTMLTextAreaElement>("snapshot"),
   battlefieldMeta: must<HTMLElement>("battlefieldMeta")
 };
@@ -287,7 +279,9 @@ function must<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-const battlefieldMount = createBattlefieldMount(el.phaserBoard);
+const battlefieldMount = createBattlefieldMount(el.board, {
+  onCellClick: (x, y) => handleCellSelected(x, y)
+});
 
 function apiBase(): string {
   const configured = import.meta.env.VITE_API_BASE_URL;
@@ -569,7 +563,7 @@ function applySnapshot(snapshot: MatchSnapshot): void {
   showGameScreen();
   updatePlayerOptions(current);
   syncCursorToBuildableCell(current);
-  renderBoard(current);
+  updateBattlefield(current);
   renderPlayerCards(current);
   pulseRepairedTowers(newEvents);
   renderPhase(current);
@@ -693,107 +687,20 @@ function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
   }
 }
 
-function cellClassFromCell(cell: MatchSnapshot["map"]["cells"][number] | undefined, x: number, y: number): string[] {
-  const classes = ["grid-cell"];
-
-  if (!cell) {
-    classes.push("blocked");
-    return classes;
-  }
-
-  if (cell.buildable) {
-    classes.push("buildable");
-  } else {
-    classes.push("path");
-  }
-
-  if (cell.pathWear > 0) {
-    classes.push("worn");
-  }
-
-  if (Number(el.x.value) === x && Number(el.y.value) === y) {
-    classes.push("cursor");
-  }
-
-  return classes;
-}
-
 function towerColorClass(playerId: string): string {
   const index = Number(playerId.replace(/\D+/g, "")) - 1;
   return PLAYER_COLORS[Math.max(0, Math.min(PLAYER_COLORS.length - 1, index))] ?? "p1";
 }
 
-function renderBoard(snapshot: MatchSnapshot | null): void {
+function updateBattlefield(snapshot: MatchSnapshot | null): void {
   battlefieldMount.renderMap(snapshot);
+  battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
 
   if (!snapshot) {
-    el.board.innerHTML = "<div class=\"board-empty\">No active match</div>";
+    el.battlefieldMeta.textContent = "Click a buildable tile to place your tower.";
     return;
   }
 
-  const width = snapshot.map.width;
-  const height = snapshot.map.height;
-
-  const cellsByKey = new Map<string, MatchSnapshot["map"]["cells"][number]>();
-  for (const cell of snapshot.map.cells) {
-    cellsByKey.set(`${cell.x},${cell.y}`, cell);
-  }
-
-  const wallsByCell = new Map<string, string>();
-  const towersByCell = new Map<string, { playerId: string; level: number }>();
-  const creaturesByCell = new Map<string, CreatureArchetype[]>();
-
-  for (const wall of snapshot.walls) {
-    wallsByCell.set(`${wall.x},${wall.y}`, wall.playerId);
-  }
-
-  for (const tower of snapshot.towers) {
-    towersByCell.set(`${tower.x},${tower.y}`, {
-      playerId: tower.playerId,
-      level: tower.level
-    });
-  }
-
-  for (const creature of snapshot.creatures) {
-    const key = `${creature.x},${creature.y}`;
-    const list = creaturesByCell.get(key) ?? [];
-    list.push(creature.archetype);
-    creaturesByCell.set(key, list);
-  }
-
-  const cells: string[] = [];
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const key = `${x},${y}`;
-      const classes = cellClassFromCell(cellsByKey.get(key), x, y).join(" ");
-      const tower = towersByCell.get(key);
-      const wall = wallsByCell.get(key);
-      const creatures = creaturesByCell.get(key) ?? [];
-
-      const markers: string[] = [];
-
-      if (wall) {
-        markers.push(`<span class="marker wall-marker ${towerColorClass(wall)}">W</span>`);
-      }
-
-      if (tower) {
-        markers.push(
-          `<span class="marker tower-marker ${towerColorClass(tower.playerId)} level-${Math.min(3, tower.level)}">T${tower.level}</span>`
-        );
-      }
-
-      if (creatures.length > 0) {
-        const archetype = creatures[0] ?? "runner";
-        const extra = creatures.length > 1 ? `<span class="stack-count">+${creatures.length - 1}</span>` : "";
-        markers.push(`<span class="marker creature-marker ${archetype}">${CREATURE_GLYPH[archetype]}${extra}</span>`);
-      }
-
-      cells.push(`<div class="${classes}" data-x="${x}" data-y="${y}">${markers.join("")}</div>`);
-    }
-  }
-
-  const cellSize = width > 40 ? 12 : width > 24 ? 16 : 24;
-  el.board.innerHTML = `<div class="game-grid" style="--grid-width:${width};--cell-size:${cellSize}px;">${cells.join("")}</div>`;
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
   el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active`;
 }
@@ -1091,7 +998,7 @@ function adjustCoord(dx: number, dy: number): void {
   el.x.value = String(nextX);
   el.y.value = String(nextY);
   if (current) {
-    renderBoard(current);
+    updateBattlefield(current);
   }
 }
 
@@ -1104,25 +1011,14 @@ function isFormField(target: EventTarget | null): boolean {
   return tag === "input" || tag === "textarea" || tag === "select";
 }
 
-function handleBoardClick(event: MouseEvent): void {
+function handleCellSelected(x: number, y: number): void {
   if (!current) {
-    return;
-  }
-
-  const target = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".grid-cell") : null;
-  if (!target) {
-    return;
-  }
-
-  const x = Number(target.dataset.x);
-  const y = Number(target.dataset.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
     return;
   }
 
   el.x.value = String(x);
   el.y.value = String(y);
-  renderBoard(current);
+  updateBattlefield(current);
 
   const cell = current.map.cells.find((entry) => entry.x === x && entry.y === y);
   if (!cell || !cell.buildable) {
@@ -1141,8 +1037,6 @@ function handleBoardClick(event: MouseEvent): void {
     void sendCommand({ type: "place-tower", playerId, x, y });
   }
 }
-
-el.board.addEventListener("click", handleBoardClick);
 
 async function sendCommand(command: SimulationCommand): Promise<void> {
   try {
@@ -1211,7 +1105,7 @@ el.playerId.addEventListener("change", () => {
   guideDismissedKey = null;
   hideGuideOverlay();
   syncCursorToBuildableCell(current);
-  renderBoard(current);
+  updateBattlefield(current);
   syncGuideOverlay(current);
 });
 

@@ -23,6 +23,9 @@ const DEPTH_TERRAIN = 0;
 const DEPTH_WALLS = 1;
 const DEPTH_TOWERS = 2;
 const DEPTH_CREATURES = 3;
+const DEPTH_CURSOR = 4;
+
+const COLOR_CURSOR = 0xfff4a7;
 
 function cellSizeForWidth(width: number): number {
   if (width > 40) {
@@ -51,7 +54,13 @@ class BattlefieldScene extends Phaser.Scene {
   private creaturesGraphics?: Phaser.GameObjects.Graphics;
   private towerLabels?: Phaser.GameObjects.Container;
   private creatureLabels?: Phaser.GameObjects.Container;
+  private cursorGraphics?: Phaser.GameObjects.Graphics;
   private pendingSnapshot: MatchSnapshot | null = null;
+  private cellSize = 24;
+  private cursorX: number | null = null;
+  private cursorY: number | null = null;
+  private pendingCursor: { x: number; y: number } | null = null;
+  private onCellClick: ((x: number, y: number) => void) | undefined;
 
   constructor() {
     super("battlefield");
@@ -64,8 +73,17 @@ class BattlefieldScene extends Phaser.Scene {
     this.towerLabels = this.add.container(0, 0).setDepth(DEPTH_TOWERS);
     this.creaturesGraphics = this.add.graphics().setDepth(DEPTH_CREATURES);
     this.creatureLabels = this.add.container(0, 0).setDepth(DEPTH_CREATURES);
+    this.cursorGraphics = this.add.graphics().setDepth(DEPTH_CURSOR);
+    this.input.on("pointerdown", this.handlePointerDown, this);
+    if (this.pendingCursor !== null) {
+      this.cursorX = this.pendingCursor.x;
+      this.cursorY = this.pendingCursor.y;
+      this.pendingCursor = null;
+    }
     if (this.pendingSnapshot !== null) {
       this.draw(this.pendingSnapshot);
+    } else {
+      this.drawCursor();
     }
   }
 
@@ -75,6 +93,45 @@ class BattlefieldScene extends Phaser.Scene {
       return;
     }
     this.draw(snapshot);
+  }
+
+  setOnCellClick(callback: ((x: number, y: number) => void) | undefined): void {
+    this.onCellClick = callback;
+  }
+
+  setCursor(x: number, y: number): void {
+    if (!this.cursorGraphics) {
+      this.pendingCursor = { x, y };
+      return;
+    }
+    this.cursorX = x;
+    this.cursorY = y;
+    this.drawCursor();
+  }
+
+  private handlePointerDown(pointer: Phaser.Input.Pointer): void {
+    if (!this.onCellClick) {
+      return;
+    }
+    const x = Math.floor(pointer.x / this.cellSize);
+    const y = Math.floor(pointer.y / this.cellSize);
+    this.onCellClick(x, y);
+  }
+
+  private drawCursor(): void {
+    const graphics = this.cursorGraphics;
+    if (!graphics) {
+      return;
+    }
+    graphics.clear();
+    if (this.cursorX === null || this.cursorY === null) {
+      return;
+    }
+    const cellSize = this.cellSize;
+    const x = this.cursorX * cellSize;
+    const y = this.cursorY * cellSize;
+    graphics.lineStyle(2, COLOR_CURSOR, 0.92);
+    graphics.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
   }
 
   private draw(snapshot: MatchSnapshot | null): void {
@@ -90,11 +147,13 @@ class BattlefieldScene extends Phaser.Scene {
     this.creatureLabels?.removeAll(true);
 
     if (!snapshot) {
+      this.drawCursor();
       return;
     }
 
     const { width, height, cells } = snapshot.map;
     const cellSize = cellSizeForWidth(width);
+    this.cellSize = cellSize;
     const cellsByKey = new Map<string, MatchSnapshot["map"]["cells"][number]>();
     for (const cell of cells) {
       cellsByKey.set(`${cell.x},${cell.y}`, cell);
@@ -119,6 +178,7 @@ class BattlefieldScene extends Phaser.Scene {
     this.drawWalls(snapshot.walls, cellSize);
     this.drawTowers(snapshot.towers, cellSize);
     this.drawCreatures(snapshot.creatures, cellSize);
+    this.drawCursor();
 
     const game = this.game;
     game.scale.resize(width * cellSize, height * cellSize);
@@ -213,12 +273,17 @@ class BattlefieldScene extends Phaser.Scene {
   }
 }
 
+export interface BattlefieldMountOptions {
+  onCellClick?: (x: number, y: number) => void;
+}
+
 export interface BattlefieldMount {
   renderMap(snapshot: MatchSnapshot | null): void;
+  setCursor(x: number, y: number): void;
   destroy(): void;
 }
 
-export function createBattlefieldMount(container: HTMLElement): BattlefieldMount {
+export function createBattlefieldMount(container: HTMLElement, options: BattlefieldMountOptions = {}): BattlefieldMount {
   let scene: BattlefieldScene | undefined;
 
   const game = new Phaser.Game({
@@ -231,11 +296,15 @@ export function createBattlefieldMount(container: HTMLElement): BattlefieldMount
   });
 
   scene = new BattlefieldScene();
+  scene.setOnCellClick(options.onCellClick);
   game.scene.add("battlefield", scene, true);
 
   return {
     renderMap(snapshot: MatchSnapshot | null): void {
       scene?.renderSnapshot(snapshot);
+    },
+    setCursor(x: number, y: number): void {
+      scene?.setCursor(x, y);
     },
     destroy(): void {
       game.destroy(true);
