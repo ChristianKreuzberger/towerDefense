@@ -2,7 +2,8 @@
 
 ## Proposed stack
 
-- Client: Phaser 3 + TypeScript + Vite
+- Client MVP: TypeScript + Vite with DOM/CSS presentation
+- Client future presentation upgrade: Phaser 3 + TypeScript + Vite
 - Simulation host: Node.js + TypeScript
 - Future online adapter: Colyseus (not enabled in MVP)
 - Shared package: game constants, DTOs, validation schemas, deterministic formulas
@@ -54,3 +55,11 @@
 - Tower-vs-tower combat disabled in simulation rules
 - Procedural map generation runs before mandatory initial tower placement
 - Round transition pipeline includes automatic tower repair and UI event emission
+
+## MVP presentation decision
+
+The current offline MVP uses a DOM/CSS client because it supports the required
+menu, placement, wave, repair, and end-of-match flows with deterministic browser
+smoke coverage. Phaser 3 remains the planned post-kickoff presentation upgrade
+for richer battlefield rendering and effects; migrating the client is not
+required for the current simulation or offline acceptance gates.
