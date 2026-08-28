@@ -775,7 +775,7 @@ function renderBoard(snapshot: MatchSnapshot | null): void {
       if (creatures.length > 0) {
         const archetype = creatures[0] ?? "runner";
         const extra = creatures.length > 1 ? `<span class="stack-count">+${creatures.length - 1}</span>` : "";
-        markers.push(`<span class="marker creature-marker">${CREATURE_GLYPH[archetype]}${extra}</span>`);
+        markers.push(`<span class="marker creature-marker ${archetype}">${CREATURE_GLYPH[archetype]}${extra}</span>`);
       }
 
       cells.push(`<div class="${classes}" data-x="${x}" data-y="${y}">${markers.join("")}</div>`);
