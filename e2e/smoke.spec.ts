@@ -38,4 +38,10 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
   await page.getByRole("button", { name: "Advance Wave Tick" }).click();
   await expect(page.locator("#snapshot")).toHaveValue(/"waveTick": 1/);
   await expect(page.locator("#battlefieldMeta")).toContainText("Tick 1");
+
+  await page.getByRole("button", { name: "Advance 30 Ticks" }).click();
+  await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
+  await expect(page.locator("#phaseSub")).toContainText("Round 1 complete");
+  await expect(page.locator("#feedbackQueue")).toContainText("Alpha tower repaired +2 HP (100/100)");
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
 });
