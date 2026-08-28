@@ -120,6 +120,11 @@ app.innerHTML = `
             }).join("")}
           </select>
         </div>
+        <div class="menu-field">
+          <label for="menuAiPlayers">AI Players</label>
+          <input id="menuAiPlayers" type="number" value="0" disabled />
+          <span class="menu-hint">Coming later</span>
+        </div>
       </div>
       <div id="menuPlayerNames" class="menu-player-names"></div>
       <div class="menu-actions">
@@ -240,6 +245,7 @@ const el = {
   gameScreen: must<HTMLElement>("gameScreen"),
   menuSeed: must<HTMLInputElement>("menuSeed"),
   menuPlayerCount: must<HTMLSelectElement>("menuPlayerCount"),
+  menuAiPlayers: must<HTMLInputElement>("menuAiPlayers"),
   menuPlayerNames: must<HTMLElement>("menuPlayerNames"),
   menuMessage: must<HTMLElement>("menuMessage"),
   menuStartBtn: must<HTMLButtonElement>("menuStartBtn"),

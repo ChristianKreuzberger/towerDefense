@@ -4,6 +4,9 @@ test("completes the local setup flow and starts wave combat", async ({ page }) =
   await page.goto("/");
 
   await expect(page.locator("#menuScreen")).toBeVisible();
+  await expect(page.locator("#menuAiPlayers")).toHaveValue("0");
+  await expect(page.locator("#menuAiPlayers")).toBeDisabled();
+  await expect(page.locator(".menu-hint")).toContainText("Coming later");
   await page.locator("#menuSeed").fill("777");
   await page.locator("#menuPlayerName1").fill("Alpha");
   await page.locator("#menuPlayerName2").fill("Bravo");
