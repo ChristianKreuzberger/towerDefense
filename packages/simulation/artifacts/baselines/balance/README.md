@@ -56,6 +56,17 @@ CI entrypoint command:
 npm run baseline:balance:verify:ci
 ```
 
+Repository workflow:
+
+- [`.github/workflows/baseline-balance-drift.yml`](.github/workflows/baseline-balance-drift.yml) runs deterministic capture + drift check on PRs and `main` pushes.
+- CI always uploads a `baseline-drift-<run_id>` artifact bundle, even when drift is detected.
+- Artifact bundle includes:
+	- `baseline-drift-summary.txt`
+	- `artifacts/baselines/balance/baseline-diff.result.json`
+	- `artifacts/baselines/balance/inputs/*.snapshots.json`
+	- `artifacts/baselines/balance/reports/*.report.txt`
+- Artifact retention is set to 30 days for PR triage and historical comparison.
+
 This runs build + deterministic drift check in non-interactive mode.
 
 Behavior:

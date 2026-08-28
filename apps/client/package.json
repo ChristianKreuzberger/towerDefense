@@ -3,15 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -b",
+    "build": "vite build && tsc -b",
     "typecheck": "tsc -b --pretty false",
-    "dev": "node dist/index.js",
+    "dev": "vite",
+    "preview": "vite preview",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@tower-defense/shared": "0.1.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
   }
 }

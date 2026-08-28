@@ -89,9 +89,9 @@ Acceptance checks:
 25. Add deterministic CI-friendly baseline refresh guard that requires explicit opt-in for artifact updates and validates clean artifact state before/after capture. [Done]
 26. Improve local playable host UX (port fallback startup, keyboard shortcuts, readiness summary) to reduce friction for manual game sessions. [Done]
 27. Add match-flow clarity UI in local host (phase banner, player status cards, end-of-match overlay + restart control, shortcut hint bar). [Done]
-28. Next: extract host UI into `apps/client` browser app served by Vite while retaining current server APIs and deterministic simulation behavior. [Next]
-29. Next: add lightweight game-state polling cadence and action feedback queue in client for smoother wave observation and clearer rejected-command handling. [Next]
-30. Next: add deterministic CI artifact upload/retention for baseline diff JSON + summary text to make PR drift triage faster without reruns. [Next]
+28. Extract host UI into `apps/client` browser app served by Vite while retaining current server APIs and deterministic simulation behavior. [Done]
+29. Add lightweight game-state polling cadence and action feedback queue in client for smoother wave observation and clearer rejected-command handling. [Done]
+30. Add deterministic CI artifact upload/retention for baseline diff JSON + summary text to make PR drift triage faster without reruns. [Done]
 
 ## Non-Goals For This Kickoff
 

@@ -22,5 +22,56 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Build and deterministic baseline drift check
-        run: npm run baseline:balance:verify:ci
+      - name: Build
+        run: npm run build
+
+      - name: Capture deterministic candidate baseline artifacts
+        run: npm run baseline:balance:capture
+
+      - name: Run deterministic baseline drift check
+        id: drift
+        continue-on-error: true
+        run: |
+          npm run baseline:balance:diff:ci 2>&1 | tee baseline-drift-summary.txt
+          status=${PIPESTATUS[0]}
+          echo "exit_code=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload baseline drift artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-drift-${{ github.run_id }}
+          retention-days: 30
+          path: |
+            baseline-drift-summary.txt
+            packages/simulation/artifacts/baselines/balance/baseline-diff.result.json
+            packages/simulation/artifacts/baselines/balance/inputs/*.snapshots.json
+            packages/simulation/artifacts/baselines/balance/reports/*.report.txt
+          if-no-files-found: warn
+
+      - name: Add drift summary
+        if: always()
+        run: |
+          echo "## Baseline Balance Drift" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f baseline-drift-summary.txt ]]; then
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            cat baseline-drift-summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No baseline-drift-summary.txt generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Fail on drift or check errors
+        if: always()
+        run: |
+          code="${{ steps.drift.outputs.exit_code }}"
+          if [[ -z "$code" ]]; then
+            echo "baseline drift step did not report an exit code"
+            exit 1
+          fi
+
+          if [[ "$code" != "0" ]]; then
+            echo "baseline drift check failed with exit code $code"
+            exit 1
+          fi

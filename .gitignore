@@ -1,5 +1,6 @@
 node_modules/
 **/node_modules/
 **/dist/
+packages/simulation/artifacts/baselines/balance/baseline-diff.result.json
 *.tsbuildinfo
 npm-debug.log*
