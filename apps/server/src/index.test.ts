@@ -26,13 +26,29 @@ async function waitForServer(child: ChildProcess): Promise<void> {
   throw new Error("server did not become ready within one second");
 }
 
-async function postJson(path: string, payload: unknown): Promise<{ status: number; body: any }> {
+type JsonResponse = {
+  ok?: boolean;
+  snapshot?: {
+    phase?: string;
+    map?: {
+      cells?: Array<{ buildable: boolean; x: number; y: number }>;
+    };
+    players?: Array<{ id: string; name: string }>;
+    towers?: Array<unknown>;
+  };
+  result?: {
+    accepted?: boolean;
+    reason?: string;
+  };
+};
+
+async function postJson(path: string, payload: unknown): Promise<{ status: number; body: JsonResponse }> {
   const response = await fetch(`${SERVER_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: (await response.json()) as JsonResponse };
 }
 
 test("server start, snapshot, and command flow preserves rejection state", async () => {
@@ -61,7 +77,7 @@ test("server start, snapshot, and command flow preserves rejection state", async
     assert.ok(buildableCell, "expected a buildable cell in the start snapshot");
 
     const snapshotResponse = await fetch(`${SERVER_URL}/api/snapshot`);
-    const snapshotBody = await snapshotResponse.json() as any;
+    const snapshotBody = (await snapshotResponse.json()) as { snapshot: { players: Array<{ id: string }> } };
     assert.equal(snapshotResponse.status, 200);
     assert.equal(snapshotBody.snapshot.players.length, 2);
 
