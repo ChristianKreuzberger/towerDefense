@@ -36,7 +36,8 @@
         "towerDamageIntake": 3,
         "wallDamageIntake": 0,
         "towerRepairApplied": 3,
-        "wallRepairApplied": 0
+        "wallRepairApplied": 0,
+        "waveClearBonusAwarded": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
@@ -55,7 +56,8 @@
         "towerDamageIntake": 3,
         "wallDamageIntake": 0,
         "towerRepairApplied": 3,
-        "wallRepairApplied": 0
+        "wallRepairApplied": 0,
+        "waveClearBonusAwarded": 0
       },
       "players": [
         {
@@ -71,6 +73,8 @@
           "spentOnUpgradesTotal": 0,
           "netPointsTotal": 8,
           "endingPoints": 8,
+          "waveClearBonusThisWave": 0,
+          "waveClearBonusTotal": 0,
           "towerLevel": 1,
           "towerHealth": 100,
           "wallCount": 0,
@@ -87,6 +91,8 @@
         "spentOnUpgradesTotal": 0,
         "netPointsTotal": 8,
         "endingPoints": 8,
+        "waveClearBonusThisWave": 0,
+        "waveClearBonusTotal": 0,
         "livingTowers": 1,
         "livingWalls": 0,
         "totalTowerHealth": 100,
@@ -118,7 +124,8 @@
         "towerDamageIntake": 6,
         "wallDamageIntake": 0,
         "towerRepairApplied": 6,
-        "wallRepairApplied": 0
+        "wallRepairApplied": 0,
+        "waveClearBonusAwarded": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
@@ -137,7 +144,8 @@
         "towerDamageIntake": 9,
         "wallDamageIntake": 0,
         "towerRepairApplied": 9,
-        "wallRepairApplied": 0
+        "wallRepairApplied": 0,
+        "waveClearBonusAwarded": 0
       },
       "players": [
         {
@@ -153,6 +161,8 @@
           "spentOnUpgradesTotal": 0,
           "netPointsTotal": 16,
           "endingPoints": 16,
+          "waveClearBonusThisWave": 0,
+          "waveClearBonusTotal": 0,
           "towerLevel": 1,
           "towerHealth": 100,
           "wallCount": 0,
@@ -169,6 +179,8 @@
         "spentOnUpgradesTotal": 0,
         "netPointsTotal": 16,
         "endingPoints": 16,
+        "waveClearBonusThisWave": 0,
+        "waveClearBonusTotal": 0,
         "livingTowers": 1,
         "livingWalls": 0,
         "totalTowerHealth": 100,

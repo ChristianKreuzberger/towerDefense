@@ -93,6 +93,7 @@ Acceptance checks:
 29. Add lightweight game-state polling cadence and action feedback queue in client for smoother wave observation and clearer rejected-command handling. [Done]
 30. Add deterministic CI artifact upload/retention for baseline diff JSON + summary text to make PR drift triage faster without reruns. [Done]
 31. Migrate the client battlefield renderer from DOM/CSS grid cells to Phaser 3 (WebGL) per [spec/04-technical-architecture.md](spec/04-technical-architecture.md) presentation layer migration plan; keep menu/HUD as DOM, keep simulation/server contracts untouched, update e2e board selectors. [Done]
+32. Add the wave-clear bonus economy income source from [spec/06-economy-balance.md](spec/06-economy-balance.md): surviving players with a living tower earn a deterministic bonus when a wave completes with zero leaks. Includes telemetry counter, balance-export fields, report render lines, client feedback, tests, and regenerated baseline artifacts. [Done]
 
 ## Non-Goals For This Kickoff
 
