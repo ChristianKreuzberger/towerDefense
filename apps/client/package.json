@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@tower-defense/shared": "0.1.0",
-    "phaser": "^3.80.0"
+    "phaser": "^4.2.1"
   },
   "devDependencies": {
     "vite": "^5.4.11"
