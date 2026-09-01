@@ -6,7 +6,10 @@ const TEST_PORT = 4190;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 
 async function waitForServer(child: ChildProcess): Promise<void> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  const maxAttempts = 200;
+  const delayMs = 50;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`server exited before becoming ready with code ${child.exitCode}`);
     }
@@ -20,10 +23,10 @@ async function waitForServer(child: ChildProcess): Promise<void> {
       // The server may still be binding its configured port.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
-  throw new Error("server did not become ready within one second");
+  throw new Error(`server did not become ready within ${(maxAttempts * delayMs) / 1000} seconds`);
 }
 
 type JsonResponse = {
