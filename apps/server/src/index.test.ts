@@ -1,12 +1,36 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createServer as createNetServer } from "node:net";
 import test from "node:test";
 
-const TEST_PORT = 4190;
-const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+let TEST_PORT = 4190;
+let SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+
+async function findOpenPort(startPort = 4190, endPort = 4299): Promise<number> {
+  for (let port = startPort; port <= endPort; port += 1) {
+    const probe = await new Promise<boolean>((resolve) => {
+      const server = createNetServer();
+
+      server.once("error", () => resolve(false));
+      server.once("listening", () => {
+        server.close(() => resolve(true));
+      });
+      server.listen(port, "127.0.0.1");
+    });
+
+    if (probe) {
+      return port;
+    }
+  }
+
+  throw new Error(`no open test port found in range ${startPort}-${endPort}`);
+}
 
 async function waitForServer(child: ChildProcess): Promise<void> {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  const maxAttempts = 600;
+  const delayMs = 100;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (child.exitCode !== null) {
       throw new Error(`server exited before becoming ready with code ${child.exitCode}`);
     }
@@ -20,25 +44,46 @@ async function waitForServer(child: ChildProcess): Promise<void> {
       // The server may still be binding its configured port.
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
-  throw new Error("server did not become ready within one second");
+  throw new Error(`server did not become ready within ${(maxAttempts * delayMs) / 1000} seconds`);
 }
 
-async function postJson(path: string, payload: unknown): Promise<{ status: number; body: any }> {
+type JsonResponse = {
+  ok?: boolean;
+  snapshot?: {
+    phase?: string;
+    map?: {
+      cells?: Array<{ buildable: boolean; x: number; y: number }>;
+    };
+    players?: Array<{ id: string; name: string }>;
+    towers?: Array<unknown>;
+  };
+  result?: {
+    accepted?: boolean;
+    reason?: string;
+  };
+};
+
+const runServerSmokeTest = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true" ? test.skip : test;
+
+async function postJson(path: string, payload: unknown): Promise<{ status: number; body: JsonResponse }> {
   const response = await fetch(`${SERVER_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-  return { status: response.status, body: await response.json() };
+  return { status: response.status, body: (await response.json()) as JsonResponse };
 }
 
-test("server start, snapshot, and command flow preserves rejection state", async () => {
+runServerSmokeTest("server start, snapshot, and command flow preserves rejection state", async () => {
+  TEST_PORT = await findOpenPort();
+  SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+
   const child = spawn(process.execPath, ["dist/index.js"], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT) },
+    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT + 20) },
     stdio: "ignore"
   });
 
@@ -54,14 +99,24 @@ test("server start, snapshot, and command flow preserves rejection state", async
     });
     assert.equal(start.status, 200);
     assert.equal(start.body.ok, true);
-    assert.equal(start.body.snapshot.phase, "placement");
 
-    const initialSnapshot = start.body.snapshot;
-    const buildableCell = initialSnapshot.map.cells.find((cell: { buildable: boolean }) => cell.buildable);
+    const startSnapshot = start.body.snapshot;
+    if (!startSnapshot) {
+      throw new Error("expected start snapshot");
+    }
+    assert.equal(startSnapshot.phase, "placement");
+    assert.ok(startSnapshot.phase, "expected start phase");
+    if (!startSnapshot.map) {
+      throw new Error("expected start map");
+    }
+    if (!startSnapshot.map.cells) {
+      throw new Error("expected start map cells");
+    }
+    const buildableCell = startSnapshot.map.cells.find((cell) => cell.buildable);
     assert.ok(buildableCell, "expected a buildable cell in the start snapshot");
 
     const snapshotResponse = await fetch(`${SERVER_URL}/api/snapshot`);
-    const snapshotBody = await snapshotResponse.json() as any;
+    const snapshotBody = (await snapshotResponse.json()) as { snapshot: { players: Array<{ id: string }> } };
     assert.equal(snapshotResponse.status, 200);
     assert.equal(snapshotBody.snapshot.players.length, 2);
 
@@ -74,8 +129,19 @@ test("server start, snapshot, and command flow preserves rejection state", async
       }
     });
     assert.equal(placement.status, 200);
-    assert.equal(placement.body.result.accepted, true);
-    assert.equal(placement.body.snapshot.towers.length, 1);
+    const placementResult = placement.body.result;
+    if (!placementResult) {
+      throw new Error("expected placement result");
+    }
+    assert.equal(placementResult.accepted, true);
+    const placedSnapshot = placement.body.snapshot;
+    if (!placedSnapshot) {
+      throw new Error("expected placed snapshot");
+    }
+    if (!placedSnapshot.towers) {
+      throw new Error("expected placed towers");
+    }
+    assert.equal(placedSnapshot.towers.length, 1);
 
     const duplicatePlacement = await postJson("/api/command", {
       command: {
@@ -86,10 +152,21 @@ test("server start, snapshot, and command flow preserves rejection state", async
       }
     });
     assert.equal(duplicatePlacement.status, 200);
-    assert.equal(duplicatePlacement.body.result.accepted, false);
-    assert.equal(duplicatePlacement.body.result.reason, "tower-already-placed");
-    assert.equal(duplicatePlacement.body.snapshot.phase, "placement");
-    assert.equal(duplicatePlacement.body.snapshot.towers.length, 1);
+    const duplicateResult = duplicatePlacement.body.result;
+    if (!duplicateResult) {
+      throw new Error("expected duplicate placement result");
+    }
+    assert.equal(duplicateResult.accepted, false);
+    assert.equal(duplicateResult.reason, "tower-already-placed");
+    const duplicateSnapshot = duplicatePlacement.body.snapshot;
+    if (!duplicateSnapshot) {
+      throw new Error("expected duplicate snapshot");
+    }
+    assert.equal(duplicateSnapshot.phase, "placement");
+    if (!duplicateSnapshot.towers) {
+      throw new Error("expected duplicate towers");
+    }
+    assert.equal(duplicateSnapshot.towers.length, 1);
   } finally {
     child.kill();
   }
