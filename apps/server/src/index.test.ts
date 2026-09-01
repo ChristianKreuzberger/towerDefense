@@ -70,10 +70,20 @@ test("server start, snapshot, and command flow preserves rejection state", async
     });
     assert.equal(start.status, 200);
     assert.equal(start.body.ok, true);
-    assert.equal(start.body.snapshot.phase, "placement");
 
-    const initialSnapshot = start.body.snapshot;
-    const buildableCell = initialSnapshot.map.cells.find((cell: { buildable: boolean }) => cell.buildable);
+    const startSnapshot = start.body.snapshot;
+    if (!startSnapshot) {
+      throw new Error("expected start snapshot");
+    }
+    assert.equal(startSnapshot.phase, "placement");
+    assert.ok(startSnapshot.phase, "expected start phase");
+    if (!startSnapshot.map) {
+      throw new Error("expected start map");
+    }
+    if (!startSnapshot.map.cells) {
+      throw new Error("expected start map cells");
+    }
+    const buildableCell = startSnapshot.map.cells.find((cell) => cell.buildable);
     assert.ok(buildableCell, "expected a buildable cell in the start snapshot");
 
     const snapshotResponse = await fetch(`${SERVER_URL}/api/snapshot`);
@@ -90,8 +100,19 @@ test("server start, snapshot, and command flow preserves rejection state", async
       }
     });
     assert.equal(placement.status, 200);
-    assert.equal(placement.body.result.accepted, true);
-    assert.equal(placement.body.snapshot.towers.length, 1);
+    const placementResult = placement.body.result;
+    if (!placementResult) {
+      throw new Error("expected placement result");
+    }
+    assert.equal(placementResult.accepted, true);
+    const placedSnapshot = placement.body.snapshot;
+    if (!placedSnapshot) {
+      throw new Error("expected placed snapshot");
+    }
+    if (!placedSnapshot.towers) {
+      throw new Error("expected placed towers");
+    }
+    assert.equal(placedSnapshot.towers.length, 1);
 
     const duplicatePlacement = await postJson("/api/command", {
       command: {
@@ -102,10 +123,21 @@ test("server start, snapshot, and command flow preserves rejection state", async
       }
     });
     assert.equal(duplicatePlacement.status, 200);
-    assert.equal(duplicatePlacement.body.result.accepted, false);
-    assert.equal(duplicatePlacement.body.result.reason, "tower-already-placed");
-    assert.equal(duplicatePlacement.body.snapshot.phase, "placement");
-    assert.equal(duplicatePlacement.body.snapshot.towers.length, 1);
+    const duplicateResult = duplicatePlacement.body.result;
+    if (!duplicateResult) {
+      throw new Error("expected duplicate placement result");
+    }
+    assert.equal(duplicateResult.accepted, false);
+    assert.equal(duplicateResult.reason, "tower-already-placed");
+    const duplicateSnapshot = duplicatePlacement.body.snapshot;
+    if (!duplicateSnapshot) {
+      throw new Error("expected duplicate snapshot");
+    }
+    assert.equal(duplicateSnapshot.phase, "placement");
+    if (!duplicateSnapshot.towers) {
+      throw new Error("expected duplicate towers");
+    }
+    assert.equal(duplicateSnapshot.towers.length, 1);
   } finally {
     child.kill();
   }
