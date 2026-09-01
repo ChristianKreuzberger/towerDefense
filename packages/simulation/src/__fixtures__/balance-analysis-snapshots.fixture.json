@@ -24,7 +24,8 @@
         "towerDamageIntake": 8,
         "wallDamageIntake": 5,
         "towerRepairApplied": 2,
-        "wallRepairApplied": 3
+        "wallRepairApplied": 3,
+        "waveClearBonusAwarded": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
@@ -43,7 +44,8 @@
         "towerDamageIntake": 12,
         "wallDamageIntake": 9,
         "towerRepairApplied": 3,
-        "wallRepairApplied": 4
+        "wallRepairApplied": 4,
+        "waveClearBonusAwarded": 0
       },
       "players": [
         {
@@ -62,7 +64,9 @@
           "towerLevel": 1,
           "towerHealth": 0,
           "wallCount": 0,
-          "wallHealthTotal": 0
+          "wallHealthTotal": 0,
+          "waveClearBonusThisWave": 0,
+          "waveClearBonusTotal": 0
         },
         {
           "playerId": "p1",
@@ -80,7 +84,9 @@
           "towerLevel": 2,
           "towerHealth": 88,
           "wallCount": 1,
-          "wallHealthTotal": 13
+          "wallHealthTotal": 13,
+          "waveClearBonusThisWave": 0,
+          "waveClearBonusTotal": 0
         }
       ],
       "totals": {
@@ -97,7 +103,9 @@
         "livingWalls": 1,
         "totalTowerHealth": 88,
         "totalWallHealth": 13,
-        "mapPathWearTotal": 6
+        "mapPathWearTotal": 6,
+        "waveClearBonusThisWave": 0,
+        "waveClearBonusTotal": 0
       }
     },
     {
@@ -124,7 +132,8 @@
         "towerDamageIntake": 4,
         "wallDamageIntake": 4,
         "towerRepairApplied": 1,
-        "wallRepairApplied": 1
+        "wallRepairApplied": 1,
+        "waveClearBonusAwarded": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
@@ -143,7 +152,8 @@
         "towerDamageIntake": 4,
         "wallDamageIntake": 4,
         "towerRepairApplied": 1,
-        "wallRepairApplied": 1
+        "wallRepairApplied": 1,
+        "waveClearBonusAwarded": 0
       },
       "players": [
         {
@@ -162,7 +172,9 @@
           "towerLevel": 1,
           "towerHealth": 71,
           "wallCount": 1,
-          "wallHealthTotal": 10
+          "wallHealthTotal": 10,
+          "waveClearBonusThisWave": 0,
+          "waveClearBonusTotal": 0
         },
         {
           "playerId": "p1",
@@ -180,7 +192,9 @@
           "towerLevel": 1,
           "towerHealth": 94,
           "wallCount": 1,
-          "wallHealthTotal": 12
+          "wallHealthTotal": 12,
+          "waveClearBonusThisWave": 0,
+          "waveClearBonusTotal": 0
         }
       ],
       "totals": {
@@ -197,7 +211,9 @@
         "livingWalls": 2,
         "totalTowerHealth": 165,
         "totalWallHealth": 22,
-        "mapPathWearTotal": 4
+        "mapPathWearTotal": 4,
+        "waveClearBonusThisWave": 0,
+        "waveClearBonusTotal": 0
       }
     }
   ]

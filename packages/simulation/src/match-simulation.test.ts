@@ -15,6 +15,7 @@ import {
   getCreatureMovementSpeedUnits,
   getTowerUpgradeCost,
   getWallCost,
+  getWaveClearBonus,
   isValidTowerPlacement,
   isValidWallPlacement,
   type GameMap,
@@ -2217,4 +2218,132 @@ test("balance-analysis export snapshots are deterministic across equivalent runs
   const firstRun = runScenario();
   const secondRun = runScenario();
   assert.deepEqual(firstRun, secondRun);
+});
+
+test("awards wave-clear bonus to every surviving player after a full clear", () => {
+  const seed = 85;
+  const towerCells = getBuildableCoordinates(seed, 3);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" },
+      { id: "p3", name: "Gamma" }
+    ],
+    seed
+  });
+
+  towerCells.forEach((cell, index) => {
+    assert.equal(
+      simulation.applyCommand({
+        type: "place-tower",
+        playerId: `p${index + 1}`,
+        x: cell.x,
+        y: cell.y
+      }).accepted,
+      true
+    );
+  });
+
+  for (let index = 1; index <= 3; index += 1) {
+    assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: `p${index}` }).accepted, true);
+  }
+
+  tickUntil(
+    simulation,
+    () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2,
+    300
+  );
+
+  const snapshot = simulation.getSnapshot();
+  const waveOneTelemetry = snapshot.telemetry.completedWaves[0];
+  assert.ok(waveOneTelemetry);
+  assert.equal(waveOneTelemetry.creaturesSpawned, waveOneTelemetry.creaturesDefeated);
+  assert.equal(waveOneTelemetry.creaturesExited, 0);
+
+  const bonusEvents = snapshot.events.filter(
+    (event): event is Extract<MatchEvent, { type: "wave-clear-bonus" }> =>
+      event.type === "wave-clear-bonus" && event.wave === 1
+  );
+  assert.equal(bonusEvents.length, 3);
+  for (const event of bonusEvents) {
+    assert.equal(event.cleared, true);
+    assert.equal(event.bonus, getWaveClearBonus());
+  }
+
+  for (const playerId of ["p1", "p2", "p3"]) {
+    const player = snapshot.players.find((entry) => entry.id === playerId);
+    assert.ok(player);
+    assert.ok(player.points >= getWaveClearBonus(), "expected clear bonus points in player total");
+  }
+
+  assert.equal(waveOneTelemetry.waveClearBonusAwarded, getWaveClearBonus() * 3);
+});
+
+test("does not award wave-clear bonus when creatures leak", () => {
+  const simulation = createSinglePlayerWaveSimulation(36);
+  tickUntil(
+    simulation,
+    () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2,
+    300
+  );
+
+  const snapshot = simulation.getSnapshot();
+  const waveOneTelemetry = snapshot.telemetry.completedWaves[0];
+  assert.ok(waveOneTelemetry);
+  assert.ok(waveOneTelemetry.creaturesExited > 0);
+
+  const bonusEvents = snapshot.events.filter(
+    (event): event is Extract<MatchEvent, { type: "wave-clear-bonus" }> =>
+      event.type === "wave-clear-bonus" && event.wave === 1
+  );
+  assert.equal(bonusEvents.length, 0);
+  assert.equal(waveOneTelemetry.waveClearBonusAwarded, 0);
+});
+
+test("records wave-clear bonus in telemetry and balance-analysis exports", () => {
+  const seed = 85;
+  const towerCells = getBuildableCoordinates(seed, 3);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" },
+      { id: "p3", name: "Gamma" }
+    ],
+    seed
+  });
+
+  towerCells.forEach((cell, index) => {
+    simulation.applyCommand({
+      type: "place-tower",
+      playerId: `p${index + 1}`,
+      x: cell.x,
+      y: cell.y
+    });
+  });
+
+  for (let index = 1; index <= 3; index += 1) {
+    simulation.applyCommand({ type: "ready-for-wave", playerId: `p${index}` });
+  }
+
+  tickUntil(
+    simulation,
+    () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2,
+    300
+  );
+
+  const snapshot = simulation.getSnapshot();
+  const exportSnapshot = snapshot.balanceAnalysisExports[0];
+  assert.ok(exportSnapshot);
+  const expectedTotalBonus = getWaveClearBonus() * 3;
+
+  assert.equal(exportSnapshot.waveTelemetry.waveClearBonusAwarded, expectedTotalBonus);
+  assert.equal(exportSnapshot.cumulativeTelemetry.waveClearBonusAwarded, expectedTotalBonus);
+  assert.equal(exportSnapshot.totals.waveClearBonusThisWave, expectedTotalBonus);
+  assert.equal(exportSnapshot.totals.waveClearBonusTotal, expectedTotalBonus);
+
+  for (const player of exportSnapshot.players) {
+    assert.equal(player.waveClearBonusThisWave, getWaveClearBonus());
+    assert.equal(player.waveClearBonusTotal, getWaveClearBonus());
+    assert.ok(player.awardedPointsThisWave >= getWaveClearBonus());
+  }
 });

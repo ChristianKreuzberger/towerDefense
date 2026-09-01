@@ -20,6 +20,7 @@ export const MOVEMENT_PROGRESS_UNITS_PER_CELL = 100;
 export const BASE_CREATURE_MOVEMENT_SPEED_UNITS = MOVEMENT_PROGRESS_UNITS_PER_CELL;
 export const CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR = 10;
 export const MIN_CREATURE_MOVEMENT_SPEED_UNITS = 40;
+export const WAVE_CLEAR_BONUS = 15;
 
 export const GAME_RULES = {
   minPlayers: MIN_PLAYERS,
@@ -44,7 +45,8 @@ export const GAME_RULES = {
   movementProgressUnitsPerCell: MOVEMENT_PROGRESS_UNITS_PER_CELL,
   baseCreatureMovementSpeedUnits: BASE_CREATURE_MOVEMENT_SPEED_UNITS,
   creatureMovementSpeedPenaltyPerWear: CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR,
-  minCreatureMovementSpeedUnits: MIN_CREATURE_MOVEMENT_SPEED_UNITS
+  minCreatureMovementSpeedUnits: MIN_CREATURE_MOVEMENT_SPEED_UNITS,
+  waveClearBonus: WAVE_CLEAR_BONUS
 } as const;
 
 export function getBetweenWaveTowerRepairAmount(maxHealth: number): number {
@@ -67,4 +69,8 @@ export function getCreatureMovementSpeedUnits(pathWear: number): number {
     MIN_CREATURE_MOVEMENT_SPEED_UNITS,
     BASE_CREATURE_MOVEMENT_SPEED_UNITS - (clampedWear * CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR)
   );
+}
+
+export function getWaveClearBonus(): number {
+  return WAVE_CLEAR_BONUS;
 }

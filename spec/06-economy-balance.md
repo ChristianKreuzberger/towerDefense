@@ -7,7 +7,7 @@ Point economy with per-player score tracking.
 ## Income sources
 
 - Creature kill rewards (primary)
-- Wave-clear bonus
+- Wave-clear bonus: every surviving player with a living tower is rewarded `WAVE_CLEAR_BONUS` (15 points) when a wave completes with zero creature leaks. Leaking a single creature forfeits the bonus for that wave.
 - Optional assist bonus for multiplayer balancing
 
 ## Spend sinks
