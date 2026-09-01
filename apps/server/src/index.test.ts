@@ -1,9 +1,30 @@
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
+import { createServer as createNetServer } from "node:net";
 import test from "node:test";
 
-const TEST_PORT = 4190;
-const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+let TEST_PORT = 4190;
+let SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+
+async function findOpenPort(startPort = 4190, endPort = 4299): Promise<number> {
+  for (let port = startPort; port <= endPort; port += 1) {
+    const probe = await new Promise<boolean>((resolve) => {
+      const server = createNetServer();
+
+      server.once("error", () => resolve(false));
+      server.once("listening", () => {
+        server.close(() => resolve(true));
+      });
+      server.listen(port, "127.0.0.1");
+    });
+
+    if (probe) {
+      return port;
+    }
+  }
+
+  throw new Error(`no open test port found in range ${startPort}-${endPort}`);
+}
 
 async function waitForServer(child: ChildProcess): Promise<void> {
   const maxAttempts = 600;
@@ -55,9 +76,12 @@ async function postJson(path: string, payload: unknown): Promise<{ status: numbe
 }
 
 test("server start, snapshot, and command flow preserves rejection state", async () => {
+  TEST_PORT = await findOpenPort();
+  SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+
   const child = spawn(process.execPath, ["dist/index.js"], {
     cwd: process.cwd(),
-    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT) },
+    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT + 20) },
     stdio: "ignore"
   });
 
