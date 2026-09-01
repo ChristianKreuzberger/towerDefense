@@ -1,0 +1,68 @@
+name: release
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run quality gates
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+
+      - name: Package release bundle
+        run: |
+          bundle_dir="tower-defense-${{ github.ref_name }}"
+          mkdir -p "${bundle_dir}/client" "${bundle_dir}/server"
+          cp -r apps/client/dist/. "${bundle_dir}/client/"
+          cp -r apps/server/dist/. "${bundle_dir}/server/"
+          cp package.json package-lock.json "${bundle_dir}/"
+          cp apps/server/package.json "${bundle_dir}/server/package.json"
+          printf '%s\n' \
+            '# Tower Defense release bundle' \
+            '' \
+            'This archive contains prebuilt client and server artifacts.' \
+            '' \
+            '## Run locally' \
+            '' \
+            '1. Install production dependencies from the repository root:' \
+            '   npm ci --omit=dev' \
+            '2. Start the server from the repository root:' \
+            '   node apps/server/dist/index.js' \
+            '3. Open http://localhost:4173' \
+            > "${bundle_dir}/RUN.md"
+          tar -czf "${bundle_dir}.tar.gz" "${bundle_dir}"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: tower-defense-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true
