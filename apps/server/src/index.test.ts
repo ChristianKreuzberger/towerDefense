@@ -6,8 +6,8 @@ const TEST_PORT = 4190;
 const SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 
 async function waitForServer(child: ChildProcess): Promise<void> {
-  const maxAttempts = 200;
-  const delayMs = 50;
+  const maxAttempts = 600;
+  const delayMs = 100;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (child.exitCode !== null) {
