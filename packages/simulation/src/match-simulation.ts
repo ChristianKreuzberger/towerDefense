@@ -1291,12 +1291,17 @@ export class MatchSimulation {
     const bonus = getWaveClearBonus();
     const recipients = [...this.state.players]
       .filter((player) => !player.eliminated)
-      .filter((player) => this.state.towers.some((tower) => tower.playerId === player.id && tower.health > 0));
+      .filter((player) => this.state.towers.some((tower) => tower.playerId === player.id && tower.health > 0))
+      .sort((a, b) => a.id.localeCompare(b.id));
 
     for (const player of recipients) {
-      this.awardPoints(player.id, bonus);
-      this.state.playerWaveClearBonusTotal[player.id] =
-        (this.state.playerWaveClearBonusTotal[player.id] ?? 0) + bonus;
+      // Award even if a prior recipient triggered score-win, so telemetry/events stay consistent.
+      player.points += bonus;
+      this.state.playerAwardedPointsTotal[player.id] = (this.state.playerAwardedPointsTotal[player.id] ?? 0) + bonus;
+      this.state.playerAwardedPointsCurrentWave[player.id] =
+        (this.state.playerAwardedPointsCurrentWave[player.id] ?? 0) + bonus;
+
+      this.state.playerWaveClearBonusTotal[player.id] = (this.state.playerWaveClearBonusTotal[player.id] ?? 0) + bonus;
       this.state.playerWaveClearBonusCurrentWave[player.id] =
         (this.state.playerWaveClearBonusCurrentWave[player.id] ?? 0) + bonus;
       this.state.telemetry.currentWave.waveClearBonusAwarded += bonus;
@@ -1309,6 +1314,12 @@ export class MatchSimulation {
         bonus,
         cleared
       });
+
+      if (this.state.phase !== "ended" && player.points >= WIN_SCORE) {
+        this.state.phase = "ended";
+        this.state.winnerId = player.id;
+        this.state.endReason = "score-win";
+      }
     }
   }
 
