@@ -1,5 +1,9 @@
 # Tower Defense (Browser, Offline-First)
 
+[![quality](https://github.com/ChristianKreuzberger/towerDefense/actions/workflows/quality.yml/badge.svg)](https://github.com/ChristianKreuzberger/towerDefense/actions/workflows/quality.yml)
+[![baseline balance drift](https://github.com/ChristianKreuzberger/towerDefense/actions/workflows/baseline-balance-drift.yml/badge.svg)](https://github.com/ChristianKreuzberger/towerDefense/actions/workflows/baseline-balance-drift.yml)
+[![release](https://github.com/ChristianKreuzberger/towerDefense/actions/workflows/release.yml/badge.svg)](https://github.com/ChristianKreuzberger/towerDefense/actions/workflows/release.yml)
+
 A multiplayer tower-defense game for the browser, designed for local offline play first and future online expansion.
 
 ## Concept
@@ -102,6 +106,25 @@ npm run test:perf
 The check measures `advance-wave` tick timings across three waves, reports the 16 ms target, and uses a 100 ms regression ceiling for machine-independent CI validation.
 
 Pull requests and pushes to `main` run the typecheck, unit tests, performance check, production build, browser smoke tests, and deterministic balance drift check in CI.
+
+## CI/CD
+
+GitHub Actions workflows live in [`.github/workflows/`](.github/workflows/).
+
+| Workflow | Trigger | Purpose |
+| --- | --- | --- |
+| `quality.yml` | PRs and `main` pushes | Build, typecheck, lint, unit tests, performance check, Playwright smoke tests |
+| `baseline-balance-drift.yml` | PRs and `main` pushes | Deterministic balance baseline capture and drift detection with artifact upload |
+| `release.yml` | `v*` tags and manual dispatch | Build, verify, package client/server artifacts, and publish a GitHub release |
+
+Dependabot opens weekly update PRs for npm and GitHub Actions dependencies via [`.github/dependabot.yml`](.github/dependabot.yml).
+
+Create a release by pushing a version tag:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 The local server emits structured JSON lifecycle logs for server startup, match creation, wave transitions, match completion, and request failures.
 
