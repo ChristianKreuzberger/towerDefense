@@ -17,7 +17,9 @@ import {
 } from "@tower-defense/shared";
 import { logger } from "./logger.js";
 
-const PORT = Number(process.env.PORT ?? "4173");
+const DEFAULT_PORT = 4173;
+const EXPLICIT_PORT = Number(process.env.PORT ?? "");
+const PORT = Number.isInteger(EXPLICIT_PORT) && EXPLICIT_PORT > 0 ? EXPLICIT_PORT : DEFAULT_PORT;
 const MAX_PORT = Number(process.env.PORT_MAX ?? String(PORT + 20));
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
 const SERVER_RUNTIME_DIR = resolve(fileURLToPath(new URL(".", import.meta.url)));
@@ -194,7 +196,7 @@ function findOpenPort(startPort: number, endPort: number): Promise<number> {
 				});
 			});
 
-			probeServer.listen(port);
+			probeServer.listen(port, "127.0.0.1");
 		});
 	};
 
@@ -398,14 +400,25 @@ const server = createServer(async (request, response) => {
 	}
 });
 
-void findOpenPort(PORT, MAX_PORT)
-	.then((port) => {
-		server.listen(port, () => {
-				logger.info({ event: "server-started", project: PROJECT_NAME, port }, "local game host running");
+const startServer = (): void => {
+	if (Number.isInteger(EXPLICIT_PORT) && EXPLICIT_PORT > 0) {
+		server.listen(PORT, "127.0.0.1", () => {
+			logger.info({ event: "server-started", project: PROJECT_NAME, port: PORT }, "local game host running");
 		});
-	})
-	.catch((error: unknown) => {
-		const message = error instanceof Error ? error.message : String(error);
-		logger.error({ event: "server-start-failed", project: PROJECT_NAME, message }, "failed to start local game host");
-		process.exit(1);
-	});
+		return;
+	}
+
+	void findOpenPort(PORT, MAX_PORT)
+		.then((port) => {
+			server.listen(port, "127.0.0.1", () => {
+				logger.info({ event: "server-started", project: PROJECT_NAME, port }, "local game host running");
+			});
+		})
+		.catch((error: unknown) => {
+			const message = error instanceof Error ? error.message : String(error);
+			logger.error({ event: "server-start-failed", project: PROJECT_NAME, message }, "failed to start local game host");
+			process.exit(1);
+		});
+};
+
+startServer();
