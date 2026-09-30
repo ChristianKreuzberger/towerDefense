@@ -167,8 +167,7 @@ test("debug mode: pause, manual ticks, wall mode, and snapshot panel", async ({ 
   await page.getByRole("button", { name: "Place Wall" }).click();
   await expect(page.getByRole("button", { name: "Place Wall" })).toHaveAttribute("aria-pressed", "true");
   await clickBuildableCell(page, 5);
-  await expect(page.locator("#feedbackQueue")).toContainText("place-wall");
-  await expect(page.locator("#feedbackQueue")).toContainText("insufficient-points");
+  await expect(page.locator("#feedbackQueue")).toContainText("Wall rejected: not enough points");
 
   await page.getByRole("button", { name: "Advance Wave (Auto)" }).click();
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");

@@ -1,12 +1,20 @@
+import { WIN_SCORE, getTowerUpgradeCost, getWallCost } from "@tower-defense/shared";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
-import { cellSizeForWidth, createBattlefieldMount } from "./battlefield-scene";
+import { applyPaletteCssVars } from "./art/palette";
+import { paintHero } from "./art/hero";
+import { createBattlefieldMount } from "./battlefield-scene";
+import { createDemo } from "./demo";
 import { perfRecordBytes, perfTimeApply } from "./perf";
 import "./style.css";
+
+// Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
+applyPaletteCssVars();
 
 interface TestBoardHook {
   findBuildableCell(index?: number): { x: number; y: number } | null;
   cellSize(): number;
+  demo?: { start(): boolean; stop(): void; running(): boolean };
   cellToPixel(x: number, y: number): { x: number; y: number };
   creaturePositions(): Array<{ id: string; x: number; y: number }>;
   playback(): { playing: boolean; speed: number };
@@ -64,15 +72,6 @@ type ApiAdvanceManyPayload = {
 
 type FeedbackType = "accepted" | "rejected" | "info" | "error";
 
-interface FeedbackItem {
-  id: number;
-  type: FeedbackType;
-  message: string;
-  commandType?: SimulationCommand["type"];
-  reason?: string;
-  createdAt: number;
-}
-
 interface FetchSnapshotOptions {
   silentStatus?: boolean;
 }
@@ -102,7 +101,9 @@ interface MenuPlayerInput {
   defaultName: string;
 }
 
-const FEEDBACK_CAPACITY = 12;
+const TOAST_CAPACITY = 5;
+const TOAST_LIFETIME_MS = 4500;
+const BANNER_LIFETIME_MS = 2600;
 // 5 ticks/s at 1x: creatures cover up to 5 cells/s, slow enough to follow and fast enough that a wave is over in seconds.
 const BASE_TICKS_PER_SECOND = 5;
 const PLAYBACK_SPEEDS = [1, 2, 4] as const;
@@ -118,13 +119,13 @@ const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]> = new Set([
   "wave-clear-bonus"
 ]);
 const EVENT_LOG_CAPACITY = 200;
+const MAX_FX_EVENT_BACKLOG = 300;
 
 const searchParams = new URLSearchParams(window.location.search);
 const DEBUG = searchParams.get("debug") === "1";
 
 let current: MatchSnapshot | null = null;
-let feedbackItems: FeedbackItem[] = [];
-let feedbackIdCounter = 1;
+let bannerTimer: ReturnType<typeof setTimeout> | null = null;
 let menuPlayers: MenuPlayerInput[] = [];
 let guideDismissedKey: string | null = null;
 let lastGuideKey = "";
@@ -146,8 +147,12 @@ let chipStructureSignature = "";
 interface PlayerChipRefs {
   root: HTMLElement;
   name: HTMLElement;
+  state: HTMLElement;
+  points: HTMLElement;
+  goalFill: HTMLElement;
   meta: HTMLElement;
   bar: HTMLElement | null;
+  barFill: HTMLElement | null;
 }
 let playerChips = new Map<string, PlayerChipRefs>();
 
@@ -159,136 +164,147 @@ if (!app) {
 app.innerHTML = `
   <section id="menuScreen" class="menu-screen">
     <div class="menu-card">
-      <div class="menu-badge">Offline mode • local skirmish • 1–8 players</div>
-      <h1>Tower Defense</h1>
-      <p class="menu-subtitle">Build your opening tower, hold the lane, and race to 1000 points before the field collapses.</p>
-      <div class="menu-fields">
-        <div class="menu-field">
-          <label for="menuSeed">Map Seed</label>
-          <input id="menuSeed" type="number" value="777" />
+      <canvas id="menuHero" class="menu-hero" aria-hidden="true"></canvas>
+      <div class="menu-body">
+        <div class="menu-badge">Offline mode &bull; local skirmish &bull; 1&ndash;8 players</div>
+        <h1 class="menu-title">Tower <span>Defense</span></h1>
+        <p class="menu-subtitle">Place your tower, hold the line, and race to 1000 points before the field collapses.</p>
+        <div class="menu-fields">
+          <div class="menu-field">
+            <label for="menuSeed">Map Seed</label>
+            <input id="menuSeed" type="number" value="777" />
+          </div>
+          <div class="menu-field">
+            <label for="menuPlayerCount">Players</label>
+            <select id="menuPlayerCount">
+              ${Array.from({ length: 8 }, (_, index) => {
+                const count = index + 1;
+                const selected = count === 2 ? "selected" : "";
+                return `<option value="${count}" ${selected}>${count}</option>`;
+              }).join("")}
+            </select>
+          </div>
+          <div class="menu-field">
+            <label for="menuAiPlayers">AI Players</label>
+            <input id="menuAiPlayers" type="number" value="0" disabled />
+            <span class="menu-hint">Coming later</span>
+          </div>
         </div>
-        <div class="menu-field">
-          <label for="menuPlayerCount">Players</label>
-          <select id="menuPlayerCount">
-            ${Array.from({ length: 8 }, (_, index) => {
-              const count = index + 1;
-              const selected = count === 2 ? "selected" : "";
-              return `<option value="${count}" ${selected}>${count}</option>`;
-            }).join("")}
-          </select>
+        <div id="menuPlayerNames" class="menu-player-names"></div>
+        <div class="menu-actions">
+          <button id="menuStartBtn" class="primary">Start Match</button>
+          <button id="menuRefreshBtn" class="ghost">Refresh Existing Match</button>
         </div>
-        <div class="menu-field">
-          <label for="menuAiPlayers">AI Players</label>
-          <input id="menuAiPlayers" type="number" value="0" disabled />
-          <span class="menu-hint">Coming later</span>
-        </div>
+        <div id="menuMessage" class="menu-message"></div>
       </div>
-      <div id="menuPlayerNames" class="menu-player-names"></div>
-      <div class="menu-actions">
-        <button id="menuStartBtn" class="primary">Start Match</button>
-        <button id="menuRefreshBtn">Refresh Existing Match</button>
-      </div>
-      <div class="menu-footnote">Tip: begin with two players to get a comfortable feel for the placement phase.</div>
-      <div id="menuMessage" class="menu-message"></div>
     </div>
   </section>
 
   <section id="gameScreen" class="game-screen hidden">
-    <header class="game-header">
-      <div>
-        <h2>Tower Defense Local Host</h2>
-        <div class="small">Place towers, hold the lane, and outscore everyone.</div>
+    <div class="stage">
+      <header class="topbar">
+        <div class="brand">Tower <span>Defense</span></div>
+        <section class="phase-banner" id="phaseBanner">
+          <div class="phase-label" id="phaseLabel">NO MATCH</div>
+          <div class="phase-sub" id="phaseSub"></div>
+        </section>
+        <div id="playbackControls" class="playback-controls hidden" role="group" aria-label="Playback">
+          <button id="playPauseBtn" aria-pressed="true">Pause</button>
+          <button class="speed-btn" data-speed="1" aria-pressed="true">1x</button>
+          <button class="speed-btn" data-speed="2" aria-pressed="false">2x</button>
+          <button class="speed-btn" data-speed="4" aria-pressed="false">4x</button>
+        </div>
+      </header>
+
+      <div id="guideOverlay" class="guide-overlay guide-idle" aria-live="polite">
+        <div id="guideCard" class="guide-card hint">
+          <div class="guide-text">
+            <div id="guideTitle" class="guide-title"></div>
+            <div id="guideBody" class="guide-body"></div>
+          </div>
+          <button id="guideActionBtn" class="guide-action"></button>
+          <button id="guideCloseBtn" class="guide-close" aria-label="Dismiss guidance">&times;</button>
+        </div>
       </div>
-      <div class="hud-chip-row" id="playerCards"></div>
-    </header>
 
-    <section class="phase-banner" id="phaseBanner">
-      <div class="phase-label" id="phaseLabel">NO MATCH</div>
-      <div class="phase-sub" id="phaseSub"></div>
-    </section>
-
-    <div class="battle-layout">
-      <section class="battlefield card">
-        <div class="battlefield-header">
-          <h3>Battlefield</h3>
-          <div class="small" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
-          <div id="playbackControls" class="playback-controls hidden" role="group" aria-label="Playback">
-            <button id="playPauseBtn" aria-pressed="true">Pause</button>
-            <button class="speed-btn" data-speed="1" aria-pressed="true">1x</button>
-            <button class="speed-btn" data-speed="2" aria-pressed="false">2x</button>
-            <button class="speed-btn" data-speed="4" aria-pressed="false">4x</button>
-          </div>
+      <section class="battlefield">
+        <div class="board-frame">
+          <div id="board" class="board-grid"></div>
+          <div id="waveBanner" class="wave-banner" aria-live="polite"><strong></strong><span></span></div>
         </div>
-        <div id="guideOverlay" class="guide-overlay guide-idle" aria-live="polite">
-          <div id="guideCard" class="guide-card hint">
-            <div class="guide-text">
-              <div id="guideTitle" class="guide-title"></div>
-              <div id="guideBody" class="guide-body"></div>
-            </div>
-            <button id="guideActionBtn" class="guide-action"></button>
-            <button id="guideCloseBtn" class="guide-close" aria-label="Dismiss guidance">x</button>
-          </div>
-        </div>
-        <div id="board" class="board-grid"></div>
+        <div class="small battlefield-meta" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
       </section>
+    </div>
 
-      <aside class="control-panel card">
-        <div class="panel-heading">
-          <h3>Commander Panel</h3>
-          <div class="panel-subtitle">Set your tower, then make the first wave count.</div>
-        </div>
-        <div class="command-help">Click a buildable tile on the battlefield to place your tower, then press R to lock in readiness.</div>
-        <label>Active Player</label>
+    <aside class="control-panel">
+      <div class="hud-chip-row" id="playerCards" aria-label="Scoreboard"></div>
+
+      <div class="panel-block">
+        <label for="playerId">Active Player</label>
         <select id="playerId"></select>
+      </div>
 
-        <div class="grid2 debug-only">
-          <div>
-            <label>Wall X</label>
-            <input id="x" type="number" value="0" />
-          </div>
-          <div>
-            <label>Wall Y</label>
-            <input id="y" type="number" value="1" />
-          </div>
+      <div class="grid2 debug-only">
+        <div>
+          <label for="x">Wall X</label>
+          <input id="x" type="number" value="0" />
         </div>
+        <div>
+          <label for="y">Wall Y</label>
+          <input id="y" type="number" value="1" />
+        </div>
+      </div>
 
-        <label>Target Mode</label>
+      <div class="toolbar" role="group" aria-label="Actions">
+        <button id="placeTowerBtn" class="tool" title="Place your tower on the highlighted tile (T)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 12h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="tool-label">Place Tower</span><span class="tool-cost">free</span><kbd>T</kbd>
+        </button>
+        <button id="placeWallBtn" class="tool" aria-pressed="false" title="Toggle wall mode, then click tiles (W)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M9 5v7M15 12v7" stroke="currentColor" stroke-width="2"/></svg><span class="tool-label">Place Wall</span><span class="tool-cost" id="wallCost">25</span><kbd>W</kbd>
+        </button>
+        <button id="upgradeBtn" class="tool" title="Upgrade your tower (U)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 9h-5v9H9v-9H4z" fill="currentColor"/></svg><span class="tool-label">Upgrade Tower</span><span class="tool-cost" id="upgradeCost">50</span><kbd>U</kbd>
+        </button>
+        <button id="readyBtn" class="tool good" title="Lock in your setup (R)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tool-label">Ready For Wave</span><span class="tool-cost">&nbsp;</span><kbd>R</kbd>
+        </button>
+      </div>
+
+      <div class="panel-block">
+        <label for="mode">Target Mode</label>
         <select id="mode">
           <option value="first">first</option>
           <option value="last">last</option>
           <option value="strongest">strongest</option>
           <option value="nearest">nearest</option>
         </select>
+      </div>
 
-        <div class="stack">
-          <button id="readyBtn" class="good">Ready For Wave</button>
-          <button id="placeWallBtn" aria-pressed="false">Place Wall</button>
-          <button id="upgradeBtn">Upgrade Tower</button>
-          <button id="modeBtn">Apply Target Mode</button>
-          <button id="advanceBtn" class="primary debug-only">Advance Wave Tick</button>
-          <button id="autoBtn" class="debug-only">Advance Wave (Auto)</button>
-          <button id="refreshBtn">Refresh Snapshot</button>
-          <button id="backToMenuBtn">Back To Menu</button>
-        </div>
+      <div class="stack debug-only">
+        <button id="advanceBtn" class="primary">Advance Wave Tick</button>
+        <button id="autoBtn">Advance Wave (Auto)</button>
+        <button id="demoBtn">Demo Combat</button>
+      </div>
 
-        <h3>Last Action</h3>
-        <div id="status" class="status">No match yet.</div>
+      <div id="status" class="status">No match yet.</div>
 
-        <h3>Action Feedback</h3>
-        <div id="feedbackQueue" class="feedback-queue">No feedback yet.</div>
-      </aside>
-    </div>
+      <div class="session-row">
+        <button id="refreshBtn" class="ghost">Refresh Snapshot</button>
+        <button id="backToMenuBtn" class="ghost">Back To Menu</button>
+      </div>
+    </aside>
 
-    <section class="snapshot-panel card debug-only">
+    <section class="snapshot-panel debug-only">
       <h3>Snapshot JSON</h3>
       <textarea id="snapshot" readonly></textarea>
     </section>
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd> upgrade <kbd>P</kbd> pause</div>
-    <div><kbd>Arrows</kbd> move cursor <kbd>Click</kbd> tile to place</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd> upgrade <kbd>P</kbd> pause <kbd>Arrows</kbd> move cursor</div>
   </footer>
+
+  <div id="feedbackQueue" class="toasts" role="status" aria-live="polite"></div>
 
   <div class="match-end-overlay" id="matchEndOverlay">
     <div class="match-end-modal">
@@ -297,8 +313,8 @@ app.innerHTML = `
       <div id="matchEndScores" class="match-end-grid"></div>
       <div class="stack">
         <button id="rematchBtn" class="primary">Rematch</button>
-        <button id="restartBtn" class="primary">Return To Menu</button>
-        <button id="closeOverlayBtn">Close</button>
+        <button id="restartBtn">Return To Menu</button>
+        <button id="closeOverlayBtn" class="ghost">Close</button>
       </div>
     </div>
   </div>
@@ -337,6 +353,12 @@ const el = {
   guideActionBtn: must<HTMLButtonElement>("guideActionBtn"),
   guideCloseBtn: must<HTMLButtonElement>("guideCloseBtn"),
   status: must<HTMLElement>("status"),
+  placeTowerBtn: must<HTMLButtonElement>("placeTowerBtn"),
+  upgradeBtn: must<HTMLButtonElement>("upgradeBtn"),
+  wallCost: must<HTMLElement>("wallCost"),
+  upgradeCost: must<HTMLElement>("upgradeCost"),
+  waveBanner: must<HTMLElement>("waveBanner"),
+  demoBtn: must<HTMLButtonElement>("demoBtn"),
   feedbackQueue: must<HTMLElement>("feedbackQueue"),
   board: must<HTMLElement>("board"),
   snapshot: must<HTMLTextAreaElement>("snapshot"),
@@ -353,6 +375,16 @@ function must<T extends HTMLElement>(id: string): T {
 
 const battlefieldMount = createBattlefieldMount(el.board, {
   onCellClick: (x, y) => handleCellSelected(x, y)
+});
+
+// Debug-only synthetic combat: feeds creatures and events to the board without touching the host simulation.
+const demo = createDemo({
+  current: () => current,
+  feed: (snapshot, events) => applySnapshot(snapshot, events),
+  tickMs: () => msPerTick(),
+  onFinished: () => {
+    el.demoBtn.textContent = "Demo Combat";
+  }
 });
 
 function apiBase(): string {
@@ -414,51 +446,51 @@ function setMenuMessage(text: string): void {
   el.menuMessage.textContent = text;
 }
 
+const REJECT_REASON_TEXT: Record<string, string> = {
+  "insufficient-points": "not enough points",
+  "cell-not-buildable": "that tile is not buildable",
+  "tower-overlap": "a tower is already there",
+  "wall-overlap": "a wall is already there",
+  "path-blocked": "that would block the path",
+  "wall-phase-not-active": "walls can only be placed during combat",
+  "placement-phase-not-active": "towers can only be placed during placement",
+  "tower-already-placed": "you already placed your tower",
+  "tower-not-placed": "place your tower first",
+  "out-of-bounds": "outside the map"
+};
+
+const COMMAND_LABEL: Partial<Record<SimulationCommand["type"], string>> = {
+  "place-wall": "Wall",
+  "place-tower": "Tower",
+  "upgrade-tower": "Upgrade",
+  "set-target-mode": "Target mode",
+  "ready-for-wave": "Ready"
+};
+
+// Toasts replace the old persistent feedback log: short-lived, stacked, and announced via aria-live.
 function addFeedback(
   type: FeedbackType,
   message: string,
   commandType?: SimulationCommand["type"],
   reason?: string
 ): void {
-  const item: FeedbackItem = {
-    id: feedbackIdCounter,
-    type,
-    message,
-    createdAt: Date.now()
-  };
-
-  if (commandType !== undefined) {
-    item.commandType = commandType;
+  let text = message;
+  if (commandType && type === "rejected") {
+    text = `${COMMAND_LABEL[commandType] ?? commandType} rejected: ${REJECT_REASON_TEXT[reason ?? ""] ?? reason ?? "unknown reason"}`;
+  } else if (commandType && type === "accepted") {
+    text = `${COMMAND_LABEL[commandType] ?? commandType} done`;
+  } else if (reason) {
+    text = `${message}: ${reason}`;
   }
 
-  if (reason !== undefined) {
-    item.reason = reason;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.textContent = text;
+  el.feedbackQueue.append(toast);
+  while (el.feedbackQueue.children.length > TOAST_CAPACITY) {
+    el.feedbackQueue.firstElementChild?.remove();
   }
-
-  feedbackIdCounter += 1;
-  feedbackItems = [item, ...feedbackItems].slice(0, FEEDBACK_CAPACITY);
-  renderFeedbackQueue();
-}
-
-function renderFeedbackQueue(): void {
-  if (feedbackItems.length === 0) {
-    el.feedbackQueue.textContent = "No feedback yet.";
-    return;
-  }
-
-  const entries = feedbackItems.map((item) => {
-    const command = item.commandType ? ` (${item.commandType})` : "";
-    const reason = item.reason ? ` reason=${item.reason}` : "";
-    const time = new Date(item.createdAt).toLocaleTimeString();
-    return (
-      `<div class="feedback-item ${item.type}">` +
-      `<div class="feedback-head"><span class="feedback-type">${item.type.toUpperCase()}</span><span class="feedback-time">${time}</span></div>` +
-      `<div class="feedback-body">${item.message}${command}${reason}</div>` +
-      "</div>"
-    );
-  });
-
-  el.feedbackQueue.innerHTML = entries.join("");
+  setTimeout(() => toast.remove(), TOAST_LIFETIME_MS);
 }
 
 function renderMenuPlayerInputs(): void {
@@ -469,9 +501,12 @@ function renderMenuPlayerInputs(): void {
     defaultName: `Player ${index + 1}`
   }));
 
-  el.menuPlayerNames.innerHTML = menuPlayers.map((player) => (
-    `<label for="${player.inputId}">${player.id.toUpperCase()} Name</label>` +
-    `<input id="${player.inputId}" value="${player.defaultName}" />`
+  el.menuPlayerNames.innerHTML = menuPlayers.map((player, index) => (
+    `<div class="menu-player">` +
+    `<span class="swatch ${player.id}" aria-hidden="true">${index + 1}</span>` +
+    `<label class="sr-only" for="${player.inputId}">${player.id.toUpperCase()} Name</label>` +
+    `<input id="${player.inputId}" value="${player.defaultName}" />` +
+    `</div>`
   )).join("");
 }
 
@@ -728,7 +763,11 @@ function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): v
   showGameScreen();
   updatePlayerOptions(current);
   syncCursorToBuildableCell(current);
-  updateBattlefield(current, glideMs);
+  // A fresh load or reconnect delivers the whole event history; replaying that as effects would be noise.
+  const fxEvents = previous !== null && newEvents.length <= MAX_FX_EVENT_BACKLOG ? newEvents : [];
+  updateBattlefield(current, glideMs, fxEvents);
+  announceWaveEnd(fxEvents);
+  renderToolbar(current);
   renderPlayerCards(current, newEvents);
   renderPhase(current);
   renderEndOverlay(current);
@@ -771,7 +810,7 @@ function msPerTick(): number {
 }
 
 function playbackShouldRun(): boolean {
-  return playing && !document.hidden && current?.phase === "wave" && !el.gameScreen.classList.contains("hidden");
+  return playing && !demo.running() && !document.hidden && current?.phase === "wave" && !el.gameScreen.classList.contains("hidden");
 }
 
 function startPlayback(): void {
@@ -897,8 +936,8 @@ function towerColorClass(playerId: string): string {
   return PLAYER_COLORS[Math.max(0, Math.min(PLAYER_COLORS.length - 1, index))] ?? "p1";
 }
 
-function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0): void {
-  battlefieldMount.renderMap(snapshot, transitionMs);
+function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0, events: MatchEvent[] = []): void {
+  battlefieldMount.renderMap(snapshot, transitionMs, events);
   battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
   syncPlacementContext(snapshot);
 
@@ -908,7 +947,8 @@ function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0): vo
   }
 
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
-  el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active`;
+  const wallHint = wallMode ? " • Wall mode: click a buildable tile (Esc to leave)" : "";
+  el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active${wallHint}`;
 }
 
 function syncPlacementContext(snapshot: MatchSnapshot | null): void {
@@ -919,7 +959,8 @@ function syncPlacementContext(snapshot: MatchSnapshot | null): void {
   battlefieldMount.setPlacementContext({
     phase: snapshot.phase,
     playerId,
-    hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId)
+    hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId),
+    wallMode
   });
 }
 
@@ -932,24 +973,98 @@ function renderSnapshot(snapshot: MatchSnapshot | null): void {
   el.snapshot.value = JSON.stringify(view, null, 2);
 }
 
+function showWaveBanner(title: string, sub: string): void {
+  const strong = el.waveBanner.querySelector("strong");
+  const span = el.waveBanner.querySelector("span");
+  if (strong) strong.textContent = title;
+  if (span) span.textContent = sub;
+  el.waveBanner.classList.remove("show");
+  void el.waveBanner.offsetWidth;
+  el.waveBanner.classList.add("show");
+  if (bannerTimer !== null) {
+    clearTimeout(bannerTimer);
+  }
+  bannerTimer = setTimeout(() => el.waveBanner.classList.remove("show"), BANNER_LIFETIME_MS);
+}
+
+function announceWaveEnd(events: MatchEvent[]): void {
+  const end = events.find((event) => event.type === "wave-end");
+  if (!end) {
+    return;
+  }
+  const bonus = events.find((event) => event.type === "wave-clear-bonus");
+  const sub = bonus && bonus.type === "wave-clear-bonus" ? `Full clear: +${bonus.bonus} points each` : "Towers repaired, prepare the next wave";
+  showWaveBanner(`Wave ${end.wave} ${bonus ? "cleared" : "complete"}`, sub);
+}
+
+// Costs come from the shared cost functions so the UI can never drift from what the simulation charges.
+function renderToolbar(snapshot: MatchSnapshot | null): void {
+  if (!snapshot) {
+    return;
+  }
+  const playerId = el.playerId.value;
+  const player = snapshot.players.find((entry) => entry.id === playerId);
+  const tower = snapshot.towers.find((entry) => entry.playerId === playerId);
+  const points = player?.points ?? 0;
+  const wallCost = getWallCost(snapshot.walls.length);
+  const upgradeCost = tower ? getTowerUpgradeCost(tower.level) : null;
+  el.wallCost.textContent = `${wallCost}`;
+  el.wallCost.classList.toggle("short", points < wallCost);
+  el.upgradeCost.textContent = upgradeCost === null ? "-" : `${upgradeCost}`;
+  el.upgradeCost.classList.toggle("short", upgradeCost !== null && points < upgradeCost);
+  el.placeTowerBtn.classList.toggle("dim", Boolean(tower) || snapshot.phase !== "placement");
+  if (tower) {
+    el.mode.value = tower.targetMode;
+  }
+}
+
 function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: string | null): PlayerChipRefs {
   const root = document.createElement("div");
   root.className = "player-chip";
-  const name = document.createElement("div");
+  const swatch = document.createElement("div");
+  swatch.className = "chip-swatch";
+  swatch.textContent = String(playerNumber(player.id));
+  swatch.setAttribute("aria-hidden", "true");
+  const body = document.createElement("div");
+  body.className = "chip-body";
+  const top = document.createElement("div");
+  top.className = "chip-top";
+  const name = document.createElement("span");
   name.className = "player-chip-name";
+  const state = document.createElement("span");
+  state.className = "chip-state";
+  top.append(name, state);
+  const scoreRow = document.createElement("div");
+  scoreRow.className = "chip-score";
+  const points = document.createElement("span");
+  points.className = "chip-points";
+  const goal = document.createElement("div");
+  goal.className = "goal-bar";
+  goal.title = `Goal: ${WIN_SCORE} points`;
+  const goalFill = document.createElement("i");
+  goal.append(goalFill);
+  scoreRow.append(points, goal);
   const meta = document.createElement("div");
   meta.className = "player-chip-meta";
-  root.append(name, meta);
+  body.append(top, scoreRow, meta);
+  root.append(swatch, body);
   let bar: HTMLElement | null = null;
+  let barFill: HTMLElement | null = null;
   if (towerId) {
     bar = document.createElement("div");
     bar.className = "tower-hp-bar";
     bar.setAttribute("role", "progressbar");
     bar.setAttribute("aria-label", `${player.name} tower health`);
     bar.setAttribute("aria-valuemin", "0");
-    root.append(bar);
+    barFill = document.createElement("i");
+    bar.append(barFill);
+    body.append(bar);
   }
-  return { root, name, meta, bar };
+  return { root, name, state, points, goalFill, meta, bar, barFill };
+}
+
+function playerNumber(playerId: string): number {
+  return Number(playerId.replace(/\D+/g, "")) || 1;
 }
 
 // Chips are created once per (player, tower) and updated in place so HP bar transitions and pulses survive snapshots.
@@ -989,6 +1104,11 @@ function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent
     if (player.eliminated) {
       status = "eliminated";
       label = "ELIMINATED";
+    } else if (snapshot.phase === "wave") {
+      status = "fighting";
+      label = "FIGHTING";
+    } else if (!player.hasPlacedTower) {
+      label = "PLACING";
     } else if (player.readyForWave) {
       status = "ready";
       label = "READY";
@@ -1006,15 +1126,24 @@ function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent
     if (refs.name.textContent !== player.name) {
       refs.name.textContent = player.name;
     }
-    const metaText = `${player.points} pts | ${towerStatus} | ${label}`;
-    if (refs.meta.textContent !== metaText) {
-      refs.meta.textContent = metaText;
+    if (refs.state.textContent !== label) {
+      refs.state.textContent = label;
+    }
+    const pointsText = `${player.points} pts`;
+    if (refs.points.textContent !== pointsText) {
+      refs.points.textContent = pointsText;
+    }
+    refs.goalFill.style.width = `${Math.min(100, (player.points / WIN_SCORE) * 100)}%`;
+    if (refs.meta.textContent !== towerStatus) {
+      refs.meta.textContent = towerStatus;
     }
 
-    if (tower && refs.bar) {
+    if (tower && refs.bar && refs.barFill) {
+      const ratio = tower.maxHealth > 0 ? tower.health / tower.maxHealth : 0;
       refs.bar.setAttribute("aria-valuemax", String(tower.maxHealth));
       refs.bar.setAttribute("aria-valuenow", String(tower.health));
-      refs.bar.style.width = `${(tower.health / tower.maxHealth) * 100}%`;
+      refs.barFill.style.width = `${ratio * 100}%`;
+      refs.bar.dataset.level = ratio > 0.6 ? "high" : ratio > 0.3 ? "mid" : "low";
       if (repairedTowerIds.has(tower.id)) {
         // Restart the animation if a previous pulse class is still present.
         refs.bar.classList.remove("repair-pulse");
@@ -1360,7 +1489,11 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
       addFeedback("rejected", "Command rejected", command.type, result?.reason);
     } else {
       setStatus("accepted");
-      addFeedback("accepted", "Command accepted", command.type);
+      if (command.type === "place-wall") {
+        addFeedback("accepted", "Wall placed");
+      } else if (command.type === "upgrade-tower") {
+        addFeedback("accepted", "Tower upgraded");
+      }
     }
 
     if (!data.snapshot || !applyWireSnapshot(data.snapshot, seq)) {
@@ -1372,6 +1505,20 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
     addFeedback("error", "Command failed", command.type, message);
   }
 }
+
+el.demoBtn.addEventListener("click", () => {
+  if (demo.running()) {
+    demo.stop();
+    el.demoBtn.textContent = "Demo Combat";
+    void fetchSnapshot({ silentStatus: true });
+    return;
+  }
+  if (demo.start()) {
+    el.demoBtn.textContent = "Stop Demo";
+  } else {
+    addFeedback("info", "Place at least one tower before starting the demo");
+  }
+});
 
 el.menuPlayerCount.addEventListener("change", renderMenuPlayerInputs);
 el.menuStartBtn.addEventListener("click", () => {
@@ -1468,7 +1615,7 @@ must<HTMLButtonElement>("upgradeBtn").addEventListener("click", () => {
   });
 });
 
-must<HTMLButtonElement>("modeBtn").addEventListener("click", () => {
+el.mode.addEventListener("change", () => {
   const requestedMode = String(el.mode.value);
   const mode: TowerTargetMode = TARGET_MODES.includes(requestedMode as TowerTargetMode)
     ? (requestedMode as TowerTargetMode)
@@ -1481,6 +1628,10 @@ must<HTMLButtonElement>("modeBtn").addEventListener("click", () => {
     towerId: playerTowerId(playerId),
     mode
   });
+});
+
+el.placeTowerBtn.addEventListener("click", () => {
+  placeTowerForSelectedPlayer();
 });
 
 must<HTMLButtonElement>("advanceBtn").addEventListener("click", () => {
@@ -1581,8 +1732,8 @@ for (const element of document.querySelectorAll(".debug-only")) {
 }
 
 renderMenuPlayerInputs();
+paintHero(must<HTMLCanvasElement>("menuHero"));
 renderPhase(null);
-renderFeedbackQueue();
 showMenuScreen();
 setStatus("No match yet.");
 setMenuMessage("Create a local match or reconnect to an existing one.");
@@ -1606,16 +1757,17 @@ window.__testBoard = {
     return findBuildableCellsInOrder()[index] ?? null;
   },
   cellSize(): number {
-    return cellSizeForWidth(current?.map.width ?? 64);
+    return battlefieldMount.cellSize();
   },
+  // CSS pixels relative to the canvas element, so it stays right when CSS scales the canvas.
   cellToPixel(x: number, y: number): { x: number; y: number } {
-    const size = cellSizeForWidth(current?.map.width ?? 64);
-    return { x: x * size + size / 2, y: y * size + size / 2 };
+    return battlefieldMount.cellToCss(x, y);
   },
   creaturePositions(): Array<{ id: string; x: number; y: number }> {
     return battlefieldMount.creaturePositions();
   },
   playback(): { playing: boolean; speed: number } {
     return { playing, speed: playbackSpeed };
-  }
+  },
+  ...(DEBUG ? { demo } : {})
 };
