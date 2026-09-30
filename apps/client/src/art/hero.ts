@@ -1,8 +1,7 @@
 // Static title-screen diorama drawn with the same painters as the board sprites.
 import type { CreatureArchetype, MapCell } from "@tower-defense/shared";
 
-import { hash3 } from "./palette";
-import { PLAYER_COLORS } from "./palette";
+import { PLAYER_COLORS, hash3 } from "./palette";
 import { paintCreature, paintTerrain, paintTowerBadge, paintTowerBase, paintTurret } from "./paint";
 
 const COLS = 24;

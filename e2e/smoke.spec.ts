@@ -232,3 +232,51 @@ test("creatures glide between snapshots instead of jumping", async ({ page }) =>
   expect(samples.some((x) => Math.abs(x - Math.round(x - 0.5) - 0.5) > 0.1)).toBe(true);
   expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(1);
 });
+
+test("tile clicks stay accurate when CSS scales the canvas down", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 600 });
+  await startMatch(page, "/");
+
+  const canvas = page.locator("#board canvas");
+  const box = await canvas.boundingBox();
+  const internalWidth = await canvas.evaluate((element) => (element as HTMLCanvasElement).width);
+  expect(box).not.toBeNull();
+  // The board must actually be scaled for this test to mean anything.
+  expect(box && box.width < internalWidth - 50).toBe(true);
+
+  // Computed from the on-screen rectangle only (not via the board hook) so scaling bugs cannot cancel out.
+  const cell = await page.evaluate(() => window.__testBoard?.findBuildableCell(25) ?? null);
+  const map = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { map: { width: number; height: number } } };
+  expect(cell).not.toBeNull();
+  if (!box || !cell) {
+    return;
+  }
+  await canvas.click({
+    position: {
+      x: ((cell.x + 0.5) / map.snapshot.map.width) * box.width,
+      y: ((cell.y + 0.5) / map.snapshot.map.height) * box.height
+    }
+  });
+
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  const after = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ x: number; y: number }> } };
+  expect(after.snapshot.towers).toHaveLength(1);
+  expect(after.snapshot.towers[0]).toMatchObject({ x: cell.x, y: cell.y });
+});
+
+test("debug demo combat shows synthetic creatures and stops cleanly", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await startMatch(page, "/?debug=1");
+  await clickBuildableCell(page, 10);
+  await page.locator("#playerId").selectOption("p2");
+  await clickBuildableCell(page, 200);
+
+  await page.locator("#demoBtn").click();
+  await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
+  await expect.poll(() => page.evaluate(() => window.__testBoard?.creaturePositions().length ?? 0), { timeout: 10_000 }).toBeGreaterThan(2);
+
+  await page.locator("#demoBtn").click();
+  await expect(page.locator("#demoBtn")).toHaveText("Demo Combat");
+  expect(errors).toEqual([]);
+});

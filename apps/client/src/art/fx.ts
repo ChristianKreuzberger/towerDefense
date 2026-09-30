@@ -52,10 +52,6 @@ export class Effects {
     this.cellSize = cellSize;
   }
 
-  get busy(): boolean {
-    return this.activeCount > 0;
-  }
-
   clear(): void {
     for (const sprite of this.sprites) {
       sprite.active = false;
