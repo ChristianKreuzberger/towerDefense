@@ -30,14 +30,20 @@ async function clickBuildableCell(page: Page, index = 0): Promise<void> {
 }
 
 async function startMatch(page: Page, path: string): Promise<void> {
+  // Register before goto so the load-time snapshot response can't be missed.
+  const reconnect = page.waitForResponse((response) => response.url().includes("/api/snapshot"));
   await page.goto(path);
+  const hasMatch = (await (await reconnect).json()).ok === true;
   // The host keeps the previous test's match alive, and the client reconnects to it on load.
-  // Wait for real state (reconnected match or fresh menu) instead of racing the reconnect request.
-  const backToMenu = page.getByRole("button", { name: "Back To Menu" });
-  const startButton = page.getByRole("button", { name: "Start Match" });
-  await expect(backToMenu.or(startButton)).toBeVisible();
-  if (await backToMenu.isVisible()) {
-    await backToMenu.click();
+  // A playback tick still in flight can re-show the game screen right after "Back To Menu", so retry until the menu sticks.
+  if (hasMatch) {
+    await expect(async () => {
+      const backToMenu = page.getByRole("button", { name: "Back To Menu" });
+      if (await backToMenu.isVisible()) {
+        await backToMenu.click();
+      }
+      await expect(page.locator("#menuScreen")).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
   }
   await expect(page.locator("#menuScreen")).toBeVisible();
   await page.locator("#menuSeed").fill("777");
