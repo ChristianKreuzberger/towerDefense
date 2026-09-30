@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 
+import { MOVEMENT_PROGRESS_UNITS_PER_CELL } from "@tower-defense/shared";
 import type { Creature, CreatureArchetype, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
 
 const COLOR_BUILDABLE = 0x3f6b3a;
@@ -32,6 +33,7 @@ const COLOR_HOVER = 0x8be9fd;
 const COLOR_INVALID_FLASH = 0xff4d4d;
 
 const POP_DURATION_MS = 220;
+const TERRAIN_TEXTURE_KEY = "terrain-base";
 
 export function cellSizeForWidth(width: number): number {
   if (width > 40) {
@@ -41,6 +43,10 @@ export function cellSizeForWidth(width: number): number {
     return 16;
   }
   return 24;
+}
+
+function cssColor(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
 }
 
 function colorForPlayer(playerId: string): number {
@@ -66,11 +72,34 @@ interface TowerVisual {
   label: Phaser.GameObjects.Text;
 }
 
+interface CreatureVisual {
+  container: Phaser.GameObjects.Container;
+  disc: Phaser.GameObjects.Arc;
+  glyph: Phaser.GameObjects.Text;
+  archetype: CreatureArchetype;
+  // Logical (cell-space) motion segment; current* is what is drawn this frame.
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  curX: number;
+  curY: number;
+  dirX: number;
+  dirY: number;
+  cellX: number;
+  cellY: number;
+  startedAt: number;
+  durationMs: number;
+}
+
 class BattlefieldScene extends Phaser.Scene {
-  private terrain?: Phaser.GameObjects.Graphics;
-  private wallsGraphics?: Phaser.GameObjects.Graphics;
-  private creaturesGraphics?: Phaser.GameObjects.Graphics;
-  private creatureLabels?: Phaser.GameObjects.Container;
+  private terrainImage: Phaser.GameObjects.Image | undefined;
+  private wearGraphics?: Phaser.GameObjects.Graphics;
+  private mapKey: string | null = null;
+  private wearSignature = -1;
+  private wallVisuals = new Map<string, Phaser.GameObjects.Rectangle>();
+  private creatureVisuals = new Map<string, CreatureVisual>();
+  private creaturePool: CreatureVisual[] = [];
   private cursorGraphics?: Phaser.GameObjects.Graphics;
   private hoverGraphics?: Phaser.GameObjects.Graphics;
   private ghostGraphics?: Phaser.GameObjects.Graphics;
@@ -98,10 +127,7 @@ class BattlefieldScene extends Phaser.Scene {
       && typeof window.matchMedia === "function"
       && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    this.terrain = this.add.graphics().setDepth(DEPTH_TERRAIN);
-    this.wallsGraphics = this.add.graphics().setDepth(DEPTH_WALLS);
-    this.creaturesGraphics = this.add.graphics().setDepth(DEPTH_CREATURES);
-    this.creatureLabels = this.add.container(0, 0).setDepth(DEPTH_CREATURES);
+    this.wearGraphics = this.add.graphics().setDepth(DEPTH_TERRAIN + 0.5);
     this.cursorGraphics = this.add.graphics().setDepth(DEPTH_CURSOR);
     this.hoverGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
     this.ghostGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
@@ -114,18 +140,37 @@ class BattlefieldScene extends Phaser.Scene {
       this.pendingCursor = null;
     }
     if (this.pendingSnapshot !== null) {
-      this.draw(this.pendingSnapshot);
+      this.draw(this.pendingSnapshot, 0);
     } else {
       this.drawCursor();
     }
   }
 
-  renderSnapshot(snapshot: MatchSnapshot | null): void {
-    if (!this.terrain) {
+  renderSnapshot(snapshot: MatchSnapshot | null, transitionMs = 0): void {
+    if (!this.wearGraphics) {
       this.pendingSnapshot = snapshot;
       return;
     }
-    this.draw(snapshot);
+    this.draw(snapshot, transitionMs);
+  }
+
+  // Test/diagnostic view of the pooled creature objects (cell-space positions as drawn this frame).
+  creaturePositions(): Array<{ id: string; x: number; y: number }> {
+    return [...this.creatureVisuals.entries()].map(([id, visual]) => ({ id, x: visual.curX, y: visual.curY }));
+  }
+
+  override update(): void {
+    if (document.hidden || this.creatureVisuals.size === 0) {
+      return;
+    }
+    const now = performance.now();
+    const cellSize = this.cellSize;
+    for (const visual of this.creatureVisuals.values()) {
+      const t = visual.durationMs <= 0 ? 1 : Math.min(1, (now - visual.startedAt) / visual.durationMs);
+      visual.curX = visual.fromX + (visual.toX - visual.fromX) * t;
+      visual.curY = visual.fromY + (visual.toY - visual.fromY) * t;
+      visual.container.setPosition(visual.curX * cellSize, visual.curY * cellSize);
+    }
   }
 
   setOnCellClick(callback: ((x: number, y: number) => void) | undefined): void {
@@ -274,36 +319,37 @@ class BattlefieldScene extends Phaser.Scene {
     graphics.strokeRect(x + 1, y + 1, cellSize - 2, cellSize - 2);
   }
 
-  private draw(snapshot: MatchSnapshot | null): void {
-    const graphics = this.terrain;
-    if (!graphics) {
+  private draw(snapshot: MatchSnapshot | null, transitionMs: number): void {
+    if (!this.wearGraphics) {
       return;
     }
-    graphics.clear();
-    this.wallsGraphics?.clear();
-    this.creaturesGraphics?.clear();
-    this.creatureLabels?.removeAll(true);
 
     if (!snapshot) {
       this.cellsByKey = new Map();
       this.occupiedCells = new Set();
+      this.mapKey = null;
+      this.terrainImage?.destroy();
+      this.terrainImage = undefined;
+      this.wearGraphics.clear();
+      this.wearSignature = -1;
       for (const visual of this.towerVisuals.values()) {
         visual.container.destroy();
       }
       this.towerVisuals.clear();
+      this.syncWalls([], this.cellSize);
+      this.syncCreatures([], this.cellSize, 0);
       this.drawCursor();
       this.drawHoverAndGhost();
       return;
     }
 
-    const { width, height, cells } = snapshot.map;
+    const { width, height, seed } = snapshot.map;
     const cellSize = cellSizeForWidth(width);
-    this.cellSize = cellSize;
-    const cellsByKey = new Map<string, MatchSnapshot["map"]["cells"][number]>();
-    for (const cell of cells) {
-      cellsByKey.set(`${cell.x},${cell.y}`, cell);
+    const mapKey = `${seed}:${width}x${height}`;
+    if (mapKey !== this.mapKey) {
+      this.rebuildMap(snapshot.map, mapKey, cellSize);
     }
-    this.cellsByKey = cellsByKey;
+    this.syncWear(snapshot.map.cells, cellSize);
 
     const occupiedCells = new Set<string>();
     for (const tower of snapshot.towers) {
@@ -314,43 +360,107 @@ class BattlefieldScene extends Phaser.Scene {
     }
     this.occupiedCells = occupiedCells;
 
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const cell = cellsByKey.get(`${x},${y}`);
-        let color = COLOR_BLOCKED;
-        if (cell) {
-          if (cell.buildable) {
-            color = COLOR_BUILDABLE;
-          } else {
-            color = cell.pathWear > 0 ? COLOR_PATH_WORN : COLOR_PATH;
-          }
-        }
-        graphics.fillStyle(color, 1);
-        graphics.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-      }
-    }
-
-    this.drawWalls(snapshot.walls, cellSize);
+    this.syncWalls(snapshot.walls, cellSize);
     this.drawTowers(snapshot.towers, cellSize);
-    this.drawCreatures(snapshot.creatures, cellSize);
-    this.drawCursor();
+    this.syncCreatures(snapshot.creatures, cellSize, transitionMs);
     this.drawHoverAndGhost();
-
-    const game = this.game;
-    game.scale.resize(width * cellSize, height * cellSize);
   }
 
-  private drawWalls(walls: Wall[], cellSize: number): void {
-    const graphics = this.wallsGraphics;
+  // Runs only when the map identity (seed + size) changes: indexes cells, bakes terrain once, resizes the canvas.
+  private rebuildMap(map: MatchSnapshot["map"], mapKey: string, cellSize: number): void {
+    this.mapKey = mapKey;
+    this.cellSize = cellSize;
+    const cellsByKey = new Map<string, MatchSnapshot["map"]["cells"][number]>();
+    for (const cell of map.cells) {
+      cellsByKey.set(`${cell.x},${cell.y}`, cell);
+    }
+    this.cellsByKey = cellsByKey;
+
+    const pixelWidth = map.width * cellSize;
+    const pixelHeight = map.height * cellSize;
+
+    // A canvas texture (rather than Graphics) is uploaded once; Graphics would be re-tessellated every frame.
+    this.terrainImage?.destroy();
+    if (this.textures.exists(TERRAIN_TEXTURE_KEY)) {
+      this.textures.remove(TERRAIN_TEXTURE_KEY);
+    }
+    const texture = this.textures.createCanvas(TERRAIN_TEXTURE_KEY, pixelWidth, pixelHeight);
+    if (texture) {
+      const ctx = texture.context;
+      ctx.fillStyle = cssColor(COLOR_BLOCKED);
+      ctx.fillRect(0, 0, pixelWidth, pixelHeight);
+      for (const cell of map.cells) {
+        ctx.fillStyle = cssColor(cell.buildable ? COLOR_BUILDABLE : COLOR_PATH);
+        ctx.fillRect(cell.x * cellSize, cell.y * cellSize, cellSize, cellSize);
+      }
+      texture.refresh();
+      this.terrainImage = this.add.image(0, 0, TERRAIN_TEXTURE_KEY).setOrigin(0, 0).setDepth(DEPTH_TERRAIN);
+    }
+
+    // Entity ids repeat across matches (e.g. "tower-p1"), so never carry visuals over to a different map.
+    for (const visual of this.towerVisuals.values()) {
+      visual.container.destroy();
+    }
+    this.towerVisuals.clear();
+    this.hasRenderedTowersOnce = false;
+    for (const visual of this.creatureVisuals.values()) {
+      visual.container.setVisible(false);
+      this.creaturePool.push(visual);
+    }
+    this.creatureVisuals.clear();
+
+    this.wearSignature = -1;
+    this.game.scale.resize(pixelWidth, pixelHeight);
+    this.drawCursor();
+  }
+
+  // Worn path cells are a small overlay so the baked terrain never has to be redrawn for wear changes.
+  private syncWear(cells: MatchSnapshot["map"]["cells"], cellSize: number): void {
+    const graphics = this.wearGraphics;
     if (!graphics) {
       return;
     }
+    let signature = 0;
+    for (let index = 0; index < cells.length; index += 1) {
+      const wear = cells[index]?.pathWear ?? 0;
+      if (wear > 0) {
+        signature = (signature * 31 + index + 1 + wear * 7919) % 2147483629;
+      }
+    }
+    if (signature === this.wearSignature) {
+      return;
+    }
+    this.wearSignature = signature;
+    graphics.clear();
+    graphics.fillStyle(COLOR_PATH_WORN, 1);
+    for (const cell of cells) {
+      if (!cell.buildable && cell.pathWear > 0) {
+        graphics.fillRect(cell.x * cellSize, cell.y * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+
+  private syncWalls(walls: Wall[], cellSize: number): void {
     const wallWidth = cellSize * 0.75;
     const wallHeight = cellSize * 0.375;
+    const seen = new Set<string>();
     for (const wall of walls) {
+      seen.add(wall.id);
       const { cx, cy } = cellCenter(wall.x, wall.y, cellSize);
-      graphics.fillStyle(COLOR_WALL, 1);
-      graphics.fillRect(cx - wallWidth / 2, cy - wallHeight / 2, wallWidth, wallHeight);
+      let visual = this.wallVisuals.get(wall.id);
+      if (!visual) {
+        visual = this.add.rectangle(cx, cy, wallWidth, wallHeight, COLOR_WALL, 1).setDepth(DEPTH_WALLS);
+        this.wallVisuals.set(wall.id, visual);
+      } else if (visual.x !== cx || visual.y !== cy || visual.width !== wallWidth) {
+        visual.setPosition(cx, cy);
+        visual.setSize(wallWidth, wallHeight);
+      }
+    }
+    for (const [id, visual] of this.wallVisuals) {
+      if (!seen.has(id)) {
+        visual.destroy();
+        this.wallVisuals.delete(id);
+      }
     }
   }
 
@@ -422,8 +532,14 @@ class BattlefieldScene extends Phaser.Scene {
       visual.glow.setFillStyle(color, 0);
     }
 
-    visual.label.setText(`T${tower.level}`);
-    visual.label.setFontSize(Math.max(8, Math.floor(cellSize * 0.4)));
+    const labelText = `T${tower.level}`;
+    if (visual.label.text !== labelText) {
+      visual.label.setText(labelText);
+    }
+    const fontSize = Math.max(8, Math.floor(cellSize * 0.4));
+    if (visual.label.style.fontSize !== `${fontSize}px`) {
+      visual.label.setFontSize(fontSize);
+    }
   }
 
   private playTowerPopAnimation(container: Phaser.GameObjects.Container): void {
@@ -448,46 +564,80 @@ class BattlefieldScene extends Phaser.Scene {
     });
   }
 
-  private drawCreatures(creatures: Creature[], cellSize: number): void {
-    const graphics = this.creaturesGraphics;
-    const labels = this.creatureLabels;
-    if (!graphics || !labels) {
-      return;
-    }
-    const radius = cellSize * 0.3;
-
-    const creaturesByCell = new Map<string, Creature[]>();
-    for (const creature of creatures) {
-      const key = `${creature.x},${creature.y}`;
-      const list = creaturesByCell.get(key) ?? [];
-      list.push(creature);
-      creaturesByCell.set(key, list);
-    }
-
-    for (const stack of creaturesByCell.values()) {
-      const first = stack[0];
-      if (!first) {
-        continue;
+  private acquireCreatureVisual(archetype: CreatureArchetype, cellSize: number): CreatureVisual {
+    const pooled = this.creaturePool.pop();
+    const fontSize = `${Math.max(8, Math.floor(cellSize * 0.35))}px`;
+    if (pooled) {
+      pooled.container.setVisible(true);
+      pooled.disc.setRadius(cellSize * 0.3);
+      pooled.glyph.setFontSize(fontSize);
+      if (pooled.archetype !== archetype) {
+        pooled.glyph.setText(CREATURE_GLYPH[archetype]);
+        pooled.archetype = archetype;
       }
-      const { cx, cy } = cellCenter(first.x, first.y, cellSize);
+      return pooled;
+    }
+    const disc = this.add.circle(0, 0, cellSize * 0.3, COLOR_CREATURE, 1);
+    const glyph = this.add.text(0, 0, CREATURE_GLYPH[archetype], { fontSize, color: "#ffffff" }).setOrigin(0.5, 0.5);
+    const container = this.add.container(0, 0, [disc, glyph]).setDepth(DEPTH_CREATURES);
+    return {
+      container, disc, glyph, archetype,
+      fromX: 0, fromY: 0, toX: 0, toY: 0, curX: 0, curY: 0,
+      dirX: 1, dirY: 0, cellX: 0, cellY: 0, startedAt: 0, durationMs: 0
+    };
+  }
 
-      graphics.fillStyle(COLOR_CREATURE, 1);
-      graphics.fillCircle(cx, cy, radius);
+  // Creatures are keyed by id and moved in place; update() interpolates between successive snapshot positions.
+  private syncCreatures(creatures: Creature[], cellSize: number, transitionMs: number): void {
+    const now = performance.now();
+    const seen = new Set<string>();
+    for (const creature of creatures) {
+      seen.add(creature.id);
+      let visual = this.creatureVisuals.get(creature.id);
+      const isNew = !visual;
+      if (!visual) {
+        visual = this.acquireCreatureVisual(creature.archetype, cellSize);
+        this.creatureVisuals.set(creature.id, visual);
+      }
 
-      const glyphText = this.add.text(cx, cy, CREATURE_GLYPH[first.archetype], {
-        fontSize: `${Math.max(8, Math.floor(cellSize * 0.35))}px`,
-        color: "#ffffff"
-      });
-      glyphText.setOrigin(0.5, 0.5);
-      labels.add(glyphText);
+      if (!isNew) {
+        const dx = creature.x - visual.cellX;
+        const dy = creature.y - visual.cellY;
+        if (Math.abs(dx) + Math.abs(dy) === 1) {
+          visual.dirX = dx;
+          visual.dirY = dy;
+        }
+      }
+      visual.cellX = creature.x;
+      visual.cellY = creature.y;
 
-      if (stack.length > 1) {
-        const badgeText = this.add.text(cx + radius * 0.8, cy - radius * 0.8, `+${stack.length - 1}`, {
-          fontSize: `${Math.max(7, Math.floor(cellSize * 0.28))}px`,
-          color: "#ffdd88"
-        });
-        badgeText.setOrigin(0.5, 0.5);
-        labels.add(badgeText);
+      // pathProgressUnits (100 per cell) is the fraction travelled towards the next path cell.
+      const progress = creature.pathProgressUnits / MOVEMENT_PROGRESS_UNITS_PER_CELL;
+      const targetX = creature.x + 0.5 + visual.dirX * progress;
+      const targetY = creature.y + 0.5 + visual.dirY * progress;
+
+      if (isNew) {
+        visual.fromX = targetX;
+        visual.fromY = targetY;
+        visual.curX = targetX;
+        visual.curY = targetY;
+        visual.durationMs = 0;
+        visual.container.setPosition(targetX * cellSize, targetY * cellSize);
+      } else {
+        visual.fromX = visual.curX;
+        visual.fromY = visual.curY;
+        visual.durationMs = transitionMs;
+      }
+      visual.toX = targetX;
+      visual.toY = targetY;
+      visual.startedAt = now;
+    }
+
+    for (const [id, visual] of this.creatureVisuals) {
+      if (!seen.has(id)) {
+        visual.container.setVisible(false);
+        this.creaturePool.push(visual);
+        this.creatureVisuals.delete(id);
       }
     }
   }
@@ -498,7 +648,8 @@ export interface BattlefieldMountOptions {
 }
 
 export interface BattlefieldMount {
-  renderMap(snapshot: MatchSnapshot | null): void;
+  renderMap(snapshot: MatchSnapshot | null, transitionMs?: number): void;
+  creaturePositions(): Array<{ id: string; x: number; y: number }>;
   setCursor(x: number, y: number): void;
   setPlacementContext(context: PlacementContext): void;
   destroy(): void;
@@ -519,8 +670,11 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
   game.scene.add("battlefield", scene, true);
 
   return {
-    renderMap(snapshot: MatchSnapshot | null): void {
-      scene?.renderSnapshot(snapshot);
+    renderMap(snapshot: MatchSnapshot | null, transitionMs = 0): void {
+      scene?.renderSnapshot(snapshot, transitionMs);
+    },
+    creaturePositions(): Array<{ id: string; x: number; y: number }> {
+      return scene.creaturePositions();
     },
     setCursor(x: number, y: number): void {
       scene?.setCursor(x, y);

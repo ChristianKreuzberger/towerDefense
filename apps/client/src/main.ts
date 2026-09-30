@@ -1,4 +1,4 @@
-import type { MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
+import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { cellSizeForWidth, createBattlefieldMount } from "./battlefield-scene";
 import { perfRecordBytes, perfTimeApply } from "./perf";
@@ -8,6 +8,8 @@ interface TestBoardHook {
   findBuildableCell(index?: number): { x: number; y: number } | null;
   cellSize(): number;
   cellToPixel(x: number, y: number): { x: number; y: number };
+  creaturePositions(): Array<{ id: string; x: number; y: number }>;
+  playback(): { playing: boolean; speed: number };
 }
 
 declare global {
@@ -25,9 +27,16 @@ type ApiErrorPayload = {
   message?: string;
 };
 
+// Snapshot as sent by the host: lite responses carry wornCells/eventsOffset instead of map.cells (see spec/07).
+type WireSnapshot = Omit<MatchSnapshot, "map"> & {
+  map: { width: number; height: number; seed: number; cells?: MapCell[]; wornCells?: Array<{ x: number; y: number; pathWear: number }> };
+  eventsOffset?: number;
+  eventsTotal?: number;
+};
+
 type ApiStartPayload = {
   ok: boolean;
-  snapshot?: MatchSnapshot;
+  snapshot?: WireSnapshot;
   setup?: MatchSetup;
   error?: string;
   message?: string;
@@ -39,7 +48,7 @@ type ApiCommandPayload = {
     accepted: boolean;
     reason?: string;
   };
-  snapshot?: MatchSnapshot;
+  snapshot?: WireSnapshot;
   error?: string;
   message?: string;
 };
@@ -48,7 +57,7 @@ type ApiAdvanceManyPayload = {
   ok: boolean;
   acceptedTicks?: number;
   stoppedReason?: string;
-  snapshot?: MatchSnapshot;
+  snapshot?: WireSnapshot;
   error?: string;
   message?: string;
 };
@@ -68,7 +77,15 @@ interface FetchSnapshotOptions {
   silentStatus?: boolean;
 }
 
-type GuideAction = "focus-place" | "place-tower" | "ready-player" | "advance-wave";
+interface MapCache {
+  key: string;
+  cells: MapCell[];
+  byKey: Map<string, MapCell>;
+  buildable: MapCell[];
+  worn: MapCell[];
+}
+
+type GuideAction = "focus-place" | "place-tower" | "ready-player" | "toggle-playback";
 
 interface GuideState {
   key: string;
@@ -86,21 +103,53 @@ interface MenuPlayerInput {
 }
 
 const FEEDBACK_CAPACITY = 12;
-const POLL_INTERVAL_MS = 450;
-const MAX_POLLING_ERRORS = 3;
+// 5 ticks/s at 1x: creatures cover up to 5 cells/s, slow enough to follow and fast enough that a wave is over in seconds.
+const BASE_TICKS_PER_SECOND = 5;
+const PLAYBACK_SPEEDS = [1, 2, 4] as const;
+const PLAYBACK_CHECK_INTERVAL_MS = 50;
+const MAX_TICKS_PER_REQUEST = 4;
+const MAX_PLAYBACK_ERRORS = 3;
+const MANUAL_TRANSITION_MS = 120;
+// Only these events drive presentation; the rest (movement, targeting, telemetry) would bloat the retained log.
+const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]> = new Set([
+  "tower-repaired",
+  "wall-repaired",
+  "path-repaired",
+  "wave-clear-bonus"
+]);
+const EVENT_LOG_CAPACITY = 200;
+
+const searchParams = new URLSearchParams(window.location.search);
+const DEBUG = searchParams.get("debug") === "1";
 
 let current: MatchSnapshot | null = null;
 let feedbackItems: FeedbackItem[] = [];
 let feedbackIdCounter = 1;
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-let pollingActive = false;
-let pollingInFlight = false;
-let pollingErrorCount = 0;
 let menuPlayers: MenuPlayerInput[] = [];
 let guideDismissedKey: string | null = null;
 let lastGuideKey = "";
-let lastGuideUpdateAt = 0;
-let processedEventCount = 0;
+let mapCache: MapCache | null = null;
+let eventLog: MatchEvent[] = [];
+let eventCursor = 0;
+let requestSeq = 0;
+let appliedSeq = 0;
+let playing = true;
+let playbackSpeed: (typeof PLAYBACK_SPEEDS)[number] = 1;
+let playbackTimer: ReturnType<typeof setInterval> | null = null;
+let playbackLastClock = 0;
+let tickDebt = 0;
+let playbackInFlight = false;
+let playbackErrors = 0;
+let wallMode = false;
+let playerSignature = "";
+let chipStructureSignature = "";
+interface PlayerChipRefs {
+  root: HTMLElement;
+  name: HTMLElement;
+  meta: HTMLElement;
+  bar: HTMLElement | null;
+}
+let playerChips = new Map<string, PlayerChipRefs>();
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) {
@@ -163,6 +212,22 @@ app.innerHTML = `
         <div class="battlefield-header">
           <h3>Battlefield</h3>
           <div class="small" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
+          <div id="playbackControls" class="playback-controls hidden" role="group" aria-label="Playback">
+            <button id="playPauseBtn" aria-pressed="true">Pause</button>
+            <button class="speed-btn" data-speed="1" aria-pressed="true">1x</button>
+            <button class="speed-btn" data-speed="2" aria-pressed="false">2x</button>
+            <button class="speed-btn" data-speed="4" aria-pressed="false">4x</button>
+          </div>
+        </div>
+        <div id="guideOverlay" class="guide-overlay guide-idle" aria-live="polite">
+          <div id="guideCard" class="guide-card hint">
+            <div class="guide-text">
+              <div id="guideTitle" class="guide-title"></div>
+              <div id="guideBody" class="guide-body"></div>
+            </div>
+            <button id="guideActionBtn" class="guide-action"></button>
+            <button id="guideCloseBtn" class="guide-close" aria-label="Dismiss guidance">x</button>
+          </div>
         </div>
         <div id="board" class="board-grid"></div>
       </section>
@@ -176,7 +241,7 @@ app.innerHTML = `
         <label>Active Player</label>
         <select id="playerId"></select>
 
-        <div class="grid2">
+        <div class="grid2 debug-only">
           <div>
             <label>Wall X</label>
             <input id="x" type="number" value="0" />
@@ -197,11 +262,11 @@ app.innerHTML = `
 
         <div class="stack">
           <button id="readyBtn" class="good">Ready For Wave</button>
-          <button id="placeWallBtn">Place Wall</button>
+          <button id="placeWallBtn" aria-pressed="false">Place Wall</button>
           <button id="upgradeBtn">Upgrade Tower</button>
           <button id="modeBtn">Apply Target Mode</button>
-          <button id="advanceBtn" class="primary">Advance Wave Tick</button>
-          <button id="autoBtn">Advance Wave (Auto)</button>
+          <button id="advanceBtn" class="primary debug-only">Advance Wave Tick</button>
+          <button id="autoBtn" class="debug-only">Advance Wave (Auto)</button>
           <button id="refreshBtn">Refresh Snapshot</button>
           <button id="backToMenuBtn">Back To Menu</button>
         </div>
@@ -214,15 +279,15 @@ app.innerHTML = `
       </aside>
     </div>
 
-    <section class="snapshot-panel card">
+    <section class="snapshot-panel card debug-only">
       <h3>Snapshot JSON</h3>
       <textarea id="snapshot" readonly></textarea>
     </section>
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall <kbd>U</kbd> upgrade <kbd>A</kbd> tick</div>
-    <div><kbd>Arrows</kbd> move X/Y</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd> upgrade <kbd>P</kbd> pause</div>
+    <div><kbd>Arrows</kbd> move cursor <kbd>Click</kbd> tile to place</div>
   </footer>
 
   <div class="match-end-overlay" id="matchEndOverlay">
@@ -235,15 +300,6 @@ app.innerHTML = `
         <button id="restartBtn" class="primary">Return To Menu</button>
         <button id="closeOverlayBtn">Close</button>
       </div>
-    </div>
-  </div>
-
-  <div id="guideOverlay" class="guide-overlay hidden" aria-live="polite">
-    <div id="guideCard" class="guide-card hint">
-      <button id="guideCloseBtn" class="guide-close" aria-label="Dismiss guidance">x</button>
-      <div id="guideTitle" class="guide-title"></div>
-      <div id="guideBody" class="guide-body"></div>
-      <button id="guideActionBtn" class="guide-action"></button>
     </div>
   </div>
 `;
@@ -266,6 +322,9 @@ const el = {
   phaseBanner: must<HTMLElement>("phaseBanner"),
   phaseLabel: must<HTMLElement>("phaseLabel"),
   phaseSub: must<HTMLElement>("phaseSub"),
+  playbackControls: must<HTMLElement>("playbackControls"),
+  playPauseBtn: must<HTMLButtonElement>("playPauseBtn"),
+  placeWallBtn: must<HTMLButtonElement>("placeWallBtn"),
   shortcutBar: must<HTMLElement>("shortcutBar"),
   overlay: must<HTMLElement>("matchEndOverlay"),
   overlaySummary: must<HTMLElement>("matchEndSummary"),
@@ -334,8 +393,7 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
 function showMenuScreen(): void {
   el.menuScreen.classList.remove("hidden");
   el.gameScreen.classList.add("hidden");
-  stopWavePolling();
-  processedEventCount = 0;
+  stopPlayback();
   hideGuideOverlay();
 }
 
@@ -428,8 +486,10 @@ function menuPlayersToSetupPlayers(): MatchSetup["players"] {
   });
 }
 
+// The guide is an inline coach mark above the board with reserved height, so it never overlaps or shifts the battlefield.
 function hideGuideOverlay(): void {
-  el.guideOverlay.classList.add("hidden");
+  el.guideOverlay.classList.add("guide-idle");
+  lastGuideKey = "";
 }
 
 function showGuideOverlay(state: GuideState): void {
@@ -438,7 +498,7 @@ function showGuideOverlay(state: GuideState): void {
   el.guideBody.textContent = state.body;
   el.guideActionBtn.textContent = state.actionLabel;
   el.guideActionBtn.dataset.action = state.action;
-  el.guideOverlay.classList.remove("hidden");
+  el.guideOverlay.classList.remove("guide-idle");
 }
 
 function activePlayerFromSnapshot(snapshot: MatchSnapshot): MatchSnapshot["players"][number] | null {
@@ -493,9 +553,9 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
         key: `start-wave-${snapshot.wave}`,
         tone: "start",
         title: "All players are ready",
-        body: "The setup is complete. Advance the first wave tick to launch the battle.",
-        actionLabel: "Start Game",
-        action: "advance-wave"
+        body: "The setup is complete. The battle starts automatically.",
+        actionLabel: "Play",
+        action: "toggle-playback"
       };
     }
 
@@ -514,9 +574,9 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
       key: `wave-${snapshot.wave}`,
       tone: "hint",
       title: "Wave in progress",
-      body: "The battle is live. Add walls, upgrade towers, and fine-tune targets while the creatures advance.",
-      actionLabel: "Advance Tick",
-      action: "advance-wave"
+      body: "The battle runs on its own. Use Place Wall, upgrades, and target modes to hold the lane, or pause to think.",
+      actionLabel: playing ? "Pause" : "Resume",
+      action: "toggle-playback"
     };
   }
 
@@ -524,12 +584,6 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
 }
 
 function syncGuideOverlay(snapshot: MatchSnapshot | null): void {
-  const now = Date.now();
-  if (now - lastGuideUpdateAt < 250) {
-    return;
-  }
-  lastGuideUpdateAt = now;
-
   const state = computeGuideState(snapshot);
   if (!state) {
     hideGuideOverlay();
@@ -537,10 +591,12 @@ function syncGuideOverlay(snapshot: MatchSnapshot | null): void {
   }
 
   if (guideDismissedKey === state.key) {
+    hideGuideOverlay();
+    guideDismissedKey = state.key;
     return;
   }
 
-  if (state.key === lastGuideKey && !el.guideOverlay.classList.contains("hidden")) {
+  if (state.key === lastGuideKey && !el.guideOverlay.classList.contains("guide-idle")) {
     return;
   }
 
@@ -565,28 +621,115 @@ function runGuideAction(action: GuideAction): void {
     return;
   }
 
-  must<HTMLButtonElement>("advanceBtn").click();
+  setPlaying(!playing);
 }
 
-function applySnapshot(snapshot: MatchSnapshot): void {
-  perfTimeApply(() => applySnapshotInner(snapshot));
+function mapKeyOf(map: { seed: number; width: number; height: number }): string {
+  return `${map.seed}:${map.width}x${map.height}`;
 }
 
-function applySnapshotInner(snapshot: MatchSnapshot): void {
-  if (snapshot.events.length < processedEventCount) {
-    processedEventCount = 0;
+function resetMatchCaches(): void {
+  eventLog = [];
+  eventCursor = 0;
+}
+
+function buildMapCache(key: string, cells: MapCell[]): MapCache {
+  const byKey = new Map<string, MapCell>();
+  const buildable: MapCell[] = [];
+  const worn: MapCell[] = [];
+  for (const cell of cells) {
+    byKey.set(`${cell.x},${cell.y}`, cell);
+    if (cell.buildable) {
+      buildable.push(cell);
+    }
+    if (cell.pathWear > 0) {
+      worn.push(cell);
+    }
+  }
+  return { key, cells, byKey, buildable, worn };
+}
+
+// Turns a wire snapshot (possibly lite) into a full MatchSnapshot. Returns null when a lite snapshot
+// arrives for a map whose cells we do not have, so the caller can fall back to a full fetch.
+function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEvents: MatchEvent[] } | null {
+  const key = mapKeyOf(wire.map);
+  if (wire.map.cells) {
+    mapCache = buildMapCache(key, wire.map.cells);
+  } else if (!mapCache || mapCache.key !== key) {
+    return null;
+  } else {
+    // The cached cell objects are mutated in place so the scene and lookups always see current wear.
+    for (const cell of mapCache.worn) {
+      cell.pathWear = 0;
+    }
+    mapCache.worn = [];
+    for (const entry of wire.map.wornCells ?? []) {
+      const cell = mapCache.byKey.get(`${entry.x},${entry.y}`);
+      if (cell) {
+        cell.pathWear = entry.pathWear;
+        mapCache.worn.push(cell);
+      }
+    }
   }
 
-  const newEvents = snapshot.events.slice(processedEventCount);
-  processedEventCount = snapshot.events.length;
+  const offset = wire.eventsOffset ?? 0;
+  const tail = wire.events;
+  const total = wire.eventsTotal ?? offset + tail.length;
+  let newEvents: MatchEvent[];
+  if (total < eventCursor) {
+    // The host restarted its match behind our back; drop history rather than replaying it.
+    eventLog = [];
+    newEvents = [];
+  } else {
+    newEvents = tail.slice(Math.max(0, eventCursor - offset));
+  }
+  eventCursor = total;
+  const retained = newEvents.filter((event) => RETAINED_EVENT_TYPES.has(event.type));
+  if (retained.length > 0) {
+    eventLog = [...eventLog, ...retained].slice(-EVENT_LOG_CAPACITY);
+  }
+
+  const snapshot: MatchSnapshot = {
+    ...wire,
+    map: { width: wire.map.width, height: wire.map.height, seed: wire.map.seed, cells: mapCache.cells },
+    events: eventLog
+  };
+  return { snapshot, newEvents };
+}
+
+// Applies a host response unless a newer one was already applied. Returns false when a full refetch is needed.
+function applyWireSnapshot(wire: WireSnapshot, seq: number, transitionMs = MANUAL_TRANSITION_MS): boolean {
+  if (seq < appliedSeq) {
+    return true;
+  }
+  const hydrated = hydrateSnapshot(wire);
+  if (!hydrated) {
+    return false;
+  }
+  appliedSeq = seq;
+  applySnapshot(hydrated.snapshot, hydrated.newEvents, transitionMs);
+  return true;
+}
+
+function applySnapshot(snapshot: MatchSnapshot, newEvents: MatchEvent[], transitionMs = MANUAL_TRANSITION_MS): void {
+  perfTimeApply(() => applySnapshotInner(snapshot, newEvents, transitionMs));
+}
+
+function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[], transitionMs: number): void {
+  const previous = current;
   current = snapshot;
+  // Real ticks between snapshots set how long creatures glide; anything else (new wave, rewind) snaps quickly.
+  const ticksElapsed = previous && previous.wave === snapshot.wave && previous.phase === "wave" && snapshot.phase === "wave"
+    ? snapshot.waveTick - previous.waveTick
+    : 0;
+  const glideMs = ticksElapsed > 0 ? ticksElapsed * msPerTick() : Math.min(transitionMs, MANUAL_TRANSITION_MS);
+
   announceRepairEvents(snapshot, newEvents);
   showGameScreen();
   updatePlayerOptions(current);
   syncCursorToBuildableCell(current);
-  updateBattlefield(current);
-  renderPlayerCards(current);
-  pulseRepairedTowers(newEvents);
+  updateBattlefield(current, glideMs);
+  renderPlayerCards(current, newEvents);
   renderPhase(current);
   renderEndOverlay(current);
   renderSnapshot(current);
@@ -623,73 +766,101 @@ function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["ev
   }
 }
 
-function pulseRepairedTowers(events: MatchSnapshot["events"]): void {
-  for (const event of events) {
-    if (event.type !== "tower-repaired") {
-      continue;
-    }
-
-    const towerBar = document.querySelector(`[data-tower-id="${event.towerId}"] .tower-hp-bar`);
-    towerBar?.classList.add("repair-pulse");
-  }
+function msPerTick(): number {
+  return 1000 / (BASE_TICKS_PER_SECOND * playbackSpeed);
 }
 
-function scheduleNextPoll(): void {
-  if (!pollingActive || pollTimer !== null) {
+function playbackShouldRun(): boolean {
+  return playing && !document.hidden && current?.phase === "wave" && !el.gameScreen.classList.contains("hidden");
+}
+
+function startPlayback(): void {
+  if (playbackTimer !== null) {
+    return;
+  }
+  playbackLastClock = performance.now();
+  tickDebt = 0;
+  playbackErrors = 0;
+  playbackTimer = setInterval(playbackStep, PLAYBACK_CHECK_INTERVAL_MS);
+}
+
+function stopPlayback(): void {
+  if (playbackTimer !== null) {
+    clearInterval(playbackTimer);
+    playbackTimer = null;
+  }
+  tickDebt = 0;
+}
+
+// Fixed-rate tick accumulator: at most one request in flight, and stalls or hidden tabs never cause a catch-up burst.
+function playbackStep(): void {
+  const now = performance.now();
+  const elapsedMs = Math.min(now - playbackLastClock, 250);
+  playbackLastClock = now;
+  if (!playbackShouldRun()) {
+    tickDebt = 0;
     return;
   }
 
-  pollTimer = setTimeout(() => {
-    pollTimer = null;
-    void runPollCycle();
-  }, POLL_INTERVAL_MS);
-}
-
-function startWavePolling(): void {
-  if (pollingActive) {
+  tickDebt = Math.min(tickDebt + (elapsedMs / 1000) * BASE_TICKS_PER_SECOND * playbackSpeed, MAX_TICKS_PER_REQUEST);
+  const ticks = Math.floor(tickDebt);
+  if (playbackInFlight || ticks < 1) {
     return;
   }
-
-  pollingActive = true;
-  pollingErrorCount = 0;
-  scheduleNextPoll();
+  tickDebt -= ticks;
+  playbackInFlight = true;
+  void advanceTicks(ticks).finally(() => {
+    playbackInFlight = false;
+  });
 }
 
-function stopWavePolling(): void {
-  pollingActive = false;
-  pollingErrorCount = 0;
-  if (pollTimer !== null) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
-  }
-}
-
-async function runPollCycle(): Promise<void> {
-  if (!pollingActive || pollingInFlight) {
-    return;
-  }
-
-  pollingInFlight = true;
+async function advanceTicks(ticks: number): Promise<void> {
+  const seq = ++requestSeq;
   try {
-    const snapshot = await fetchSnapshot({ silentStatus: true });
-    if (snapshot) {
-      pollingErrorCount = 0;
-    } else {
-      pollingErrorCount += 1;
+    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks, lite: true, eventsSince: eventCursor });
+    playbackErrors = 0;
+    if (data.snapshot && !applyWireSnapshot(data.snapshot, seq)) {
+      await fetchSnapshot({ silentStatus: true });
     }
-
-    if (pollingErrorCount >= MAX_POLLING_ERRORS) {
-      stopWavePolling();
-      setStatus("Polling paused after repeated snapshot failures. Use Refresh Snapshot to retry.");
-      addFeedback("error", "Polling paused after repeated snapshot failures");
-      return;
+  } catch (error) {
+    playbackErrors += 1;
+    if (playbackErrors >= MAX_PLAYBACK_ERRORS) {
+      setPlaying(false);
+      const message = error instanceof Error ? error.message : "request failed";
+      setStatus(`Playback paused after repeated failures: ${message}`);
+      addFeedback("error", "Playback paused after repeated failures", undefined, message);
     }
-  } finally {
-    pollingInFlight = false;
   }
-
-  scheduleNextPoll();
 }
+
+function setPlaying(next: boolean): void {
+  playing = next;
+  syncPlaybackControls();
+  if (playing) {
+    tickDebt = 0;
+    playbackLastClock = performance.now();
+  }
+  // The wave guidance button label mirrors the current state.
+  syncGuideOverlay(current);
+}
+
+function setPlaybackSpeed(next: (typeof PLAYBACK_SPEEDS)[number]): void {
+  playbackSpeed = next;
+  syncPlaybackControls();
+}
+
+function syncPlaybackControls(): void {
+  el.playPauseBtn.textContent = playing ? "Pause" : "Play";
+  el.playPauseBtn.setAttribute("aria-pressed", String(playing));
+  for (const button of el.playbackControls.querySelectorAll<HTMLButtonElement>(".speed-btn")) {
+    button.setAttribute("aria-pressed", String(Number(button.dataset.speed) === playbackSpeed));
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  tickDebt = 0;
+  playbackLastClock = performance.now();
+});
 
 function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
   if (!snapshot || snapshot.players.length === 0) {
@@ -699,9 +870,15 @@ function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
 }
 
 function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
+  const players = snapshot?.players ?? [];
+  const signature = players.map((player) => `${player.id}:${player.name}`).join("|");
+  if (signature === playerSignature) {
+    return;
+  }
+  playerSignature = signature;
+
   const previous = el.playerId.value;
   el.playerId.innerHTML = "";
-  const players = snapshot?.players ?? [];
   for (const player of players) {
     const option = document.createElement("option");
     option.value = player.id;
@@ -720,9 +897,10 @@ function towerColorClass(playerId: string): string {
   return PLAYER_COLORS[Math.max(0, Math.min(PLAYER_COLORS.length - 1, index))] ?? "p1";
 }
 
-function updateBattlefield(snapshot: MatchSnapshot | null): void {
-  battlefieldMount.renderMap(snapshot);
+function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0): void {
+  battlefieldMount.renderMap(snapshot, transitionMs);
   battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
+  syncPlacementContext(snapshot);
 
   if (!snapshot) {
     el.battlefieldMeta.textContent = "Click a buildable tile to place your tower.";
@@ -733,20 +911,78 @@ function updateBattlefield(snapshot: MatchSnapshot | null): void {
   el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active`;
 }
 
-function renderSnapshot(snapshot: MatchSnapshot | null): void {
-  el.snapshot.value = JSON.stringify(snapshot, null, 2);
+function syncPlacementContext(snapshot: MatchSnapshot | null): void {
+  if (!snapshot) {
+    return;
+  }
+  const playerId = el.playerId.value;
+  battlefieldMount.setPlacementContext({
+    phase: snapshot.phase,
+    playerId,
+    hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId)
+  });
 }
 
-function renderPlayerCards(snapshot: MatchSnapshot | null): void {
+function renderSnapshot(snapshot: MatchSnapshot | null): void {
+  if (!DEBUG) {
+    return;
+  }
+  // The static cell list is elided; it is 2500 entries of noise in a debugging view.
+  const view = snapshot ? { ...snapshot, map: { ...snapshot.map, cells: `[${snapshot.map.cells.length} cells]` } } : null;
+  el.snapshot.value = JSON.stringify(view, null, 2);
+}
+
+function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: string | null): PlayerChipRefs {
+  const root = document.createElement("div");
+  root.className = "player-chip";
+  const name = document.createElement("div");
+  name.className = "player-chip-name";
+  const meta = document.createElement("div");
+  meta.className = "player-chip-meta";
+  root.append(name, meta);
+  let bar: HTMLElement | null = null;
+  if (towerId) {
+    bar = document.createElement("div");
+    bar.className = "tower-hp-bar";
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-label", `${player.name} tower health`);
+    bar.setAttribute("aria-valuemin", "0");
+    root.append(bar);
+  }
+  return { root, name, meta, bar };
+}
+
+// Chips are created once per (player, tower) and updated in place so HP bar transitions and pulses survive snapshots.
+function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent[] = []): void {
   if (!snapshot) {
+    playerChips = new Map();
     el.playerCards.textContent = "No active match";
     return;
   }
 
-  const cards: string[] = [];
+  const towersByPlayer = new Map(snapshot.towers.map((tower) => [tower.playerId, tower]));
+  const repairedTowerIds = new Set(
+    newEvents.filter((event) => event.type === "tower-repaired").map((event) => event.towerId)
+  );
+  const structure = snapshot.players.map((player) => `${player.id}:${towersByPlayer.has(player.id) ? 1 : 0}`).join("|");
+  if (structure !== chipStructureSignature) {
+    chipStructureSignature = structure;
+    playerChips = new Map();
+    el.playerCards.textContent = "";
+    for (const player of snapshot.players) {
+      const tower = towersByPlayer.get(player.id);
+      const refs = buildPlayerChip(player, tower?.id ?? null);
+      playerChips.set(player.id, refs);
+      el.playerCards.append(refs.root);
+    }
+  }
+
   for (const player of snapshot.players) {
-    const colorClass = towerColorClass(player.id);
-    const tower = snapshot.towers.find((entry) => entry.playerId === player.id);
+    const refs = playerChips.get(player.id);
+    if (!refs) {
+      continue;
+    }
+    const tower = towersByPlayer.get(player.id);
     const towerStatus = tower ? `Tower ${tower.health}/${tower.maxHealth}` : "Tower not placed";
     let status = "waiting";
     let label = "WAITING";
@@ -758,17 +994,37 @@ function renderPlayerCards(snapshot: MatchSnapshot | null): void {
       label = "READY";
     }
 
-    cards.push(
-      `<div class="player-chip ${status} ${colorClass}"${tower ? ` data-tower-id="${tower.id}"` : ""}>` +
-      `<div class="player-chip-name">${player.name}</div>` +
-      `<div class="player-chip-meta">${player.points} pts | ${towerStatus} | ${label}</div>` +
-      (tower
-        ? `<div class="tower-hp-bar" role="progressbar" aria-label="${player.name} tower health" aria-valuemin="0" aria-valuemax="${tower.maxHealth}" aria-valuenow="${tower.health}" style="width: ${(tower.health / tower.maxHealth) * 100}%"></div>`
-        : "") +
-      "</div>"
-    );
+    const className = `player-chip ${status} ${towerColorClass(player.id)}`;
+    if (refs.root.className !== className) {
+      refs.root.className = className;
+    }
+    if (tower) {
+      refs.root.dataset.towerId = tower.id;
+    } else {
+      delete refs.root.dataset.towerId;
+    }
+    if (refs.name.textContent !== player.name) {
+      refs.name.textContent = player.name;
+    }
+    const metaText = `${player.points} pts | ${towerStatus} | ${label}`;
+    if (refs.meta.textContent !== metaText) {
+      refs.meta.textContent = metaText;
+    }
+
+    if (tower && refs.bar) {
+      refs.bar.setAttribute("aria-valuemax", String(tower.maxHealth));
+      refs.bar.setAttribute("aria-valuenow", String(tower.health));
+      refs.bar.style.width = `${(tower.health / tower.maxHealth) * 100}%`;
+      if (repairedTowerIds.has(tower.id)) {
+        // Restart the animation if a previous pulse class is still present.
+        refs.bar.classList.remove("repair-pulse");
+        void refs.bar.offsetWidth;
+        refs.bar.classList.add("repair-pulse");
+      } else {
+        refs.bar.classList.remove("repair-pulse");
+      }
+    }
   }
-  el.playerCards.innerHTML = cards.join("");
 }
 
 function phaseSubText(snapshot: MatchSnapshot): string {
@@ -811,7 +1067,8 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
     el.phaseLabel.textContent = "NO MATCH";
     el.phaseSub.textContent = "Start a local match to play.";
     el.shortcutBar.style.display = "flex";
-    stopWavePolling();
+    el.playbackControls.classList.add("hidden");
+    stopPlayback();
     return;
   }
 
@@ -834,9 +1091,11 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
   el.shortcutBar.style.display = snapshot.phase === "ended" ? "none" : "flex";
 
   if (snapshot.phase === "wave") {
-    startWavePolling();
+    el.playbackControls.classList.remove("hidden");
+    startPlayback();
   } else {
-    stopWavePolling();
+    el.playbackControls.classList.add("hidden");
+    stopPlayback();
   }
 }
 
@@ -866,11 +1125,16 @@ function closeOverlay(): void {
 }
 
 async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnapshot | null> {
+  const seq = ++requestSeq;
   try {
-    const data = await getJson<{ ok: true; snapshot: MatchSnapshot }>("/api/snapshot");
-    applySnapshot(data.snapshot);
+    // Without cached map cells the host must send a full snapshot; afterwards lite is enough.
+    const path = mapCache ? `/api/snapshot?lite=1&eventsSince=${eventCursor}` : "/api/snapshot";
+    let data = await getJson<{ ok: true; snapshot: WireSnapshot }>(path);
+    if (!applyWireSnapshot(data.snapshot, seq)) {
+      data = await getJson<{ ok: true; snapshot: WireSnapshot }>("/api/snapshot");
+      applyWireSnapshot(data.snapshot, seq);
+    }
     setMenuMessage("Reconnected to running match.");
-    guideDismissedKey = null;
     return current;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch snapshot";
@@ -879,6 +1143,15 @@ async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnaps
     }
     return null;
   }
+}
+
+function startFreshMatch(wire: WireSnapshot): void {
+  resetMatchCaches();
+  guideDismissedKey = null;
+  playing = true;
+  syncPlaybackControls();
+  setWallMode(false);
+  applyWireSnapshot(wire, ++requestSeq);
 }
 
 async function startMatchFromMenu(): Promise<void> {
@@ -902,7 +1175,7 @@ async function startMatchFromMenu(): Promise<void> {
 
     setStatus(`match-started: players=${players.length} seed=${payload.seed}`);
     addFeedback("info", `Match started with ${players.length} players`);
-    applySnapshot(data.snapshot);
+    startFreshMatch(data.snapshot);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start match";
     setMenuMessage(message);
@@ -933,7 +1206,7 @@ async function rematchWithSamePlayers(): Promise<void> {
 
     setStatus(`rematch-started: seed=${payload.seed}`);
     addFeedback("info", `Rematch started with seed ${payload.seed}`);
-    applySnapshot(data.snapshot);
+    startFreshMatch(data.snapshot);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start rematch";
     setStatus(`error: ${message}`);
@@ -967,11 +1240,7 @@ function currentCommandCoords(snapshot: MatchSnapshot | null): { x: number; y: n
   };
 }
 
-function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y: number } | null {
-  if (!snapshot) {
-    return null;
-  }
-
+function occupiedCellKeys(snapshot: MatchSnapshot): Set<string> {
   const occupied = new Set<string>();
   for (const tower of snapshot.towers) {
     occupied.add(`${tower.x},${tower.y}`);
@@ -979,22 +1248,24 @@ function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y
   for (const wall of snapshot.walls) {
     occupied.add(`${wall.x},${wall.y}`);
   }
+  return occupied;
+}
 
-  const currentX = Number(el.x.value);
-  const currentY = Number(el.y.value);
-  const currentCellIsFree = Number.isFinite(currentX) && Number.isFinite(currentY)
-    && snapshot.map.cells.some((cell) => cell.x === currentX && cell.y === currentY && cell.buildable && !occupied.has(`${cell.x},${cell.y}`));
-
-  if (currentCellIsFree) {
-    return { x: currentX, y: currentY };
-  }
-
-  const cell = snapshot.map.cells.find((entry) => entry.buildable && !occupied.has(`${entry.x},${entry.y}`));
-  if (!cell) {
+function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y: number } | null {
+  if (!snapshot || !mapCache) {
     return null;
   }
 
-  return { x: cell.x, y: cell.y };
+  const occupied = occupiedCellKeys(snapshot);
+  const currentX = Number(el.x.value);
+  const currentY = Number(el.y.value);
+  const currentCell = mapCache.byKey.get(`${currentX},${currentY}`);
+  if (currentCell?.buildable && !occupied.has(`${currentX},${currentY}`)) {
+    return { x: currentX, y: currentY };
+  }
+
+  const cell = mapCache.buildable.find((entry) => !occupied.has(`${entry.x},${entry.y}`));
+  return cell ? { x: cell.x, y: cell.y } : null;
 }
 
 function syncCursorToBuildableCell(snapshot: MatchSnapshot | null): void {
@@ -1026,7 +1297,7 @@ function adjustCoord(dx: number, dy: number): void {
   el.x.value = String(nextX);
   el.y.value = String(nextY);
   if (current) {
-    updateBattlefield(current);
+    battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
   }
 }
 
@@ -1046,29 +1317,43 @@ function handleCellSelected(x: number, y: number): void {
 
   el.x.value = String(x);
   el.y.value = String(y);
-  updateBattlefield(current);
+  battlefieldMount.setCursor(x, y);
 
-  const cell = current.map.cells.find((entry) => entry.x === x && entry.y === y);
+  const cell = mapCache?.byKey.get(`${x},${y}`);
   if (!cell || !cell.buildable) {
     return;
   }
 
-  const occupied = current.towers.some((tower) => tower.x === x && tower.y === y)
-    || current.walls.some((wall) => wall.x === x && wall.y === y);
-  if (occupied) {
+  if (occupiedCellKeys(current).has(`${x},${y}`)) {
     return;
   }
 
   const playerId = selectedPlayerId();
+  if (wallMode) {
+    void sendCommand({ type: "place-wall", playerId, x, y });
+    return;
+  }
+
   const alreadyHasTower = current.towers.some((tower) => tower.playerId === playerId);
   if (current.phase === "placement" && !alreadyHasTower) {
     void sendCommand({ type: "place-tower", playerId, x, y });
   }
 }
 
+function setWallMode(next: boolean): void {
+  wallMode = next;
+  el.placeWallBtn.setAttribute("aria-pressed", String(next));
+  el.placeWallBtn.classList.toggle("active", next);
+  el.battlefieldMeta.classList.toggle("wall-mode", next);
+  if (current) {
+    updateBattlefield(current);
+  }
+}
+
 async function sendCommand(command: SimulationCommand): Promise<void> {
+  const seq = ++requestSeq;
   try {
-    const data = await postJson<ApiCommandPayload>("/api/command", { command });
+    const data = await postJson<ApiCommandPayload>("/api/command", { command, lite: true, eventsSince: eventCursor });
     const result = data.result;
     if (!result?.accepted) {
       setStatus(`rejected: ${result?.reason ?? "unknown"}`);
@@ -1078,9 +1363,7 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
       addFeedback("accepted", "Command accepted", command.type);
     }
 
-    if (data.snapshot) {
-      applySnapshot(data.snapshot);
-    } else {
+    if (!data.snapshot || !applyWireSnapshot(data.snapshot, seq)) {
       await fetchSnapshot();
     }
   } catch (error) {
@@ -1157,14 +1440,24 @@ must<HTMLButtonElement>("readyBtn").addEventListener("click", () => {
   void sendCommand({ type: "ready-for-wave", playerId: selectedPlayerId() });
 });
 
-must<HTMLButtonElement>("placeWallBtn").addEventListener("click", () => {
-  void sendCommand({
-    type: "place-wall",
-    playerId: selectedPlayerId(),
-    x: coordValue(el.x),
-    y: coordValue(el.y)
-  });
+// Walls are placed by clicking tiles while this mode is on (the sim accepts walls during combat only).
+el.placeWallBtn.addEventListener("click", () => {
+  setWallMode(!wallMode);
 });
+
+el.playPauseBtn.addEventListener("click", () => {
+  setPlaying(!playing);
+});
+
+for (const button of el.playbackControls.querySelectorAll<HTMLButtonElement>(".speed-btn")) {
+  button.addEventListener("click", () => {
+    const speed = Number(button.dataset.speed);
+    const match = PLAYBACK_SPEEDS.find((candidate) => candidate === speed);
+    if (match) {
+      setPlaybackSpeed(match);
+    }
+  });
+}
 
 must<HTMLButtonElement>("upgradeBtn").addEventListener("click", () => {
   const playerId = selectedPlayerId();
@@ -1197,13 +1490,12 @@ must<HTMLButtonElement>("advanceBtn").addEventListener("click", () => {
 must<HTMLButtonElement>("autoBtn").addEventListener("click", async () => {
   try {
     const attemptedTicks = 200;
-    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks: attemptedTicks });
+    const seq = ++requestSeq;
+    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks: attemptedTicks, lite: true, eventsSince: eventCursor });
     setStatus(`advance-many: attempted=${attemptedTicks} accepted=${data.acceptedTicks ?? 0} stopped=${data.stoppedReason ?? "none"}`);
     addFeedback("info", `Advance-many accepted ${data.acceptedTicks ?? 0} ticks`, "advance-wave", data.stoppedReason);
 
-    if (data.snapshot) {
-      applySnapshot(data.snapshot);
-    } else {
+    if (!data.snapshot || !applyWireSnapshot(data.snapshot, seq)) {
       await fetchSnapshot();
     }
   } catch (error) {
@@ -1233,7 +1525,18 @@ document.addEventListener("keydown", (event) => {
 
   if (key === "w") {
     event.preventDefault();
-    must<HTMLButtonElement>("placeWallBtn").click();
+    el.placeWallBtn.click();
+    return;
+  }
+
+  if (key === "p") {
+    event.preventDefault();
+    el.playPauseBtn.click();
+    return;
+  }
+
+  if (event.key === "Escape" && wallMode) {
+    setWallMode(false);
     return;
   }
 
@@ -1243,7 +1546,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (key === "a") {
+  if (key === "a" && DEBUG) {
     event.preventDefault();
     must<HTMLButtonElement>("advanceBtn").click();
     return;
@@ -1273,6 +1576,10 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+for (const element of document.querySelectorAll(".debug-only")) {
+  element.classList.toggle("hidden", !DEBUG);
+}
+
 renderMenuPlayerInputs();
 renderPhase(null);
 renderFeedbackQueue();
@@ -1284,20 +1591,13 @@ void fetchSnapshot({ silentStatus: true });
 
 // Read-only test hook so Playwright can locate buildable cells without DOM grid elements.
 function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {
-  if (!current) {
+  if (!current || !mapCache) {
     return [];
   }
 
-  const occupied = new Set<string>();
-  for (const tower of current.towers) {
-    occupied.add(`${tower.x},${tower.y}`);
-  }
-  for (const wall of current.walls) {
-    occupied.add(`${wall.x},${wall.y}`);
-  }
-
-  return current.map.cells
-    .filter((cell) => cell.buildable && !occupied.has(`${cell.x},${cell.y}`))
+  const occupied = occupiedCellKeys(current);
+  return mapCache.buildable
+    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`))
     .map((cell) => ({ x: cell.x, y: cell.y }));
 }
 
@@ -1311,5 +1611,11 @@ window.__testBoard = {
   cellToPixel(x: number, y: number): { x: number; y: number } {
     const size = cellSizeForWidth(current?.map.width ?? 64);
     return { x: x * size + size / 2, y: y * size + size / 2 };
+  },
+  creaturePositions(): Array<{ id: string; x: number; y: number }> {
+    return battlefieldMount.creaturePositions();
+  },
+  playback(): { playing: boolean; speed: number } {
+    return { playing, speed: playbackSpeed };
   }
 };
