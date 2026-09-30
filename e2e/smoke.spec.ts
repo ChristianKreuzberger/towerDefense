@@ -32,7 +32,10 @@ async function clickBuildableCell(page: Page, index = 0): Promise<void> {
 async function startMatch(page: Page, path: string): Promise<void> {
   await page.goto(path);
   // The host keeps the previous test's match alive, and the client reconnects to it on load.
+  // Wait for real state (reconnected match or fresh menu) instead of racing the reconnect request.
   const backToMenu = page.getByRole("button", { name: "Back To Menu" });
+  const startButton = page.getByRole("button", { name: "Start Match" });
+  await expect(backToMenu.or(startButton)).toBeVisible();
   if (await backToMenu.isVisible()) {
     await backToMenu.click();
   }
@@ -279,4 +282,91 @@ test("debug demo combat shows synthetic creatures and stops cleanly", async ({ p
   await page.locator("#demoBtn").click();
   await expect(page.locator("#demoBtn")).toHaveText("Demo Combat");
   expect(errors).toEqual([]);
+});
+
+test("scoreboard chips and hotkeys switch the active player", async ({ page }) => {
+  await startMatch(page, "/");
+  const select = page.locator("#playerId");
+  const chips = page.locator("#playerCards .player-chip");
+  await expect(select).toHaveValue("p1");
+  await expect(chips.nth(0)).toHaveAttribute("aria-current", "true");
+  await expect(chips.nth(1)).not.toHaveAttribute("aria-current", "true");
+
+  await chips.nth(1).click();
+  await expect(select).toHaveValue("p2");
+  await expect(chips.nth(1)).toHaveAttribute("aria-current", "true");
+  await expect(chips.nth(1)).toHaveClass(/active/);
+  await expect(chips.nth(0)).not.toHaveClass(/active/);
+
+  await chips.nth(0).focus();
+  await page.keyboard.press("Enter");
+  await expect(select).toHaveValue("p1");
+  await chips.nth(1).focus();
+  await page.keyboard.press("Space");
+  await expect(select).toHaveValue("p2");
+
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("1");
+  await expect(select).toHaveValue("p1");
+  await page.keyboard.press("2");
+  await expect(select).toHaveValue("p2");
+  // Only two players exist, so 5 must not change anything.
+  await page.keyboard.press("5");
+  await expect(select).toHaveValue("p2");
+
+  await select.selectOption("p1");
+  await expect(chips.nth(0)).toHaveAttribute("aria-current", "true");
+  await expect(chips.nth(1)).not.toHaveAttribute("aria-current", "true");
+});
+
+test("typing in a form field does not switch players", async ({ page }) => {
+  await startMatch(page, "/");
+  await page.locator("#playerId").selectOption("p2");
+  // Debug-only inputs are hidden, so use the focused select: digits typed there must not reach the hotkey.
+  await page.locator("#playerId").focus();
+  await page.keyboard.press("1");
+  await expect(page.locator("#playerId")).toHaveValue("p2");
+  await expect(page.locator("#playerCards .player-chip").nth(1)).toHaveAttribute("aria-current", "true");
+});
+
+test("a tower can be placed as a player switched to via hotkey", async ({ page }) => {
+  await startMatch(page, "/");
+  await page.locator("#playerId").selectOption("p1");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("2");
+  await clickBuildableCell(page);
+  await expect(page.locator("#playerCards .player-chip").nth(1)).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards .player-chip").nth(0)).toContainText("Tower not placed");
+});
+
+test("board renders 20% larger by default and clicks stay accurate", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await startMatch(page, "/");
+
+  const canvas = page.locator("#board canvas");
+  const map = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { map: { width: number; height: number } } };
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) {
+    return;
+  }
+  // Old cell sizes were 28 / 22 / 16 px by map width; the new ones must display at least 1.15x larger.
+  const mapWidth = map.snapshot.map.width;
+  const oldCell = mapWidth > 40 ? 16 : mapWidth > 24 ? 22 : 28;
+  expect(box.width).toBeGreaterThanOrEqual(1.15 * oldCell * mapWidth);
+
+  const cell = await page.evaluate(() => window.__testBoard?.findBuildableCell(25) ?? null);
+  expect(cell).not.toBeNull();
+  if (!cell) {
+    return;
+  }
+  await canvas.click({
+    position: {
+      x: ((cell.x + 0.5) / map.snapshot.map.width) * box.width,
+      y: ((cell.y + 0.5) / map.snapshot.map.height) * box.height
+    }
+  });
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  const after = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ x: number; y: number }> } };
+  expect(after.snapshot.towers[0]).toMatchObject({ x: cell.x, y: cell.y });
 });
