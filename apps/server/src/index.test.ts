@@ -171,3 +171,66 @@ runServerSmokeTest("server start, snapshot, and command flow preserves rejection
     child.kill();
   }
 });
+type LiteSnapshot = {
+  map?: { cells?: unknown[]; wornCells?: unknown[]; width?: number };
+  events?: unknown[];
+  eventsOffset?: number;
+  eventsTotal?: number;
+  balanceAnalysisExports?: unknown[];
+  towers?: unknown[];
+};
+
+runServerSmokeTest("lite snapshots omit map cells and return only new events", async () => {
+  TEST_PORT = await findOpenPort();
+  SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+
+  const child = spawn(process.execPath, ["dist/index.js"], {
+    cwd: process.cwd(),
+    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT + 20) },
+    stdio: "ignore"
+  });
+
+  try {
+    await waitForServer(child);
+    const start = await postJson("/api/start", { seed: 777, players: [{ id: "p1", name: "Alpha" }] });
+    const cells = start.body.snapshot?.map?.cells ?? [];
+    const buildable = cells.find((cell) => cell.buildable);
+    assert.ok(buildable);
+    await postJson("/api/command", { command: { type: "place-tower", playerId: "p1", x: buildable.x, y: buildable.y } });
+    await postJson("/api/command", { command: { type: "ready-for-wave", playerId: "p1" } });
+    await postJson("/api/advance-many", { ticks: 2 });
+
+    const full = (await (await fetch(`${SERVER_URL}/api/snapshot`)).json()) as { snapshot: LiteSnapshot };
+    assert.ok((full.snapshot.map?.cells?.length ?? 0) > 0, "full snapshot keeps map cells");
+    const total = full.snapshot.events?.length ?? 0;
+    assert.ok(total > 0);
+
+    const lite = (await (await fetch(`${SERVER_URL}/api/snapshot?lite=1&eventsSince=${total - 1}`)).json()) as {
+      snapshot: LiteSnapshot;
+    };
+    assert.equal(lite.snapshot.map?.cells, undefined);
+    assert.ok(Array.isArray(lite.snapshot.map?.wornCells));
+    assert.equal(lite.snapshot.map?.width, full.snapshot.map?.width);
+    assert.equal(lite.snapshot.events?.length, 1);
+    assert.equal(lite.snapshot.eventsOffset, total - 1);
+    assert.equal(lite.snapshot.eventsTotal, total);
+    assert.deepEqual(lite.snapshot.balanceAnalysisExports, []);
+    assert.equal(lite.snapshot.towers?.length, 1);
+
+    const viaCommand = await postJson("/api/command", {
+      lite: true,
+      eventsSince: total,
+      command: { type: "advance-wave" }
+    });
+    const commandSnapshot = viaCommand.body.snapshot as LiteSnapshot | undefined;
+    assert.equal(commandSnapshot?.map?.cells, undefined);
+    assert.equal(commandSnapshot?.eventsOffset, total);
+
+    const advanced = await postJson("/api/advance-many", { ticks: 2, lite: true, eventsSince: 0 });
+    const advancedSnapshot = advanced.body.snapshot as LiteSnapshot | undefined;
+    assert.equal(advancedSnapshot?.map?.cells, undefined);
+    assert.equal(advancedSnapshot?.eventsOffset, 0);
+  } finally {
+    child.kill();
+  }
+});

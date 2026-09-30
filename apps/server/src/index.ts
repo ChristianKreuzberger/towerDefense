@@ -84,6 +84,49 @@ function normalizeSetup(body: unknown): MatchSetup {
 	return { players, seed };
 }
 
+interface SnapshotOptions {
+	lite: boolean;
+	eventsSince: number;
+}
+
+function snapshotOptionsFromQuery(params: URLSearchParams): SnapshotOptions {
+	return {
+		lite: params.get("lite") === "1",
+		eventsSince: Math.max(0, Math.floor(Number(params.get("eventsSince") ?? 0)) || 0)
+	};
+}
+
+function snapshotOptionsFromBody(body: unknown): SnapshotOptions {
+	const source = typeof body === "object" && body ? (body as Record<string, unknown>) : {};
+	return {
+		lite: source.lite === true,
+		eventsSince: Math.max(0, Math.floor(Number(source.eventsSince ?? 0)) || 0)
+	};
+}
+
+// Lite snapshots drop data that is static per map or only useful for analysis (see spec/07).
+function toWireSnapshot(snapshot: MatchSnapshot, options: SnapshotOptions): unknown {
+	if (!options.lite) {
+		return snapshot;
+	}
+
+	const { cells, ...mapRest } = snapshot.map;
+	const wornCells = cells
+		.filter((cell) => cell.pathWear > 0)
+		.map((cell) => ({ x: cell.x, y: cell.y, pathWear: cell.pathWear }));
+	const eventsSince = Math.min(options.eventsSince, snapshot.events.length);
+
+	return {
+		...snapshot,
+		map: { ...mapRest, wornCells },
+		events: snapshot.events.slice(eventsSince),
+		eventsOffset: eventsSince,
+		eventsTotal: snapshot.events.length,
+		telemetry: { ...snapshot.telemetry, completedWaves: [] },
+		balanceAnalysisExports: []
+	};
+}
+
 function requireSimulation(response: ServerResponse): MatchSimulation | null {
 	if (!simulation) {
 		writeJson(response, 400, {
@@ -277,7 +320,7 @@ function logPhaseTransition(previous: MatchSnapshot, next: MatchSnapshot): void 
 const server = createServer(async (request, response) => {
 	const method = request.method ?? "GET";
 	const requestUrl = request.url ?? "/";
-	const { pathname } = new URL(requestUrl, "http://localhost");
+	const { pathname, searchParams } = new URL(requestUrl, "http://localhost");
 
 	try {
 		if (method === "GET") {
@@ -304,7 +347,7 @@ const server = createServer(async (request, response) => {
 			}
 			writeJson(response, 200, {
 				ok: true,
-				snapshot: activeSimulation.getSnapshot()
+				snapshot: toWireSnapshot(activeSimulation.getSnapshot(), snapshotOptionsFromQuery(searchParams))
 			});
 			return;
 		}
@@ -342,7 +385,7 @@ const server = createServer(async (request, response) => {
 			writeJson(response, 200, {
 				ok: true,
 				result,
-				snapshot: nextSnapshot
+				snapshot: toWireSnapshot(nextSnapshot, snapshotOptionsFromBody(body))
 			});
 			return;
 		}
@@ -380,7 +423,7 @@ const server = createServer(async (request, response) => {
 				ok: true,
 				acceptedTicks,
 				stoppedReason,
-				snapshot: activeSimulation.getSnapshot()
+				snapshot: toWireSnapshot(activeSimulation.getSnapshot(), snapshotOptionsFromBody(body))
 			});
 			return;
 		}
