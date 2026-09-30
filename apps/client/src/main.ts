@@ -698,7 +698,7 @@ function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEven
 }
 
 // Applies a host response unless a newer one was already applied. Returns false when a full refetch is needed.
-function applyWireSnapshot(wire: WireSnapshot, seq: number, transitionMs = MANUAL_TRANSITION_MS): boolean {
+function applyWireSnapshot(wire: WireSnapshot, seq: number): boolean {
   if (seq < appliedSeq) {
     return true;
   }
@@ -707,22 +707,22 @@ function applyWireSnapshot(wire: WireSnapshot, seq: number, transitionMs = MANUA
     return false;
   }
   appliedSeq = seq;
-  applySnapshot(hydrated.snapshot, hydrated.newEvents, transitionMs);
+  applySnapshot(hydrated.snapshot, hydrated.newEvents);
   return true;
 }
 
-function applySnapshot(snapshot: MatchSnapshot, newEvents: MatchEvent[], transitionMs = MANUAL_TRANSITION_MS): void {
-  perfTimeApply(() => applySnapshotInner(snapshot, newEvents, transitionMs));
+function applySnapshot(snapshot: MatchSnapshot, newEvents: MatchEvent[]): void {
+  perfTimeApply(() => applySnapshotInner(snapshot, newEvents));
 }
 
-function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[], transitionMs: number): void {
+function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): void {
   const previous = current;
   current = snapshot;
   // Real ticks between snapshots set how long creatures glide; anything else (new wave, rewind) snaps quickly.
   const ticksElapsed = previous && previous.wave === snapshot.wave && previous.phase === "wave" && snapshot.phase === "wave"
     ? snapshot.waveTick - previous.waveTick
     : 0;
-  const glideMs = ticksElapsed > 0 ? ticksElapsed * msPerTick() : Math.min(transitionMs, MANUAL_TRANSITION_MS);
+  const glideMs = ticksElapsed > 0 ? ticksElapsed * msPerTick() : MANUAL_TRANSITION_MS;
 
   announceRepairEvents(snapshot, newEvents);
   showGameScreen();
