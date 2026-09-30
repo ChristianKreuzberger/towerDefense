@@ -147,9 +147,18 @@ class BattlefieldScene extends Phaser.Scene {
     this.drawHoverAndGhost();
   }
 
+  // Phaser 4 caches the canvas position, so pointer.x/y drift when the page layout shifts after setup.
+  // Measuring the canvas at event time keeps cell hit-testing correct.
+  private cellFromPointer(pointer: Phaser.Input.Pointer): { x: number; y: number } {
+    const rect = this.game.canvas.getBoundingClientRect();
+    const event = pointer.event as MouseEvent | undefined;
+    const localX = event && rect.width > 0 ? (event.clientX - rect.left) * (this.game.canvas.width / rect.width) : pointer.x;
+    const localY = event && rect.height > 0 ? (event.clientY - rect.top) * (this.game.canvas.height / rect.height) : pointer.y;
+    return { x: Math.floor(localX / this.cellSize), y: Math.floor(localY / this.cellSize) };
+  }
+
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
-    const x = Math.floor(pointer.x / this.cellSize);
-    const y = Math.floor(pointer.y / this.cellSize);
+    const { x, y } = this.cellFromPointer(pointer);
     if (!this.isHoverValid(x, y)) {
       this.playInvalidClickFlash(x, y);
     }
@@ -159,8 +168,7 @@ class BattlefieldScene extends Phaser.Scene {
   }
 
   private handlePointerMove = (pointer: Phaser.Input.Pointer): void => {
-    const x = Math.floor(pointer.x / this.cellSize);
-    const y = Math.floor(pointer.y / this.cellSize);
+    const { x, y } = this.cellFromPointer(pointer);
     this.hoverX = x;
     this.hoverY = y;
     this.drawHoverAndGhost();
