@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run -ws --if-present build",
+    "build": "npm run build -w @tower-defense/shared && npm run -ws --if-present build",
     "typecheck": "npm run -ws --if-present typecheck",
     "lint": "eslint .",
     "test": "npm run -ws --if-present test",

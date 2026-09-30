@@ -132,12 +132,12 @@ Quick play loop in browser:
 1. Enter player names and click Start Match.
 2. Pick a player and place each tower on buildable cells shown as . in the board.
 3. Click Ready For Wave for each player.
-4. Click Advance Wave Tick or Advance 30 Ticks to run combat.
-5. Use Place Wall, Upgrade Tower, and Set Target Mode during wave phase.
+4. Combat starts and advances automatically (Pause/Play and 1x/2x/4x appear during combat; press P to toggle).
+5. Use Place Wall (then click a tile), Upgrade Tower, and Set Target Mode during wave phase.
 
 Notes:
 - If a command is rejected, Last Action shows the reason (for example path-blocked or insufficient-points).
-- The right-side snapshot panel is the live deterministic simulation state.
+- Add `?debug=1` to the URL for the snapshot JSON panel, wall X/Y inputs, and manual tick buttons; add `?perf=1` for the performance overlay (`window.__perf`).
 
 ## Balance Analysis Workflow (Offline)
 
