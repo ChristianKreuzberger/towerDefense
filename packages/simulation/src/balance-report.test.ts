@@ -86,11 +86,11 @@ test("formats report with stable section ordering and key lines", () => {
   );
 
   assert.ok(
-    output.includes("- p1 (Alpha) status=active delta=3 total=6 ending=6 towerLv=1 towerHp=94 walls=1 wallHp=12"),
+    output.includes("- p1 (Alpha) status=active delta=3 bonus=0 total=6 ending=6 towerLv=1 towerHp=94 walls=1 wallHp=12"),
     "expected deterministic p1 wave line"
   );
   assert.ok(
-    output.includes("- p2 (Beta) status=eliminated delta=3 total=5 ending=5 towerLv=1 towerHp=0 walls=0 wallHp=0"),
+    output.includes("- p2 (Beta) status=eliminated delta=3 bonus=0 total=5 ending=5 towerLv=1 towerHp=0 walls=0 wallHp=0"),
     "expected deterministic elimination line"
   );
 });

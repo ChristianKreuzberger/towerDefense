@@ -31,6 +31,7 @@ import {
   type Wall,
   getWallCost,
   getTowerUpgradeCost,
+  getWaveClearBonus,
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
@@ -58,6 +59,8 @@ interface InternalMatchState {
   playerAwardedPointsCurrentWave: Record<string, number>;
   playerSpentOnWallsCurrentWave: Record<string, number>;
   playerSpentOnUpgradesCurrentWave: Record<string, number>;
+  playerWaveClearBonusTotal: Record<string, number>;
+  playerWaveClearBonusCurrentWave: Record<string, number>;
   events: MatchEvent[];
   winnerId?: string;
   endReason?: "score-win" | "all-towers-destroyed";
@@ -93,7 +96,8 @@ function createWaveTelemetrySnapshot(wave: number, tick: number): WaveTelemetryS
     towerDamageIntake: 0,
     wallDamageIntake: 0,
     towerRepairApplied: 0,
-    wallRepairApplied: 0
+    wallRepairApplied: 0,
+    waveClearBonusAwarded: 0
   };
 }
 
@@ -117,7 +121,8 @@ function createEmptyCumulativeTelemetrySnapshot(): CumulativeTelemetrySnapshot {
     towerDamageIntake: 0,
     wallDamageIntake: 0,
     towerRepairApplied: 0,
-    wallRepairApplied: 0
+    wallRepairApplied: 0,
+    waveClearBonusAwarded: 0
   };
 }
 
@@ -140,6 +145,7 @@ function accumulateWaveTelemetry(
   target.wallDamageIntake += waveTelemetry.wallDamageIntake;
   target.towerRepairApplied += waveTelemetry.towerRepairApplied;
   target.wallRepairApplied += waveTelemetry.wallRepairApplied;
+  target.waveClearBonusAwarded += waveTelemetry.waveClearBonusAwarded;
 }
 
 function cloneCumulativeTelemetrySnapshot(snapshot: CumulativeTelemetrySnapshot): CumulativeTelemetrySnapshot {
@@ -276,6 +282,8 @@ export class MatchSimulation {
       playerAwardedPointsCurrentWave: createPlayerCounterMap(setup.players),
       playerSpentOnWallsCurrentWave: createPlayerCounterMap(setup.players),
       playerSpentOnUpgradesCurrentWave: createPlayerCounterMap(setup.players),
+      playerWaveClearBonusTotal: createPlayerCounterMap(setup.players),
+      playerWaveClearBonusCurrentWave: createPlayerCounterMap(setup.players),
       events: [],
       players: setup.players.map((player) => ({
         id: player.id,
@@ -569,6 +577,7 @@ export class MatchSimulation {
       this.state.playerAwardedPointsCurrentWave[player.id] = 0;
       this.state.playerSpentOnWallsCurrentWave[player.id] = 0;
       this.state.playerSpentOnUpgradesCurrentWave[player.id] = 0;
+      this.state.playerWaveClearBonusCurrentWave[player.id] = 0;
     }
     this.currentWaveSpawned = 0;
     this.currentWavePath.length = 0;
@@ -1242,9 +1251,14 @@ export class MatchSimulation {
   }
 
   private endWave(): void {
+    const waveCleared = this.isWaveCleared();
     this.repairTowersBetweenWaves();
     this.repairWallsBetweenWaves();
     this.repairPathWearBetweenWaves();
+    this.awardWaveClearBonus(waveCleared);
+    if (this.state.phase === "ended") {
+      return;
+    }
     this.emitTelemetrySnapshotEvent();
     const completedWaveTelemetry = cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave);
     this.state.telemetry.completedWaves.push(completedWaveTelemetry);
@@ -1261,6 +1275,51 @@ export class MatchSimulation {
     this.state.targetAssignments = [];
     for (const player of this.state.players) {
       player.readyForWave = false;
+    }
+  }
+
+  private isWaveCleared(): boolean {
+    const telemetry = this.state.telemetry.currentWave;
+    return telemetry.creaturesSpawned > 0 && telemetry.creaturesExited === 0;
+  }
+
+  private awardWaveClearBonus(cleared: boolean): void {
+    if (!cleared) {
+      return;
+    }
+
+    const bonus = getWaveClearBonus();
+    const recipients = [...this.state.players]
+      .filter((player) => !player.eliminated)
+      .filter((player) => this.state.towers.some((tower) => tower.playerId === player.id && tower.health > 0))
+      .sort((a, b) => a.id.localeCompare(b.id));
+
+    for (const player of recipients) {
+      // Award even if a prior recipient triggered score-win, so telemetry/events stay consistent.
+      player.points += bonus;
+      this.state.playerAwardedPointsTotal[player.id] = (this.state.playerAwardedPointsTotal[player.id] ?? 0) + bonus;
+      this.state.playerAwardedPointsCurrentWave[player.id] =
+        (this.state.playerAwardedPointsCurrentWave[player.id] ?? 0) + bonus;
+
+      this.state.playerWaveClearBonusTotal[player.id] = (this.state.playerWaveClearBonusTotal[player.id] ?? 0) + bonus;
+      this.state.playerWaveClearBonusCurrentWave[player.id] =
+        (this.state.playerWaveClearBonusCurrentWave[player.id] ?? 0) + bonus;
+      this.state.telemetry.currentWave.waveClearBonusAwarded += bonus;
+      this.updateCurrentWaveTelemetryTick();
+      this.state.events.push({
+        type: "wave-clear-bonus",
+        wave: this.state.wave,
+        tick: this.state.waveTick,
+        playerId: player.id,
+        bonus,
+        cleared
+      });
+
+      if (this.state.phase !== "ended" && player.points >= WIN_SCORE) {
+        this.state.phase = "ended";
+        this.state.winnerId = player.id;
+        this.state.endReason = "score-win";
+      }
     }
   }
 
@@ -1429,6 +1488,8 @@ export class MatchSimulation {
         const awardedThisWave = this.state.playerAwardedPointsCurrentWave[player.id] ?? 0;
         const spentWallsThisWave = this.state.playerSpentOnWallsCurrentWave[player.id] ?? 0;
         const spentUpgradesThisWave = this.state.playerSpentOnUpgradesCurrentWave[player.id] ?? 0;
+        const waveClearBonusThisWave = this.state.playerWaveClearBonusCurrentWave[player.id] ?? 0;
+        const waveClearBonusTotal = this.state.playerWaveClearBonusTotal[player.id] ?? 0;
         const netThisWave = awardedThisWave - spentWallsThisWave - spentUpgradesThisWave;
         const netTotal = awardedTotal - spentWallsTotal - spentUpgradesTotal;
 
@@ -1445,6 +1506,8 @@ export class MatchSimulation {
           spentOnUpgradesTotal: spentUpgradesTotal,
           netPointsTotal: netTotal,
           endingPoints: player.points,
+          waveClearBonusThisWave,
+          waveClearBonusTotal,
           towerLevel: tower?.level ?? 0,
           towerHealth: tower?.health ?? 0,
           wallCount: playerWalls.length,
@@ -1462,6 +1525,8 @@ export class MatchSimulation {
       spentOnUpgradesTotal: players.reduce((total, player) => total + player.spentOnUpgradesTotal, 0),
       netPointsTotal: players.reduce((total, player) => total + player.netPointsTotal, 0),
       endingPoints: players.reduce((total, player) => total + player.endingPoints, 0),
+      waveClearBonusThisWave: players.reduce((total, player) => total + player.waveClearBonusThisWave, 0),
+      waveClearBonusTotal: players.reduce((total, player) => total + player.waveClearBonusTotal, 0),
       livingTowers: this.state.towers.filter((tower) => tower.health > 0).length,
       livingWalls: this.state.walls.filter((wall) => wall.health > 0).length,
       totalTowerHealth: this.state.towers.reduce((total, tower) => total + Math.max(0, tower.health), 0),

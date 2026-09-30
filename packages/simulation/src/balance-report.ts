@@ -25,6 +25,7 @@ export interface BalanceReportCumulativeSummary {
   wallDamageIntake: number;
   towerRepairApplied: number;
   wallRepairApplied: number;
+  waveClearBonusAwarded: number;
   awardedPointsTotal: number;
   spentOnWallsTotal: number;
   spentOnUpgradesTotal: number;
@@ -159,6 +160,7 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
   let wallDamageIntake = 0;
   let towerRepairApplied = 0;
   let wallRepairApplied = 0;
+  let waveClearBonusAwarded = 0;
 
   for (const wave of waveSummaries) {
     totalTicks += toNumber(wave.waveTelemetry.tick);
@@ -167,6 +169,7 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
     wallDamageIntake += toNumber(wave.waveTelemetry.wallDamageIntake);
     towerRepairApplied += toNumber(wave.waveTelemetry.towerRepairApplied);
     wallRepairApplied += toNumber(wave.waveTelemetry.wallRepairApplied);
+    waveClearBonusAwarded += toNumber(wave.waveTelemetry.waveClearBonusAwarded);
     cumulativeKills.runner += toNumber(wave.waveTelemetry.killsByArchetype.runner);
     cumulativeKills.swarm += toNumber(wave.waveTelemetry.killsByArchetype.swarm);
     cumulativeKills.armored += toNumber(wave.waveTelemetry.killsByArchetype.armored);
@@ -188,6 +191,7 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
     wallDamageIntake,
     towerRepairApplied,
     wallRepairApplied,
+    waveClearBonusAwarded,
     awardedPointsTotal: finalSnapshot.totals.awardedPointsTotal,
     spentOnWallsTotal: finalSnapshot.totals.spentOnWallsTotal,
     spentOnUpgradesTotal: finalSnapshot.totals.spentOnUpgradesTotal,
@@ -219,6 +223,7 @@ function formatPlayerLine(prefix: string, player: BalanceAnalysisPlayerSnapshot)
   return (
     `${prefix}${player.playerId} (${player.playerName}) status=${status}` +
     ` delta=${player.netPointsDeltaThisWave}` +
+    ` bonus=${player.waveClearBonusThisWave}` +
     ` total=${player.netPointsTotal}` +
     ` ending=${player.endingPoints}` +
     ` towerLv=${player.towerLevel}` +
@@ -258,6 +263,7 @@ export function formatBalanceReport(report: BalanceReport): string {
         `spentUpgrades=${wave.totals.spentOnUpgradesThisWave} ` +
         `net=${wave.totals.netPointsDeltaThisWave}`
     );
+    lines.push(`Wave-clear bonus: awarded=${wave.totals.waveClearBonusThisWave}`);
     lines.push("Players:");
     for (const player of wave.players) {
       lines.push(formatPlayerLine("- ", player));
@@ -278,6 +284,7 @@ export function formatBalanceReport(report: BalanceReport): string {
   lines.push(
     `Repairs totals: towers=${report.cumulative.towerRepairApplied} walls=${report.cumulative.wallRepairApplied}`
   );
+  lines.push(`Wave-clear bonus total: ${report.cumulative.waveClearBonusAwarded}`);
   lines.push(
     `Economy totals: awarded=${report.cumulative.awardedPointsTotal} ` +
       `spentWalls=${report.cumulative.spentOnWallsTotal} ` +

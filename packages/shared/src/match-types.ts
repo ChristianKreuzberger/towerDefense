@@ -68,6 +68,7 @@ export interface WaveTelemetrySnapshot {
   wallDamageIntake: number;
   towerRepairApplied: number;
   wallRepairApplied: number;
+  waveClearBonusAwarded: number;
 }
 
 export interface MatchTelemetrySnapshot {
@@ -88,6 +89,7 @@ export interface CumulativeTelemetrySnapshot {
   wallDamageIntake: number;
   towerRepairApplied: number;
   wallRepairApplied: number;
+  waveClearBonusAwarded: number;
 }
 
 export interface BalanceAnalysisPlayerSnapshot {
@@ -103,6 +105,8 @@ export interface BalanceAnalysisPlayerSnapshot {
   spentOnUpgradesTotal: number;
   netPointsTotal: number;
   endingPoints: number;
+  waveClearBonusThisWave: number;
+  waveClearBonusTotal: number;
   towerLevel: number;
   towerHealth: number;
   wallCount: number;
@@ -128,6 +132,8 @@ export interface BalanceAnalysisSnapshot {
     spentOnUpgradesTotal: number;
     netPointsTotal: number;
     endingPoints: number;
+    waveClearBonusThisWave: number;
+    waveClearBonusTotal: number;
     livingTowers: number;
     livingWalls: number;
     totalTowerHealth: number;
@@ -181,6 +187,14 @@ export type MatchEvent =
       type: "wave-end";
       wave: number;
       tick: number;
+    }
+  | {
+      type: "wave-clear-bonus";
+      wave: number;
+      tick: number;
+      playerId: string;
+      bonus: number;
+      cleared: boolean;
     }
   | {
       type: "tower-repaired";
