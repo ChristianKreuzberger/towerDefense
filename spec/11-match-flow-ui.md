@@ -23,6 +23,35 @@
 - Show tower HP status indicators
 - Show active wave and remaining creatures
 
+## Real-time playback
+
+- Combat advances automatically on a client timer; players do not press a tick button
+- Default is playing at 1x whenever the match is in the combat phase
+- Base rate is 5 simulation ticks per second at 1x; 2x and 4x run 10 and 20 ticks per second
+- Controls: Play/Pause toggle and 1x / 2x / 4x speed buttons, visible during combat
+- Pausing stops tick requests only; placing walls, upgrades and target modes stay available while paused
+- Ticks are requested in small batches (at most 4 per request, one request in flight) so a slow response never queues work
+- Playback never runs while the browser tab is hidden and does not catch up on return
+- Playback stops when the phase leaves combat (round end, match end) and resumes automatically when the next wave starts
+- Creature positions are interpolated between the previous and latest snapshot over the real time one tick takes at the current speed, so motion looks continuous although the simulation is discrete
+- Sub-cell progress (pathProgressUnits, 100 per cell) offsets the drawn position along the creature's heading
+
+## Wall placement
+
+- Walls are placed from the battlefield: toggle "Place Wall" (or press W), then click a buildable free tile; the mode stays active until toggled off
+- Coordinate entry fields are not part of the normal UI
+
+## Guidance overlay
+
+- Guidance is a non-blocking coach mark: it never intercepts pointer input outside its own card and never covers the battlefield
+- It can be dismissed with its close control and reappears only when the guidance step changes
+
+## Diagnostics and debug
+
+- Query `?perf=1` shows an overlay and exposes `window.__perf` (snapshot apply time, fps, snapshot size)
+- Query `?debug=1` reveals developer controls: snapshot JSON, wall X/Y inputs, manual tick and advance-many buttons
+- None of these appear in the default view
+
 ## Between-round UX requirements
 
 - Announce round completion

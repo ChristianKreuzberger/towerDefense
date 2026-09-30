@@ -1,6 +1,7 @@
 import type { MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { cellSizeForWidth, createBattlefieldMount } from "./battlefield-scene";
+import { perfRecordBytes, perfTimeApply } from "./perf";
 import "./style.css";
 
 interface TestBoardHook {
@@ -305,7 +306,9 @@ function apiBase(): string {
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${apiBase()}${path}`);
-  const data = (await response.json()) as T & ApiErrorPayload;
+  const text = await response.text();
+  perfRecordBytes(text.length);
+  const data = JSON.parse(text) as T & ApiErrorPayload;
   if (!response.ok) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
@@ -319,7 +322,9 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
     body: JSON.stringify(payload)
   });
 
-  const data = (await response.json()) as T & ApiErrorPayload;
+  const text = await response.text();
+  perfRecordBytes(text.length);
+  const data = JSON.parse(text) as T & ApiErrorPayload;
   if (!response.ok) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
@@ -564,6 +569,10 @@ function runGuideAction(action: GuideAction): void {
 }
 
 function applySnapshot(snapshot: MatchSnapshot): void {
+  perfTimeApply(() => applySnapshotInner(snapshot));
+}
+
+function applySnapshotInner(snapshot: MatchSnapshot): void {
   if (snapshot.events.length < processedEventCount) {
     processedEventCount = 0;
   }
