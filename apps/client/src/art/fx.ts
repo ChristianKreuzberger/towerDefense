@@ -76,6 +76,8 @@ export class Effects {
     }
     sprite.kind = kind;
     sprite.active = true;
+    // Pooled sprites must not inherit a spin from a previous spark; it would override a bolt's heading.
+    sprite.spin = 0;
     sprite.image.setTexture(key).setTint(tint).setAlpha(0).setVisible(false).setRotation(0);
     this.activeCount += 1;
     return sprite;

@@ -305,9 +305,13 @@ class BattlefieldScene extends Phaser.Scene {
   // Measuring the canvas at event time keeps cell hit-testing correct, including under CSS scaling.
   private cellFromPointer(pointer: Phaser.Input.Pointer): { x: number; y: number } {
     const rect = this.game.canvas.getBoundingClientRect();
-    const event = pointer.event as MouseEvent | undefined;
-    const localX = event && rect.width > 0 ? (event.clientX - rect.left) * (this.game.canvas.width / rect.width) : pointer.x;
-    const localY = event && rect.height > 0 ? (event.clientY - rect.top) * (this.game.canvas.height / rect.height) : pointer.y;
+    const source = pointer.event as MouseEvent | TouchEvent | undefined;
+    // Touch events carry coordinates on the touch point, not on the event itself.
+    const point = source && "changedTouches" in source ? source.changedTouches[0] : (source as MouseEvent | undefined);
+    const clientX = point?.clientX;
+    const clientY = point?.clientY;
+    const localX = clientX !== undefined && rect.width > 0 ? (clientX - rect.left) * (this.game.canvas.width / rect.width) : pointer.x;
+    const localY = clientY !== undefined && rect.height > 0 ? (clientY - rect.top) * (this.game.canvas.height / rect.height) : pointer.y;
     return { x: Math.floor(localX / this.cellSize), y: Math.floor(localY / this.cellSize) };
   }
 

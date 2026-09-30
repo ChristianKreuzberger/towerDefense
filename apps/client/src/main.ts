@@ -759,12 +759,12 @@ function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): v
     : 0;
   const glideMs = ticksElapsed > 0 ? ticksElapsed * msPerTick() : MANUAL_TRANSITION_MS;
 
-  announceRepairEvents(snapshot, newEvents);
+  // A fresh load or reconnect delivers the whole event history; replaying that as toasts or effects would be noise.
+  const fxEvents = previous !== null && newEvents.length <= MAX_FX_EVENT_BACKLOG ? newEvents : [];
+  announceRepairEvents(snapshot, fxEvents);
   showGameScreen();
   updatePlayerOptions(current);
   syncCursorToBuildableCell(current);
-  // A fresh load or reconnect delivers the whole event history; replaying that as effects would be noise.
-  const fxEvents = previous !== null && newEvents.length <= MAX_FX_EVENT_BACKLOG ? newEvents : [];
   updateBattlefield(current, glideMs, fxEvents);
   announceWaveEnd(fxEvents);
   renderToolbar(current);
@@ -877,6 +877,8 @@ function setPlaying(next: boolean): void {
   syncPlaybackControls();
   if (playing) {
     tickDebt = 0;
+    // Otherwise a single failure after a failure-triggered pause would pause again immediately.
+    playbackErrors = 0;
     playbackLastClock = performance.now();
   }
   // The wave guidance button label mirrors the current state.
