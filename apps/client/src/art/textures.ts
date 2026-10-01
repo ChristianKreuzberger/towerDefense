@@ -8,6 +8,7 @@ import {
   paintCreature,
   paintDot,
   paintPips,
+  paintRuin,
   paintRut,
   paintShadow,
   paintSoftDisc,
@@ -31,6 +32,7 @@ export const KEY = {
   pips: (count: number): string => `pips-${Math.min(Math.max(count, 1), 5)}`,
   creature: (archetype: CreatureArchetype): string => `creature-${archetype}`,
   wall: (player: number, crack: number): string => `wall-${player}-${crack}`,
+  ruin: (player: number): string => `ruin-${player}`,
   rut: "rut",
   shadow: "fx-shadow",
   soft: "fx-soft",
@@ -73,6 +75,7 @@ export function ensureTextures(scene: Phaser.Scene, cs: number): void {
     for (let level = 1; level <= MAX_TOWER_LEVEL_ART; level += 1) {
       bake(textures, KEY.turret(index, level), towerPx, towerPx, (ctx) => paintTurret(ctx, towerPx, color, level));
     }
+    bake(textures, KEY.ruin(index), towerPx, towerPx, (ctx) => paintRuin(ctx, towerPx, color));
     const badgePx = Math.round(cs * 0.62 * SS);
     bake(textures, KEY.badge(index), badgePx, badgePx, (ctx) => paintTowerBadge(ctx, badgePx, String(index + 1)));
     for (let crack = 0; crack < 3; crack += 1) {

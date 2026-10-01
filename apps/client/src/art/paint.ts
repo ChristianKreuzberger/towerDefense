@@ -590,3 +590,36 @@ export function paintDot(ctx: Ctx, s: number): void {
   circle(ctx, s / 2, s / 2, s / 2 - 1);
   ctx.fill();
 }
+
+// Ruins fill the 2x2 footprint of a tower: scorch mark, broken base ring in the owner colour, rubble and a cracked slab.
+export function paintRuin(ctx: Ctx, s: number, color: number): void {
+  ctx.clearRect(0, 0, s, s);
+  const scorch = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s * 0.46);
+  scorch.addColorStop(0, "rgba(20,16,14,0.65)");
+  scorch.addColorStop(1, "rgba(20,16,14,0)");
+  ctx.fillStyle = scorch;
+  ctx.fillRect(0, 0, s, s);
+
+  // Broken ring: arcs with gaps, so it reads as a collapsed base rather than a live one.
+  ctx.lineCap = "round";
+  ctx.strokeStyle = hex(shade(color, 0.6));
+  ctx.lineWidth = Math.max(2, s * 0.07);
+  for (const [from, to] of [[0.2, 0.9], [1.2, 1.55], [1.8, 2.5], [3.3, 3.9], [4.4, 5.6]] as const) {
+    ctx.beginPath();
+    ctx.arc(s / 2, s / 2, s * 0.32, from * Math.PI, to * Math.PI * 0.99);
+    ctx.stroke();
+  }
+
+  // Rubble chunks at fixed positions so the ruin looks identical on every redraw.
+  const chunks: Array<[number, number, number, number]> = [
+    [0.36, 0.42, 0.11, 0.7], [0.58, 0.36, 0.08, 0.5], [0.62, 0.6, 0.12, 0.8],
+    [0.42, 0.64, 0.09, 0.6], [0.5, 0.5, 0.07, 0.9], [0.28, 0.58, 0.06, 0.5], [0.7, 0.46, 0.06, 0.6]
+  ];
+  for (const [x, y, size, tone] of chunks) {
+    roundRect(ctx, s * (x - size / 2), s * (y - size / 2), s * size, s * size * 0.8, s * 0.015);
+    outline(ctx, shade(0x8a8378, tone), Math.max(1, s * 0.015));
+  }
+  // Remains of the turret in the owner colour.
+  roundRect(ctx, s * 0.44, s * 0.4, s * 0.12, s * 0.09, s * 0.02);
+  outline(ctx, color, Math.max(1, s * 0.015), shade(color, 0.5));
+}
