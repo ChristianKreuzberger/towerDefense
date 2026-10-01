@@ -1,6 +1,6 @@
 import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
-import type { Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
+import type { DamageType, Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 
 export interface PlayerSetup {
@@ -266,7 +266,9 @@ export type MatchEvent =
       // Creature cell at impact: a creature killed within one batched response never shows up in a snapshot.
       x: number;
       y: number;
+      // After the creature's multiplier for damageType.
       damage: number;
+      damageType: DamageType;
       remainingHp: number;
     }
   | {
@@ -420,6 +422,9 @@ export type CommandRejectReason =
   | "invalid-upgrade-target"
   | "invalid-target-mode-target"
   | "invalid-target-mode"
+  | "damage-type-phase-not-active"
+  | "invalid-damage-type-target"
+  | "invalid-damage-type"
   | "out-of-bounds"
   | "cell-not-buildable"
   | "tower-overlap"
@@ -465,6 +470,12 @@ export type SimulationCommand =
       playerId: string;
       towerId: string;
       mode: TowerTargetMode;
+    }
+  | {
+      type: "set-damage-type";
+      playerId: string;
+      towerId: string;
+      damageType: DamageType;
     }
   | {
       type: "ready-for-wave";

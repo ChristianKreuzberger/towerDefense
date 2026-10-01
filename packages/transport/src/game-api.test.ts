@@ -34,6 +34,23 @@ test("unknown set-target-mode values are rejected instead of becoming first", ()
   assertRejected(command(api, { type: "set-target-mode", playerId: "p1", towerId: "tower-p1" }), "invalid-command");
 });
 
+test("unknown or missing set-damage-type values are rejected instead of becoming physical", () => {
+  const api = startedApi();
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "fire" }), "invalid-command");
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: 3 }), "invalid-command");
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1" }), "invalid-command");
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", damageType: "magic" }), "invalid-command");
+});
+
+test("a valid set-damage-type reaches the simulation and its rejection comes back as a normal result", () => {
+  const api = startedApi();
+  const response = command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" });
+  assert.equal(response.status, 200);
+  const payload = response.payload as { result: { accepted: boolean; reason?: string } };
+  assert.equal(payload.result.accepted, false);
+  assert.equal(payload.result.reason, "invalid-damage-type-target");
+});
+
 test("place-tower and place-wall reject non-integer or non-finite coordinates", () => {
   const api = startedApi();
   for (const type of ["place-tower", "place-wall"]) {

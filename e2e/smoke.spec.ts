@@ -616,6 +616,67 @@ test("wall and target-mode controls follow the phase and a disabled wall button 
   await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
 });
 
+test("the damage type selector follows the tower, is sent as a command and locks once the player is ready", async ({ page }) => {
+  await startMatch(page, "/");
+  // Nothing to change before a tower exists.
+  await expect(page.locator("#damageType")).toBeDisabled();
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#damageType")).toBeEnabled();
+  await expect(page.locator("#damageType")).toHaveValue("physical");
+
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+  await page.locator("#damageType").selectOption("magic");
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toContain("set-damage-type");
+  expect(commands[0]).toContain("magic");
+  await expect(page.locator("#feedbackQueue")).not.toContainText("rejected");
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ playerId: string; damageType: string }> } };
+  expect(live.snapshot.towers.find((tower) => tower.playerId === "p1")?.damageType).toBe("magic");
+
+  // Readying commits the type: the control locks, like the upgrade buttons.
+  await page.locator("#readyBtn").click();
+  await expect(page.locator("#damageType")).toBeDisabled();
+  await expect(page.locator("#damageType")).toHaveValue("magic");
+});
+
+test("a destroyed tower leaves ruins whose tooltip names the owner and the wave", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const towers = live.snapshot.towers as Array<{ id: string; x: number; y: number; playerId: string }>;
+  const fallen = towers[0]!;
+  const withRuins = {
+    ...live.snapshot,
+    towers: [],
+    ruins: [{ id: fallen.id, playerId: fallen.playerId, x: fallen.x, y: fallen.y, destroyedWave: 3, destroyedTick: 12 }]
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: withRuins }) });
+  }, { times: 1 });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#playerCards")).not.toContainText("Tower 100/100");
+
+  const tooltip = page.locator(".tower-tooltip");
+  const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, fallen);
+  // Wait out the explosion so the ruins have faded in, then hover them.
+  await page.waitForTimeout(1200);
+  await page.locator("#board canvas").hover({ position: position! });
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Alpha's tower");
+  await expect(tooltip).toContainText("wave 3");
+
+  await page.locator("#board canvas").hover({ position: { x: 2, y: 2 } });
+  await expect(tooltip).toBeHidden();
+});
+
 async function showEndedOverlay(page: Page): Promise<void> {
   const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
   const ended = {
@@ -674,7 +735,7 @@ test("the guide close button has an accessible name and the shortcut bar matches
 
 test("the prep banner previews the next wave and combat shows creatures still to spawn", async ({ page }) => {
   await startMatch(page, "/");
-  await expect(page.locator("#wavePreview")).toHaveText("Next wave 1: 1x Runner, 1x Swarm, 1x Armored");
+  await expect(page.locator("#wavePreview")).toHaveText("Next wave 1: 1x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic)");
 
   await clickCellNearSpawn(page, 0);
   await page.locator("#playerId").selectOption("p2");

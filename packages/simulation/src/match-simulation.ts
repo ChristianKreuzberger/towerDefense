@@ -3,6 +3,7 @@ import {
   isWithinCreatureAttackRange,
   getCreatureBaseHp,
   getCreatureRewardPoints,
+  DEFAULT_DAMAGE_TYPE,
   DEFAULT_TOWER_TARGET_MODE,
   DEFAULT_TOWER_HEALTH,
   DEFAULT_WALL_HEALTH,
@@ -46,6 +47,8 @@ import {
   getWaveCreatureArchetype,
   getWaveCreatureCount,
   WAVE_SPAWN_INTERVAL_TICKS,
+  getDamageAgainst,
+  isValidDamageType,
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
@@ -377,7 +380,8 @@ export class MatchSimulation {
         maxHealth: DEFAULT_TOWER_HEALTH,
         level: 1,
         upgrades: { ...BASE_TOWER_UPGRADES },
-        targetMode: DEFAULT_TOWER_TARGET_MODE
+        targetMode: DEFAULT_TOWER_TARGET_MODE,
+        damageType: DEFAULT_DAMAGE_TYPE
       });
 
       return { accepted: true };
@@ -599,6 +603,38 @@ export class MatchSimulation {
       tower.upgrades[track] += 1;
       tower.level = getTowerOverallLevel(tower.upgrades);
 
+      return { accepted: true };
+    }
+
+    if (command.type === "set-damage-type") {
+      // Same window as upgrades: a prep decision, made before the player commits with ready.
+      const player = this.state.players.find((entry) => entry.id === command.playerId);
+      if (!player) {
+        return { accepted: false, reason: "unknown-player" };
+      }
+
+      if (player.eliminated) {
+        return { accepted: false, reason: "player-eliminated" };
+      }
+
+      if (this.state.phase !== "placement") {
+        return { accepted: false, reason: "damage-type-phase-not-active" };
+      }
+
+      if (player.readyForWave) {
+        return { accepted: false, reason: "player-already-ready-for-wave" };
+      }
+
+      const tower = this.state.towers.find((entry) => entry.id === command.towerId);
+      if (!tower || tower.playerId !== command.playerId) {
+        return { accepted: false, reason: "invalid-damage-type-target" };
+      }
+
+      if (!isValidDamageType(command.damageType)) {
+        return { accepted: false, reason: "invalid-damage-type" };
+      }
+
+      tower.damageType = command.damageType;
       return { accepted: true };
     }
 
@@ -962,7 +998,7 @@ export class MatchSimulation {
         continue;
       }
 
-      const damage = this.getTowerDamage(tower);
+      const damage = getDamageAgainst(this.getTowerDamage(tower), tower.damageType, creature.archetype);
       creature.hp -= damage;
       this.state.telemetry.currentWave.towerDamageDealt += damage;
       this.updateCurrentWaveTelemetryTick();
@@ -977,6 +1013,7 @@ export class MatchSimulation {
         x: creature.x,
         y: creature.y,
         damage,
+        damageType: tower.damageType,
         remainingHp: Math.max(0, creature.hp)
       });
 

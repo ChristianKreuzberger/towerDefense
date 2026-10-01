@@ -5,7 +5,9 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   PROJECT_NAME,
+  DAMAGE_TYPES,
   UPGRADE_TRACKS,
+  isValidDamageType,
   isValidUpgradeTrack,
   type MatchSetup,
   type MatchSnapshot,
@@ -168,6 +170,14 @@ function parseCommand(body: unknown): SimulationCommand {
       throw new GameApiError("invalid-command", `set-target-mode: mode must be one of ${TARGET_MODES.join(", ")}`);
     }
     return { type, playerId: text("playerId"), towerId: text("towerId"), mode: mode as TowerTargetMode };
+  }
+
+  if (type === "set-damage-type") {
+    const damageType = commandSource.damageType;
+    if (!isValidDamageType(damageType)) {
+      throw new GameApiError("invalid-command", `set-damage-type: damageType must be one of ${DAMAGE_TYPES.join(", ")}`);
+    }
+    return { type, playerId: text("playerId"), towerId: text("towerId"), damageType };
   }
 
   if (type === "ready-for-wave") {

@@ -76,3 +76,12 @@ test("the move button follows the token: locked early, free when unlocked, used 
   assert.equal(getToolbarState({ ...unlocked, phase: "wave" }).moveLabel, "-");
   assert.equal(getToolbarState({ ...unlocked, upgrades: null }).moveLabel, "-");
 });
+
+test("damage type is selectable only in prep, before ready, with a living tower", () => {
+  assert.equal(getToolbarState(prep).damageTypeEnabled, true);
+  assert.equal(getToolbarState({ ...prep, readyForWave: true }).damageTypeEnabled, false);
+  assert.equal(getToolbarState({ ...prep, phase: "wave", readyForWave: true }).damageTypeEnabled, false);
+  assert.equal(getToolbarState({ ...prep, phase: "ended" }).damageTypeEnabled, false);
+  assert.equal(getToolbarState({ ...prep, upgrades: null }).damageTypeEnabled, false);
+  assert.equal(getToolbarState({ ...prep, eliminated: true }).damageTypeEnabled, false);
+});

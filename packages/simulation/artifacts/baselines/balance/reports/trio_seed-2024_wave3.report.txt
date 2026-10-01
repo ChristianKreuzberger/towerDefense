@@ -4,7 +4,7 @@ matchSeed=2024
 snapshots=3
 
 === Wave 1 (export=1, tick=20) ===
-DPS proxy: 0.50 dmg/tick (dealt=10, ticks=20)
+DPS proxy: 0.55 dmg/tick (dealt=11, ticks=20)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=3, exited=0)
 Damage intake: towers=0 walls=0
 Repairs: towers=0 walls=0
@@ -16,21 +16,21 @@ Players:
 - p2 (Beta) status=active delta=29 bonus=15 catchUp=0 swarmCapped=0 total=29 ending=29 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=0 wallHp=0
 
-=== Wave 2 (export=2, tick=27) ===
-DPS proxy: 0.67 dmg/tick (dealt=18, ticks=27)
+=== Wave 2 (export=2, tick=23) ===
+DPS proxy: 0.83 dmg/tick (dealt=19, ticks=23)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=1 (defeated=4, spawned=4, exited=0)
-Damage intake: towers=3 walls=0
-Repairs: towers=3 walls=1
+Damage intake: towers=0 walls=0
+Repairs: towers=0 walls=1
 Economy delta: awarded=97 spentWalls=25 spentUpgrades=0 net=72
 Wave-clear bonus: awarded=45
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=8 bonus=15 catchUp=0 swarmCapped=0 total=41 ending=41 towerLv=1 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=49 bonus=15 catchUp=0 swarmCapped=0 total=78 ending=78 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p1 (Alpha) status=active delta=22 bonus=15 catchUp=0 swarmCapped=0 total=55 ending=55 towerLv=1 towerHp=100 walls=1 wallHp=60
+- p2 (Beta) status=active delta=35 bonus=15 catchUp=0 swarmCapped=0 total=64 ending=64 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=30 ending=30 towerLv=1 towerHp=100 walls=0 wallHp=0
 
 === Wave 3 (export=3, tick=24) ===
-DPS proxy: 1.00 dmg/tick (dealt=24, ticks=24)
+DPS proxy: 0.92 dmg/tick (dealt=22, ticks=24)
 Kills by archetype: runner=2 swarm=1 armored=1 tank=1 (defeated=5, spawned=5, exited=0)
 Damage intake: towers=0 walls=0
 Repairs: towers=0 walls=2
@@ -39,20 +39,20 @@ Wave-clear bonus: awarded=45
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
 - p1 (Alpha) status=active delta=-19 bonus=15 catchUp=0 swarmCapped=0 total=77 ending=77 towerLv=2 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=93 ending=93 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=79 ending=79 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=-15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=1 wallHp=60
 
 === Cumulative Summary ===
 Waves completed: 3
-DPS proxy: 0.73 dmg/tick (dealt=52, ticks=71)
+DPS proxy: 0.78 dmg/tick (dealt=52, ticks=67)
 Kills by archetype: runner=4 swarm=3 armored=3 tank=2
-Damage intake totals: towers=3 walls=0
-Repairs totals: towers=3 walls=3
+Damage intake totals: towers=0 walls=0
+Repairs totals: towers=0 walls=3
 Wave-clear bonus total: 135
 Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
-Economy totals: awarded=336 spentWalls=55 spentUpgrades=96 net=185 ending=185
-Structures: livingTowers=3 livingWalls=2 towerHp=300 wallHp=120 pathWearTotal=20
+Economy totals: awarded=322 spentWalls=55 spentUpgrades=96 net=171 ending=171
+Structures: livingTowers=3 livingWalls=2 towerHp=300 wallHp=120 pathWearTotal=21
 Players (final):
 - p1 (Alpha) status=active delta=-19 bonus=15 catchUp=0 swarmCapped=0 total=77 ending=77 towerLv=2 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=93 ending=93 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=79 ending=79 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=-15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=1 wallHp=60

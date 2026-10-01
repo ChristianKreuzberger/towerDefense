@@ -126,7 +126,7 @@ Next-wave preview and HUD
 - The ended status text names the winner (never the raw id)
 
 Damage type selector
-- A "Damage" select sits next to the Target Mode select with Physical, Explosive and Magic. It is enabled only when the simulation would accept `set-damage-type` (player has a living tower, prep phase, not ready; `damageTypeEnabled` in the toolbar state) and shows the tower's current type from the snapshot. Shots are tinted by damage type (physical white-yellow, explosive orange, magic violet). Rejections show a toast with their own text
+- A "Damage" select sits next to the Target Mode select with Physical, Explosive and Magic. It is enabled only when the simulation would accept `set-damage-type` (player has a living tower, prep phase, not ready; `damageTypeEnabled` in the toolbar state) and shows the tower's current type from the snapshot. Rejections show a toast with their own text
 
 Move tower
 - A "Move Tower" button (hotkey `V`, cost shown as "free") appears in the toolbar. It is available only when the simulation would accept a move (`towerMoveAvailable` for the player, prep phase, not ready); before the unlock it is dimmed and a press explains "unlocks after round 5"

@@ -23,7 +23,7 @@ function mapFrom(rows: string[]): GameMap {
 }
 
 function towerAt(id: string, x: number, y: number, playerId = id): Tower {
-  return { id, playerId, x, y, health: 100, maxHealth: 100, level: 1, upgrades: { range: 1, damage: 1, accuracy: 1 }, targetMode: "first" };
+  return { id, playerId, x, y, health: 100, maxHealth: 100, level: 1, upgrades: { range: 1, damage: 1, accuracy: 1 }, targetMode: "first", damageType: "physical" };
 }
 
 function wallAt(x: number, y: number): Wall {

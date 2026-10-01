@@ -137,7 +137,7 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
         const targetCell = path[Math.min(target.index, path.length - 1)];
         const x = targetCell?.x ?? 0;
         const y = targetCell?.y ?? 0;
-        events.push({ type: "tower-hit", wave, tick, towerId: tower.id, playerId: tower.playerId, creatureId: target.id, x, y, damage, remainingHp: Math.max(0, target.hp) });
+        events.push({ type: "tower-hit", wave, tick, towerId: tower.id, playerId: tower.playerId, creatureId: target.id, x, y, damage, damageType: tower.damageType, remainingHp: Math.max(0, target.hp) });
         if (target.hp <= 0) {
           const rewardPoints = getCreatureRewardPoints(target.archetype);
           points.set(tower.playerId, (points.get(tower.playerId) ?? 0) + rewardPoints);

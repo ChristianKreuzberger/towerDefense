@@ -12,7 +12,7 @@ import {
   TOWER_STYLE_TIERS,
   isInSpawnProtection
 } from "@tower-defense/shared";
-import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades, Wall } from "@tower-defense/shared";
+import type { Creature, CreatureArchetype, DamageType, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades, Wall } from "@tower-defense/shared";
 
 import { Effects } from "./art/fx";
 import { CREAM, INK, UI_COLORS, colorForPlayer, playerIndex } from "./art/palette";
@@ -86,6 +86,7 @@ interface TowerVisual {
   level: number;
   tier: number;
   upgrades: TowerUpgrades;
+  damageType: DamageType;
   hp: number;
   maxHp: number;
   angle: number;
@@ -498,6 +499,7 @@ class BattlefieldScene extends Phaser.Scene {
       ["Health", `${tower.hp}/${tower.maxHp}`],
       ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
       ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
+      ["Type", tower.damageType],
       ["DPS", String(stats.damagePerSecond)],
       ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
     ];
@@ -899,7 +901,7 @@ class BattlefieldScene extends Phaser.Scene {
     container.add([shadow, base, flash, turret, badge, pips, hpBg, hpFill]);
     return {
       container, base, turret, pips, hpBg, hpFill, flash,
-      player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
+      player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, damageType: tower.damageType, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
       baseX: cx, baseY: cy, flashUntil: 0, shakeUntil: 0, recoilUntil: 0
     };
   }
@@ -913,6 +915,7 @@ class BattlefieldScene extends Phaser.Scene {
       this.glideTowerTo(visual, cx, cy);
     }
     visual.upgrades = { ...tower.upgrades };
+    visual.damageType = tower.damageType;
     if (visual.level !== tower.level) {
       const bought = tower.level > visual.level;
       const tier = getTowerStyleTier(tower.level);

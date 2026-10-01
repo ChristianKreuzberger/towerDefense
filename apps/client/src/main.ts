@@ -2,7 +2,7 @@ import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, UPGRADE_TRACKS, WIN_SCORE, ge
 import { getToolbarState } from "./toolbar-state.js";
 import { resolvePlacementCell } from "./placement.js";
 import { formatWavePreview } from "./wave-preview.js";
-import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode, UpgradeTrack } from "@tower-defense/shared";
+import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, DamageType, SimulationCommand, TowerTargetMode, UpgradeTrack } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
 import { cueForCommandResult, cuesForSnapshotChange, createSoundEngine } from "./audio/index";
@@ -36,6 +36,7 @@ declare global {
 }
 
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
+const DAMAGE_TYPE_OPTIONS: DamageType[] = ["physical", "explosive", "magic"];
 const PLAYER_COLORS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"] as const;
 
 type ApiErrorPayload = {
@@ -318,6 +319,15 @@ app.innerHTML = `
         </select>
       </div>
 
+      <div class="panel-block">
+        <label for="damageType">Damage Type</label>
+        <select id="damageType">
+          <option value="physical">physical</option>
+          <option value="explosive">explosive</option>
+          <option value="magic">magic</option>
+        </select>
+      </div>
+
       <div class="stack debug-only">
         <button id="advanceBtn" class="primary">Advance Wave Tick</button>
         <button id="autoBtn">Advance Wave (Auto)</button>
@@ -391,6 +401,7 @@ const el = {
   x: must<HTMLInputElement>("x"),
   y: must<HTMLInputElement>("y"),
   mode: must<HTMLSelectElement>("mode"),
+  damageType: must<HTMLSelectElement>("damageType"),
   playerCards: must<HTMLElement>("playerCards"),
   phaseBanner: must<HTMLElement>("phaseBanner"),
   phaseLabel: must<HTMLElement>("phaseLabel"),
@@ -543,6 +554,9 @@ const REJECT_REASON_TEXT: Record<string, string> = {
   "tower-max-level": "your tower is already at max level",
   "invalid-target-mode-target": "you can only change your own tower",
   "invalid-target-mode": "unknown target mode",
+  "damage-type-phase-not-active": "damage type can only be changed during prep, before you ready",
+  "invalid-damage-type-target": "you can only change your own tower",
+  "invalid-damage-type": "unknown damage type",
   "match-already-ended": "the match is over",
   "player-eliminated": "your tower was destroyed",
   "unknown-player": "unknown player",
@@ -559,6 +573,7 @@ const COMMAND_LABEL: Partial<Record<SimulationCommand["type"], string>> = {
   "upgrade-tower": "Upgrade",
   "move-tower": "Move",
   "set-target-mode": "Target mode",
+  "set-damage-type": "Damage type",
   "ready-for-wave": "Ready"
 };
 
@@ -1212,8 +1227,10 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
     setMoveMode(false);
   }
   el.mode.disabled = !state.targetModeEnabled;
+  el.damageType.disabled = !state.damageTypeEnabled;
   if (tower) {
     el.mode.value = tower.targetMode;
+    el.damageType.value = tower.damageType;
   }
 }
 
@@ -1984,6 +2001,16 @@ el.mode.addEventListener("change", () => {
     towerId: playerTowerId(playerId),
     mode
   });
+});
+
+el.damageType.addEventListener("change", () => {
+  const requested = String(el.damageType.value);
+  const damageType = DAMAGE_TYPE_OPTIONS.find((candidate) => candidate === requested);
+  if (!damageType) {
+    return;
+  }
+  const playerId = selectedPlayerId();
+  void sendCommand({ type: "set-damage-type", playerId, towerId: playerTowerId(playerId), damageType });
 });
 
 el.placeTowerBtn.addEventListener("click", () => {
