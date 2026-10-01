@@ -84,7 +84,9 @@ export class Effects {
   }
 
   // Positions are world pixels; delayMs staggers events that arrived in one batched response.
-  projectile(x0: number, y0: number, x1: number, y1: number, color: number, delayMs: number): void {
+  // `tier` is the shooter's style tier (0 to 4): higher tiers fire longer, thicker bolts with a brighter muzzle flash
+  // and, from tier 3, a white core.
+  projectile(x0: number, y0: number, x1: number, y1: number, color: number, delayMs: number, tier = 0): void {
     const distance = Math.hypot(x1 - x0, y1 - y0);
     const sprite = this.acquireSprite("bolt", KEY.bolt, color);
     if (!sprite) {
@@ -96,11 +98,48 @@ export class Effects {
     sprite.y0 = y0;
     sprite.x1 = x1;
     sprite.y1 = y1;
-    const length = (this.cellSize * 0.9) / 48;
+    const length = ((this.cellSize * 0.9) / 48) * (1 + tier * 0.2);
+    const heading = Math.atan2(y1 - y0, x1 - x0);
     sprite.scale0 = length;
     sprite.scale1 = length;
-    sprite.image.setRotation(Math.atan2(y1 - y0, x1 - x0));
+    sprite.image.setRotation(heading);
     this.spark(x1, y1, color, delayMs + sprite.duration);
+    if (tier >= 2) {
+      this.spark(x0, y0, 0xffffff, delayMs);
+    }
+    if (tier >= 3) {
+      const core = this.acquireSprite("bolt", KEY.bolt, 0xffffff);
+      if (core) {
+        core.start = sprite.start;
+        core.duration = sprite.duration;
+        core.x0 = x0;
+        core.y0 = y0;
+        core.x1 = x1;
+        core.y1 = y1;
+        core.scale0 = length * 0.55;
+        core.scale1 = length * 0.55;
+        core.image.setRotation(heading);
+      }
+    }
+  }
+
+  // Level-up shine: an expanding gold glow, sparkles, and (for a new style tier) a second, larger wave.
+  shine(x: number, y: number, bigger: boolean, delayMs: number): void {
+    const wave = this.acquireSprite("puff", KEY.soft, 0xffe08a);
+    if (wave) {
+      wave.start = performance.now() + delayMs;
+      wave.duration = this.reducedMotion ? 200 : 650;
+      wave.x0 = x;
+      wave.y0 = y;
+      wave.x1 = x;
+      wave.y1 = y;
+      wave.scale0 = (this.cellSize * 0.8) / 32;
+      wave.scale1 = (this.cellSize * (this.reducedMotion ? 1.4 : bigger ? 4.2 : 3)) / 32;
+    }
+    this.burst(x, y, 0xf2b84b, delayMs);
+    if (bigger) {
+      this.burst(x, y, 0xffffff, delayMs + 140);
+    }
   }
 
   spark(x: number, y: number, color: number, delayMs: number): void {

@@ -7,6 +7,9 @@ import {
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
   getTowerStats,
+  getTowerStyleTier,
+  TOWER_STYLE_TIER_SIZE,
+  TOWER_STYLE_TIERS,
   isInSpawnProtection
 } from "@tower-defense/shared";
 import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades, Wall } from "@tower-defense/shared";
@@ -76,6 +79,7 @@ interface TowerVisual {
   flash: Phaser.GameObjects.Image;
   player: number;
   level: number;
+  tier: number;
   upgrades: TowerUpgrades;
   hp: number;
   maxHp: number;
@@ -450,7 +454,7 @@ class BattlefieldScene extends Phaser.Scene {
         ghostWall.setTexture(KEY.wall(index, 0)).setPosition(cx, cy).setVisible(true);
       } else {
         ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
-        ghostTurret.setTexture(KEY.turret(index, 1)).setPosition(cx, cy).setVisible(true);
+        ghostTurret.setTexture(KEY.turret(index, 0)).setPosition(cx, cy).setVisible(true);
         // Placement is one-shot, so show the coverage before the player commits.
         this.drawRangeCircle(hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
       }
@@ -873,7 +877,7 @@ class BattlefieldScene extends Phaser.Scene {
     const shadow = this.add.image(0, cellSize * 0.2, KEY.shadow).setDisplaySize(cellSize * TOWER_SCALE * 1.05, cellSize * 1.15);
     const base = this.add.image(0, 0, KEY.towerBase(player)).setScale(INV);
     const flash = this.add.image(0, 0, KEY.soft).setTint(0xff5a4a).setDisplaySize(cellSize * 2, cellSize * 2).setVisible(false);
-    const turret = this.add.image(0, 0, KEY.turret(player, tower.level)).setScale(INV);
+    const turret = this.add.image(0, 0, KEY.turret(player, getTowerStyleTier(tower.level))).setScale(INV);
     const badge = this.add.image(cellSize * 0.74, cellSize * 0.7, KEY.badge(player)).setScale(INV);
     const pips = this.add.image(0, cellSize * 1.12, KEY.pips(1)).setScale(INV).setVisible(false);
     const barWidth = cellSize * 1.5;
@@ -885,7 +889,7 @@ class BattlefieldScene extends Phaser.Scene {
     container.add([shadow, base, flash, turret, badge, pips, hpBg, hpFill]);
     return {
       container, base, turret, pips, hpBg, hpFill, flash,
-      player, level: tower.level, upgrades: { ...tower.upgrades }, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
+      player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
       baseX: cx, baseY: cy, flashUntil: 0, shakeUntil: 0, recoilUntil: 0
     };
   }
@@ -896,11 +900,20 @@ class BattlefieldScene extends Phaser.Scene {
     visual.baseY = cy;
     visual.upgrades = { ...tower.upgrades };
     if (visual.level !== tower.level) {
+      const bought = tower.level > visual.level;
+      const tier = getTowerStyleTier(tower.level);
+      const newStyle = tier !== visual.tier;
       visual.level = tower.level;
-      visual.turret.setTexture(KEY.turret(visual.player, tower.level));
+      visual.tier = tier;
+      visual.turret.setTexture(KEY.turret(visual.player, tier));
+      if (bought) {
+        this.playLevelUp(visual, newStyle);
+      }
     }
-    if (tower.level >= 2) {
-      visual.pips.setTexture(KEY.pips(tower.level - 1)).setVisible(true);
+    // Pips show progress towards the next style tier (0 to 2); the top tier has nothing left to earn.
+    const progress = visual.tier >= TOWER_STYLE_TIERS - 1 ? 0 : (tower.level - 1) % TOWER_STYLE_TIER_SIZE;
+    if (progress >= 1) {
+      visual.pips.setTexture(KEY.pips(progress)).setVisible(true);
     } else {
       visual.pips.setVisible(false);
     }
@@ -910,6 +923,16 @@ class BattlefieldScene extends Phaser.Scene {
       const ratio = tower.maxHealth > 0 ? Math.max(0, Math.min(1, tower.health / tower.maxHealth)) : 0;
       visual.hpFill.setDisplaySize(Math.max(0, cellSize * 1.5 * ratio), cellSize * 0.2).setTint(hpColor(ratio));
     }
+  }
+
+  private playLevelUp(visual: TowerVisual, newStyle: boolean): void {
+    this.fx?.shine(visual.baseX, visual.baseY, newStyle, 0);
+    this.fx?.floatText(visual.baseX, visual.baseY - this.cellSize * 1.4, newStyle ? "New style!" : "Level up", 0xf2b84b, 0);
+    if (this.reducedMotion) {
+      return;
+    }
+    visual.container.setScale(1);
+    this.tweens.add({ targets: visual.container, scale: newStyle ? 1.3 : 1.15, duration: 140, yoyo: true, ease: "Quad.Out" });
   }
 
   private playTowerPopAnimation(container: Phaser.GameObjects.Container): void {
@@ -1062,7 +1085,7 @@ class BattlefieldScene extends Phaser.Scene {
             const color = colorForPlayer(event.playerId);
             const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
             const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
-            fx.projectile(tower.baseX, tower.baseY, x, y, color, delay);
+            fx.projectile(tower.baseX, tower.baseY, x, y, color, delay, tower.tier);
             tower.recoilUntil = now + delay + RECOIL_MS;
             budget -= 1;
           }
@@ -1081,7 +1104,7 @@ class BattlefieldScene extends Phaser.Scene {
             const length = Math.max(1, Math.hypot(dx, dy));
             const missX = x + (-dy / length) * cellSize * 0.9;
             const missY = y + (dx / length) * cellSize * 0.9;
-            fx.projectile(tower.baseX, tower.baseY, missX, missY, color, delay);
+            fx.projectile(tower.baseX, tower.baseY, missX, missY, color, delay, tower.tier);
             fx.floatText(x, y - cellSize * 0.5, "miss", 0xcfc8b8, delay + 120);
             tower.recoilUntil = now + delay + RECOIL_MS;
             budget -= 1;

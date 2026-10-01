@@ -1,6 +1,6 @@
 // Bakes all procedural sprites into Phaser canvas textures. Runs at boot and again only if the cell size changes.
 import type Phaser from "phaser";
-import type { CreatureArchetype } from "@tower-defense/shared";
+import { TOWER_STYLE_TIERS, type CreatureArchetype } from "@tower-defense/shared";
 
 import { PLAYER_COLORS } from "./palette";
 import {
@@ -21,13 +21,13 @@ import {
 
 // Sprites are baked at 2x and displayed at 1/SS so they stay crisp when the board is scaled up.
 export const SS = 2;
-export const MAX_TOWER_LEVEL_ART = 4;
 export const CREATURE_SCALE: Record<CreatureArchetype, number> = { runner: 1.05, swarm: 0.85, armored: 1.15, tank: 1.45 };
 export const TOWER_SCALE = 2;
 
 export const KEY = {
   towerBase: (player: number): string => `tower-base-${player}`,
-  turret: (player: number, level: number): string => `turret-${player}-${Math.min(level, MAX_TOWER_LEVEL_ART)}`,
+  // `tier` is the style tier from getTowerStyleTier (0 to 4), not the raw level.
+  turret: (player: number, tier: number): string => `turret-${player}-${Math.min(Math.max(tier, 0), TOWER_STYLE_TIERS - 1)}`,
   ruins: (player: number): string => `ruins-${player}`,
   badge: (player: number): string => `badge-${player}`,
   pips: (count: number): string => `pips-${Math.min(Math.max(count, 1), 5)}`,
@@ -72,8 +72,8 @@ export function ensureTextures(scene: Phaser.Scene, cs: number): void {
   const towerPx = Math.round(cs * TOWER_SCALE * SS);
   PLAYER_COLORS.forEach((color, index) => {
     bake(textures, KEY.towerBase(index), towerPx, towerPx, (ctx) => paintTowerBase(ctx, towerPx, color));
-    for (let level = 1; level <= MAX_TOWER_LEVEL_ART; level += 1) {
-      bake(textures, KEY.turret(index, level), towerPx, towerPx, (ctx) => paintTurret(ctx, towerPx, color, level));
+    for (let tier = 0; tier < TOWER_STYLE_TIERS; tier += 1) {
+      bake(textures, KEY.turret(index, tier), towerPx, towerPx, (ctx) => paintTurret(ctx, towerPx, color, tier + 1));
     }
     bake(textures, KEY.ruins(index), towerPx, towerPx, (ctx) => paintRuins(ctx, towerPx, color));
     const badgePx = Math.round(cs * 0.62 * SS);

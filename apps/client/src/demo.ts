@@ -77,8 +77,8 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
     if (!live || live.towers.length === 0) {
       return false;
     }
-    // Showcase upgrade art: later towers get higher levels (presentation only).
-    const base: MatchSnapshot = { ...live, towers: live.towers.map((tower, index) => ({ ...tower, level: Math.min(4, tower.level + index * 2), upgrades: { range: 1 + index, damage: 1 + index * 2, accuracy: 1 } })) };
+    // Showcase upgrade art: each later tower is one style tier higher (presentation only).
+    const base: MatchSnapshot = { ...live, towers: live.towers.map((tower, index) => ({ ...tower, level: Math.min(13, tower.level + index * 3), upgrades: { range: 1 + index, damage: 1 + index * 2, accuracy: 1 } })) };
     stop();
     const path = findLane(base.map);
     // Showcase wall art at three damage levels on the lane (presentation only).
