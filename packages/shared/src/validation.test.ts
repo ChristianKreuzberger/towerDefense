@@ -5,8 +5,8 @@ import { SPAWN_PROTECTION_RADIUS } from "./game-rules.js";
 import { isInSpawnProtection, type GameMap } from "./map-types.js";
 import type { Tower } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
+import { getTowerUpgradeCost } from "./game-rules.js";
 import {
-  getTowerUpgradeCost,
   getWallCost,
   isValidTowerTargetMode,
   isValidTowerPlacement,
@@ -23,7 +23,7 @@ function mapFrom(rows: string[]): GameMap {
 }
 
 function towerAt(id: string, x: number, y: number, playerId = id): Tower {
-  return { id, playerId, x, y, health: 100, maxHealth: 100, level: 0, targetMode: "first" };
+  return { id, playerId, x, y, health: 100, maxHealth: 100, level: 1, upgrades: { range: 1, damage: 1, accuracy: 1 }, targetMode: "first" };
 }
 
 function wallAt(x: number, y: number): Wall {
@@ -122,7 +122,7 @@ test("wall placement: rejects cutting the only lane and cutting off a tower", ()
 
 test("cost helpers grow with count and level", () => {
   assert.ok(getWallCost(1) >= getWallCost(0));
-  assert.ok(getTowerUpgradeCost(2) >= getTowerUpgradeCost(0));
+  assert.ok(getTowerUpgradeCost("damage", 2) >= getTowerUpgradeCost("damage", 1));
 });
 
 test("upgrade target and target mode checks", () => {

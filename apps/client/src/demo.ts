@@ -78,7 +78,7 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
       return false;
     }
     // Showcase upgrade art: later towers get higher levels (presentation only).
-    const base: MatchSnapshot = { ...live, towers: live.towers.map((tower, index) => ({ ...tower, level: Math.min(4, tower.level + index * 2) })) };
+    const base: MatchSnapshot = { ...live, towers: live.towers.map((tower, index) => ({ ...tower, level: Math.min(4, tower.level + index * 2), upgrades: { range: 1 + index, damage: 1 + index * 2, accuracy: 1 } })) };
     stop();
     const path = findLane(base.map);
     // Showcase wall art at three damage levels on the lane (presentation only).
@@ -132,7 +132,7 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
         if (!target) {
           continue;
         }
-        const damage = Math.max(1, tower.level);
+        const damage = Math.max(1, tower.upgrades.damage);
         target.hp -= damage;
         const targetCell = path[Math.min(target.index, path.length - 1)];
         const x = targetCell?.x ?? 0;

@@ -1,6 +1,6 @@
 import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
-import type { Tower, TowerTargetMode } from "./tower-types.js";
+import type { Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 
 export interface PlayerSetup {
@@ -240,6 +240,17 @@ export type MatchEvent =
       remainingHp: number;
     }
   | {
+      // The tower fired but missed; no damage. x/y is the creature cell, like tower-hit.
+      type: "tower-miss";
+      wave: number;
+      tick: number;
+      towerId: string;
+      playerId: string;
+      creatureId: string;
+      x: number;
+      y: number;
+    }
+  | {
       type: "creature-defeated";
       wave: number;
       tick: number;
@@ -355,6 +366,7 @@ export type CommandRejectReason =
   | "wall-phase-not-active"
   | "upgrade-phase-not-active"
   | "tower-max-level"
+  | "invalid-upgrade-track"
   | "player-already-ready-for-wave"
   | "invalid-upgrade-target"
   | "invalid-target-mode-target"
@@ -390,6 +402,7 @@ export type SimulationCommand =
       type: "upgrade-tower";
       playerId: string;
       towerId: string;
+      track: UpgradeTrack;
     }
   | {
       type: "set-target-mode";

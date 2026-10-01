@@ -13,7 +13,10 @@ import {
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
+  BASE_TOWER_UPGRADES,
+  getTowerAccuracy,
   getTowerDamage,
+  getTowerOverallLevel,
   getTowerRange,
   SPAWN_PROTECTION_TICKS,
   type CommandResult,
@@ -39,12 +42,14 @@ import {
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
+  isValidUpgradeTrack,
   MAX_TOWER_LEVEL,
   isValidWallPlacement,
   WIN_SCORE,
 } from "@tower-defense/shared";
 
 import { generateMap } from "./procedural-map.js";
+import { rollShot } from "./shot-roll.js";
 
 interface InternalMatchState {
   phase: "placement" | "wave" | "ended";
@@ -347,6 +352,7 @@ export class MatchSimulation {
         health: DEFAULT_TOWER_HEALTH,
         maxHealth: DEFAULT_TOWER_HEALTH,
         level: 1,
+        upgrades: { ...BASE_TOWER_UPGRADES },
         targetMode: DEFAULT_TOWER_TARGET_MODE
       });
 
@@ -480,11 +486,16 @@ export class MatchSimulation {
         return { accepted: false, reason: "invalid-upgrade-target" };
       }
 
-      if (tower.level >= MAX_TOWER_LEVEL) {
+      const track = command.track;
+      if (!isValidUpgradeTrack(track)) {
+        return { accepted: false, reason: "invalid-upgrade-track" };
+      }
+
+      if (tower.upgrades[track] >= MAX_TOWER_LEVEL) {
         return { accepted: false, reason: "tower-max-level" };
       }
 
-      const upgradeCost = getTowerUpgradeCost(tower.level);
+      const upgradeCost = getTowerUpgradeCost(track, tower.upgrades[track]);
       if (player.points < upgradeCost) {
         return { accepted: false, reason: "insufficient-points" };
       }
@@ -494,7 +505,8 @@ export class MatchSimulation {
         (this.state.playerSpentOnUpgradesTotal[command.playerId] ?? 0) + upgradeCost;
       this.state.playerSpentOnUpgradesCurrentWave[command.playerId] =
         (this.state.playerSpentOnUpgradesCurrentWave[command.playerId] ?? 0) + upgradeCost;
-      tower.level += 1;
+      tower.upgrades[track] += 1;
+      tower.level = getTowerOverallLevel(tower.upgrades);
 
       return { accepted: true };
     }
@@ -821,6 +833,22 @@ export class MatchSimulation {
         continue;
       }
 
+      // Misses are decided by the match seed, so replays and tower order never change the outcome.
+      const roll = rollShot(this.state.map.seed, this.state.wave, this.state.waveTick, tower.id);
+      if (roll >= getTowerAccuracy(tower.upgrades.accuracy)) {
+        this.state.events.push({
+          type: "tower-miss",
+          wave: this.state.wave,
+          tick: this.state.waveTick,
+          towerId: tower.id,
+          playerId: tower.playerId,
+          creatureId: creature.id,
+          x: creature.x,
+          y: creature.y
+        });
+        continue;
+      }
+
       const damage = this.getTowerDamage(tower);
       creature.hp -= damage;
       this.state.telemetry.currentWave.towerDamageDealt += damage;
@@ -1026,7 +1054,7 @@ export class MatchSimulation {
 
   private selectCreatureTargetForTower(tower: Tower): Creature | undefined {
     // Squared comparison keeps the range check free of sqrt and float drift.
-    const range = getTowerRange(tower.level);
+    const range = getTowerRange(tower.upgrades.range);
     const creatures = this.state.creatures
       .filter((creature) => !this.isSpawnProtected(creature) && this.getSquaredDistance(tower, creature) <= range * range)
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -1128,7 +1156,7 @@ export class MatchSimulation {
   }
 
   private getTowerDamage(tower: Tower): number {
-    return getTowerDamage(tower.level);
+    return getTowerDamage(tower.upgrades.damage);
   }
 
   private getCreatureAttackDamage(creature: Creature): number {
