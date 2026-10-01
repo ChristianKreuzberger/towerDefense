@@ -87,3 +87,30 @@ export function getWaveClearBonus(): number {
 export function getTowerRange(level: number): number {
   return BASE_TOWER_RANGE + (Math.max(1, level) - 1) * TOWER_RANGE_PER_LEVEL;
 }
+
+// Simulation ticks per second of game time at 1x playback; towers fire once per tick.
+export const TICKS_PER_SECOND = 5;
+
+export function getTowerDamage(level: number): number {
+  return Math.max(1, level);
+}
+
+export interface TowerStats {
+  level: number;
+  range: number;
+  damagePerShot: number;
+  damagePerSecond: number;
+  // 0..1 share of shots that hit. Always 1 today: towers never miss.
+  accuracy: number;
+}
+
+export function getTowerStats(level: number): TowerStats {
+  const damagePerShot = getTowerDamage(level);
+  return {
+    level: Math.max(1, level),
+    range: getTowerRange(level),
+    damagePerShot,
+    damagePerSecond: damagePerShot * TICKS_PER_SECOND,
+    accuracy: 1
+  };
+}

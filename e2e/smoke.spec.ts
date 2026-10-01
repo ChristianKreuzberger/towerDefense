@@ -487,3 +487,21 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
   // The handoff must refresh the toolbar: p2 is not ready, so Upgrade must not stay dimmed from p1.
   await expect(page.locator("#upgradeBtn")).not.toHaveClass(/dim/);
 });
+
+test("hovering a tower shows its level and combat stats", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  const tooltip = page.locator(".tower-tooltip");
+  await expect(tooltip).toBeHidden();
+  const position = await page.evaluate(() => window.__testBoard?.cellToPixel(5, 16) ?? null);
+  await page.locator("#board canvas").hover({ position: position! });
+  await expect(tooltip).toBeVisible();
+  for (const label of ["Level", "Range", "Damage", "DPS", "Accuracy"]) {
+    await expect(tooltip).toContainText(label);
+  }
+
+  await page.locator("#board canvas").hover({ position: { x: 2, y: 2 } });
+  await expect(tooltip).toBeHidden();
+});

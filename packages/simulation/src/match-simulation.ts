@@ -12,6 +12,7 @@ import {
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
+  getTowerDamage,
   getTowerRange,
   type CommandResult,
   type BalanceAnalysisSnapshot,
@@ -1113,7 +1114,7 @@ export class MatchSimulation {
   }
 
   private getTowerDamage(tower: Tower): number {
-    return Math.max(1, tower.level);
+    return getTowerDamage(tower.level);
   }
 
   private getCreatureAttackDamage(creature: Creature): number {
