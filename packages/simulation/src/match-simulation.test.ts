@@ -1269,7 +1269,7 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
     );
   assert.ok(assignmentEvent);
   const assignment = assignmentEvent.assignments.find((entry) => entry.towerId === "tower-p1");
-  assert.equal(assignment?.targetCreatureId, "wave-1-creature-2");
+  assert.equal(assignment?.targetCreatureId, "wave-1-creature-1");
 });
 
 test("last mode prefers lowest pathIndex", () => {
@@ -1381,11 +1381,11 @@ test("emits hit events and reduces creature hp deterministically", () => {
   assert.equal(hitEvents[0]?.towerId, "tower-p1");
   assert.equal(hitEvents[0]?.creatureId, "wave-1-creature-1");
   assert.equal(hitEvents[0]?.damage, 1);
-  assert.equal(hitEvents[0]?.remainingHp, 1);
+  assert.equal(hitEvents[0]?.remainingHp, 2);
 
   const creature = snapshot.creatures.find((entry) => entry.id === "wave-1-creature-1");
   assert.ok(creature);
-  assert.equal(creature.hp, 1);
+  assert.equal(creature.hp, 2);
 });
 
 test("emits creature-defeated event, removes creature, and awards points", () => {
@@ -1405,6 +1405,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
   advanceToFirstTargetableTick(simulation);
+  advanceWaveTick(simulation);
 
   const snapshot = simulation.getSnapshot();
   const defeatedEvents = snapshot.events.filter((event) => event.type === "creature-defeated");
@@ -1459,6 +1460,7 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     simulation.applyCommand({ type: "set-target-mode", playerId: "p2", towerId: "tower-p2", mode: "first" });
 
     advanceToFirstTargetableTick(simulation);
+  advanceWaveTick(simulation);
 
     const snapshot = simulation.getSnapshot();
     const hitEvents = snapshot.events.filter((event) => event.type === "tower-hit");
@@ -1473,17 +1475,18 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
   const secondRun = runScenario();
   assert.deepEqual(firstRun, secondRun);
 
-  assert.equal(firstRun.events.hitEvents.length, 2);
+  assert.equal(firstRun.events.hitEvents.length, 3);
   assert.equal(firstRun.events.hitEvents[0]?.towerId, "tower-p1");
   assert.equal(firstRun.events.hitEvents[1]?.towerId, "tower-p2");
+  assert.equal(firstRun.events.hitEvents[2]?.towerId, "tower-p1");
   assert.equal(firstRun.events.defeatedEvents.length, 1);
-  assert.equal(firstRun.events.defeatedEvents[0]?.towerId, "tower-p2");
-  assert.equal(firstRun.events.defeatedEvents[0]?.playerId, "p2");
+  assert.equal(firstRun.events.defeatedEvents[0]?.towerId, "tower-p1");
+  assert.equal(firstRun.events.defeatedEvents[0]?.playerId, "p1");
   assert.equal(firstRun.events.defeatedEvents[0]?.creatureId, "wave-1-creature-1");
   assert.equal(firstRun.events.defeatedEvents[0]?.rewardPoints, 10);
   assert.deepEqual(firstRun.players, [
-    { id: "p2", points: 10 },
-    { id: "p1", points: 0 }
+    { id: "p2", points: 0 },
+    { id: "p1", points: 10 }
   ]);
 });
 
@@ -2718,6 +2721,11 @@ type TargetMode = "first" | "last" | "strongest" | "nearest";
 
 // Creatures cannot be targeted for their first SPAWN_PROTECTION_TICKS ticks, so the first creature is
 // shootable on the tick after the protected ones. Wave ticks start at 1 and creature 1 spawns on tick 1.
+// A runner outlives the first volley, so kill assertions need one more tick of tower fire.
+function advanceWaveTick(simulation: ReturnType<typeof createMatch>): void {
+  simulation.applyCommand({ type: "advance-wave" });
+}
+
 function advanceToFirstTargetableTick(simulation: ReturnType<typeof createMatch>): void {
   for (let tick = 0; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
