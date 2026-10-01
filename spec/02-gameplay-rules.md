@@ -9,6 +9,8 @@
 5. Reward and short prep phase with automatic tower repairs
 6. Repeat until a player reaches 1000 points
 
+- Wave start: only non-eliminated players need to place a tower and ready up; eliminated players never block the next wave
+
 ## Shared objectives
 
 - Keep all player towers alive
