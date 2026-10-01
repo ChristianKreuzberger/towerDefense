@@ -1,4 +1,5 @@
-import { TICKS_PER_SECOND, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { getToolbarState } from "./toolbar-state.js";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
@@ -442,7 +443,7 @@ async function getJson<T>(path: string): Promise<T> {
   const { ok, text } = await sendRequest("GET", path);
   perfRecordBytes(text.length);
   const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!ok) {
+  if (!ok || data.ok === false) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
   return data;
@@ -452,7 +453,7 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   const { ok, text } = await sendRequest("POST", path, payload);
   perfRecordBytes(text.length);
   const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!ok) {
+  if (!ok || data.ok === false) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
   return data;
@@ -493,6 +494,12 @@ const REJECT_REASON_TEXT: Record<string, string> = {
   "spawn-protected": "too close to the monster cave",
   "wall-phase-not-active": "walls can only be placed during combat",
   "upgrade-phase-not-active": "upgrades can only be bought during prep, before you ready",
+  "tower-max-level": "your tower is already at max level",
+  "invalid-target-mode-target": "you can only change your own tower",
+  "invalid-target-mode": "unknown target mode",
+  "match-already-ended": "the match is over",
+  "player-eliminated": "your tower was destroyed",
+  "unknown-player": "unknown player",
   "player-already-ready-for-wave": "you are already ready",
   "placement-phase-not-active": "towers can only be placed during placement",
   "tower-already-placed": "you already placed your tower",
@@ -542,19 +549,30 @@ function renderMenuPlayerInputs(): void {
     defaultName: `Player ${index + 1}`
   }));
 
-  el.menuPlayerNames.innerHTML = menuPlayers.map((player, index) => (
-    `<div class="menu-player">` +
-    `<span class="swatch ${player.id}" aria-hidden="true">${index + 1}</span>` +
-    `<label class="sr-only" for="${player.inputId}">${player.id.toUpperCase()} Name</label>` +
-    `<input id="${player.inputId}" value="${player.defaultName}" />` +
-    `</div>`
-  )).join("");
+  el.menuPlayerNames.replaceChildren(...menuPlayers.map((player, index) => {
+    const row = document.createElement("div");
+    row.className = "menu-player";
+    const swatch = document.createElement("span");
+    swatch.className = `swatch ${player.id}`;
+    swatch.setAttribute("aria-hidden", "true");
+    swatch.textContent = String(index + 1);
+    const label = document.createElement("label");
+    label.className = "sr-only";
+    label.htmlFor = player.inputId;
+    label.textContent = `${player.id.toUpperCase()} Name`;
+    const input = document.createElement("input");
+    input.id = player.inputId;
+    input.maxLength = MAX_PLAYER_NAME_LENGTH;
+    input.value = player.defaultName;
+    row.append(swatch, label, input);
+    return row;
+  }));
 }
 
 function menuPlayersToSetupPlayers(): MatchSetup["players"] {
   return menuPlayers.map((player, index) => {
     const element = must<HTMLInputElement>(player.inputId);
-    const name = element.value.trim();
+    const name = element.value.trim().slice(0, MAX_PLAYER_NAME_LENGTH);
     return {
       id: `p${index + 1}`,
       name: name.length > 0 ? name : player.defaultName
@@ -1094,11 +1112,24 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   const upgradeCost = tower ? getTowerUpgradeCost(tower.level) : null;
   el.wallCost.textContent = `${wallCost}`;
   el.wallCost.classList.toggle("short", points < wallCost);
-  el.upgradeCost.textContent = upgradeCost === null ? "-" : `${upgradeCost}`;
-  el.upgradeCost.classList.toggle("short", upgradeCost !== null && points < upgradeCost);
-  // Upgrades are prep-only and locked once this player readies (matches the simulation rule).
-  el.upgradeBtn.classList.toggle("dim", !tower || Boolean(player?.eliminated) || snapshot.phase !== "placement" || Boolean(player?.readyForWave));
+  const state = getToolbarState({
+    phase: snapshot.phase,
+    towerLevel: tower?.level ?? null,
+    eliminated: Boolean(player?.eliminated),
+    readyForWave: Boolean(player?.readyForWave)
+  });
+  el.upgradeCost.textContent = state.upgradeMaxed ? "MAX" : upgradeCost === null ? "-" : `${upgradeCost}`;
+  el.upgradeCost.classList.toggle("short", !state.upgradeMaxed && upgradeCost !== null && points < upgradeCost);
+  el.upgradeBtn.classList.toggle("dim", !state.upgradeEnabled);
+  el.upgradeBtn.setAttribute("aria-disabled", String(!state.upgradeEnabled));
+  // The wall button stays clickable so a press explains why it is off (see the click handler) instead of failing silently.
+  el.placeWallBtn.classList.toggle("dim", !state.wallEnabled);
+  el.placeWallBtn.setAttribute("aria-disabled", String(!state.wallEnabled));
+  if (!state.wallEnabled && wallMode) {
+    setWallMode(false);
+  }
   el.placeTowerBtn.classList.toggle("dim", Boolean(tower) || snapshot.phase !== "placement");
+  el.mode.disabled = !state.targetModeEnabled;
   if (tower) {
     el.mode.value = tower.targetMode;
   }
@@ -1339,9 +1370,14 @@ function renderEndOverlay(snapshot: MatchSnapshot | null): void {
   el.overlaySummary.textContent = `${winnerText} secured the win${snapshot.endReason ? ` • ${snapshot.endReason}` : ""}.`;
 
   const ranked = [...snapshot.players].sort((a, b) => b.points - a.points || a.id.localeCompare(b.id));
-  el.overlayScores.innerHTML = ranked
-    .map((player) => `<div>${player.name}</div><div>${player.points} pts</div>`)
-    .join("");
+  // Names are user input: build text nodes, never parse them as HTML.
+  el.overlayScores.replaceChildren(...ranked.flatMap((player) => {
+    const name = document.createElement("div");
+    name.textContent = player.name;
+    const points = document.createElement("div");
+    points.textContent = `${player.points} pts`;
+    return [name, points];
+  }));
 
   el.overlay.style.display = "flex";
 }
@@ -1352,6 +1388,8 @@ function closeOverlay(): void {
 
 async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnapshot | null> {
   const seq = ++requestSeq;
+  // Only a client that had no match yet is actually reconnecting; later calls are routine refreshes.
+  const reconnecting = current === null;
   try {
     // Without cached map cells the host must send a full snapshot; afterwards lite is enough.
     const path = mapCache ? `/api/snapshot?lite=1&eventsSince=${eventCursor}` : "/api/snapshot";
@@ -1360,7 +1398,9 @@ async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnaps
       data = await getJson<{ ok: true; snapshot: WireSnapshot }>("/api/snapshot");
       applyWireSnapshot(data.snapshot, seq);
     }
-    setMenuMessage("Reconnected to running match.");
+    if (reconnecting) {
+      setMenuMessage("Reconnected to running match.");
+    }
     return current;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch snapshot";
@@ -1385,10 +1425,14 @@ async function startMatchFromMenu(): Promise<void> {
   setMenuMessage("");
 
   const players = menuPlayersToSetupPlayers();
-  const payload: MatchSetup = {
-    seed: Number(el.menuSeed.value),
-    players
-  };
+  // Number("") is 0 and Number("abc") is NaN; never send either as a seed.
+  const seedText = el.menuSeed.value.trim();
+  const seed = Number(seedText);
+  if (seedText === "" || !Number.isInteger(seed)) {
+    setMenuMessage("Map seed must be a whole number.");
+    return;
+  }
+  const payload: MatchSetup = { seed, players };
 
   try {
     const data = await postJson<ApiStartPayload>("/api/start", payload);
@@ -1723,6 +1767,10 @@ must<HTMLButtonElement>("readyBtn").addEventListener("click", () => {
 
 // Walls are placed by clicking tiles while this mode is on (the sim accepts walls during combat only).
 el.placeWallBtn.addEventListener("click", () => {
+  if (el.placeWallBtn.getAttribute("aria-disabled") === "true") {
+    addFeedback("info", REJECT_REASON_TEXT["wall-phase-not-active"] ?? "walls are not available right now");
+    return;
+  }
   setWallMode(!wallMode);
 });
 

@@ -12,6 +12,7 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
+    "test": "node --test dist/*.test.js",
     "clean": "rm -rf dist"
   },
   "dependencies": {

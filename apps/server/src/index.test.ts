@@ -91,6 +91,41 @@ async function postJson(path: string, payload: unknown): Promise<{ status: numbe
   return { status: response.status, body: (await response.json()) as JsonResponse };
 }
 
+runServerSmokeTest("server answers malformed JSON with a structured error and allows cross-origin calls", async () => {
+  TEST_PORT = await findOpenPort();
+  SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+
+  const child = spawn(process.execPath, ["dist/index.js"], {
+    cwd: process.cwd(),
+    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT + 20) },
+    stdio: "ignore"
+  });
+
+  try {
+    await waitForServer(child);
+
+    const malformed = await fetch(`${SERVER_URL}/api/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not json"
+    });
+    assert.equal(malformed.status, 400);
+    assert.equal(malformed.headers.get("access-control-allow-origin"), "*");
+    assert.deepEqual(await malformed.json(), { ok: false, error: "invalid-json", message: "request body is not valid JSON" });
+
+    const invalidSeed = await postJson("/api/start", { seed: "abc", players: [{ id: "p1", name: "Alpha" }] });
+    assert.equal(invalidSeed.status, 400);
+    assert.equal((invalidSeed.body as { error?: string }).error, "invalid-setup");
+
+    const preflight = await fetch(`${SERVER_URL}/api/command`, { method: "OPTIONS" });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+    assert.match(preflight.headers.get("access-control-allow-methods") ?? "", /POST/);
+  } finally {
+    child.kill();
+  }
+});
+
 runServerSmokeTest("server start, snapshot, and command flow preserves rejection state", async () => {
   TEST_PORT = await findOpenPort();
   SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;

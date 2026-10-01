@@ -28,7 +28,7 @@
 - Turn banner: a big, centered banner (separate from the wave banner so both can show after a wave ends) with the player's name and "it's your turn". The text uses the player's colour, at least 40px on desktop (scaled down with the viewport on phones, never below 28px, wrapping instead of overflowing), and stays visible for about 3.5 seconds. It is `aria-live="polite"`, does not take pointer events, and under `prefers-reduced-motion` it appears without animation. It is only shown when more than one player is in the match. Generic action toasts are unchanged
 - The guide card title is larger (18px) so the turn message is readable from across the table
 - Show active wave and remaining creatures
-- Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; the Upgrade button is enabled only in prep for a player who has not readied
+- Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; the Upgrade button is enabled only in prep for a player who has not readied and whose tower is below max level (it then shows "MAX" instead of a cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
 ## Real-time playback
@@ -37,7 +37,8 @@
 - Default is playing at 1x whenever the match is in the combat phase
 - Base rate is 5 simulation ticks per second at 1x; 2x and 4x run 10 and 20 ticks per second
 - Controls: Play/Pause toggle and 1x / 2x / 4x speed buttons, visible during combat
-- Pausing stops tick requests only; placing walls and target modes stay available while paused
+- Pausing stops tick requests only; placing walls and target modes stay available while paused. Target modes also stay available in prep
+- Player names are always rendered as text (never as HTML) and are limited to 24 characters
 - Ticks are requested in small batches (at most 4 per request, one request in flight) so a slow response never queues work
 - Playback never runs while the browser tab is hidden and does not catch up on return
 - Playback stops when the phase leaves combat (round end, match end) and resumes automatically when the next wave starts
@@ -128,7 +129,7 @@ Event to sound table
 | `tower-repaired` | `repair` | at most one per snapshot |
 | phase change into `ended` from another phase | `win` (score-win) or `lose` (all-towers-destroyed) | priority |
 | command accepted: place-tower, place-wall, upgrade-tower, ready-for-wave | `place-tower`, `place-wall`, `upgrade`, `ready` | |
-| command rejected | `rejected` | debug commands and set-target-mode are silent |
+| command rejected | `rejected` | debug commands are silent; a rejected set-target-mode shows a toast but plays no sound |
 | enabled button click | `ui-click` | `data-sfx` on a button overrides or disables (`none`) it |
 
 ## Wall placement

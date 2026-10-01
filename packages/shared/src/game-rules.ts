@@ -1,5 +1,7 @@
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 8;
+// Names are shown in the HUD and the end screen; the cap keeps those layouts intact.
+export const MAX_PLAYER_NAME_LENGTH = 24;
 export const WIN_SCORE = 1000;
 export const DEFAULT_MAP_WIDTH = 50;
 export const DEFAULT_MAP_HEIGHT = 50;
@@ -30,10 +32,13 @@ export const CREATURE_SPAWN_PROTECTION_SECONDS = 1;
 export const SPAWN_PROTECTION_TICKS = CREATURE_SPAWN_PROTECTION_SECONDS * 5;
 export const BASE_TOWER_RANGE = 6;
 export const TOWER_RANGE_PER_LEVEL = 1.5;
+// A default chosen with the economy spec (spec/06): reaching it costs 739 points of the 1000 needed to win.
+export const MAX_TOWER_LEVEL = 5;
 
 export const GAME_RULES = {
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
+  maxPlayerNameLength: MAX_PLAYER_NAME_LENGTH,
   winScore: WIN_SCORE,
   towersPerPlayer: 1,
   mapWidth: DEFAULT_MAP_WIDTH,
@@ -60,7 +65,8 @@ export const GAME_RULES = {
   creatureSpawnProtectionSeconds: CREATURE_SPAWN_PROTECTION_SECONDS,
   spawnProtectionTicks: SPAWN_PROTECTION_TICKS,
   baseTowerRange: BASE_TOWER_RANGE,
-  towerRangePerLevel: TOWER_RANGE_PER_LEVEL
+  towerRangePerLevel: TOWER_RANGE_PER_LEVEL,
+  maxTowerLevel: MAX_TOWER_LEVEL
 } as const;
 
 export function getBetweenWaveTowerRepairAmount(maxHealth: number): number {

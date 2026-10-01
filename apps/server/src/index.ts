@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createGameApi } from "@tower-defense/transport";
+import { createGameApi, GameApiError } from "@tower-defense/transport";
 import { PROJECT_NAME } from "@tower-defense/shared";
 import { logger } from "./logger.js";
 
@@ -37,7 +37,12 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 		return {};
 	}
 
-	return JSON.parse(bodyText) as unknown;
+	try {
+		return JSON.parse(bodyText) as unknown;
+	} catch {
+		// Keep the parser's own message out of the response; the code is the stable contract.
+		throw new GameApiError("invalid-json", "request body is not valid JSON");
+	}
 }
 
 function contentTypeFor(path: string): string {
@@ -151,6 +156,16 @@ const server = createServer(async (request, response) => {
 	const requestUrl = request.url ?? "/";
 	const { pathname, searchParams } = new URL(requestUrl, "http://localhost");
 
+	// Local, unauthenticated dev host: any origin may call the API (documented in spec/07).
+	response.setHeader("Access-Control-Allow-Origin", "*");
+	response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+	response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+	if (method === "OPTIONS") {
+		response.statusCode = 204;
+		response.end();
+		return;
+	}
+
 	try {
 		if (method === "GET") {
 			const served = await tryServeClientAsset(pathname, response);
@@ -167,7 +182,7 @@ const server = createServer(async (request, response) => {
 		logger.error({ event: "request-error", method, pathname, message }, "request failed");
 		writeJson(response, 400, {
 			ok: false,
-			error: "bad-request",
+			error: error instanceof GameApiError ? error.code : "bad-request",
 			message
 		});
 	}

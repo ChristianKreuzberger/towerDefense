@@ -32,15 +32,22 @@ async function clickBuildableCell(page: Page, index = 0): Promise<void> {
 // Towers have a limited range, so tests that need combat place them just outside the protected area
 // around seed 777's monster cave at (0, 0). They are isolated pads inside the maze walls, so they never cut the route.
 const SEED_777_TOWER_CELLS = [{ x: 9, y: 6 }, { x: 6, y: 10 }];
+// On seed 777 no tower ever takes damage in wave 1 (the maze keeps creatures away from every pad), but the repair
+// flow needs a damaged tower. On seed 43 the first pad sits on a corridor corner that creatures reach in wave 1.
+const SEED_43_TOWER_CELLS = [{ x: 5, y: 7 }, { x: 47, y: 46 }];
 
-async function clickCellNearSpawn(page: Page, slot: 0 | 1): Promise<void> {
-  const cell = SEED_777_TOWER_CELLS[slot]!;
+async function clickCellNearSpawn(
+  page: Page,
+  slot: 0 | 1,
+  cells: ReadonlyArray<{ x: number; y: number }> = SEED_777_TOWER_CELLS
+): Promise<void> {
+  const cell = cells[slot]!;
   // Fail with a clear message if map generation changes, instead of a silent "tower never fires" later.
   const { snapshot } = (await (await page.request.get("/api/snapshot")).json()) as {
     snapshot: { map: { cells: Array<{ x: number; y: number; buildable: boolean }> } };
   };
   const buildable = snapshot.map.cells.some((entry) => entry.x === cell.x && entry.y === cell.y && entry.buildable);
-  expect(buildable, `SEED_777_TOWER_CELLS[${slot}] (${cell.x},${cell.y}) is no longer buildable on seed 777; update the cells`).toBe(true);
+  expect(buildable, `tower cell ${slot} (${cell.x},${cell.y}) is no longer buildable on this seed; update the cells`).toBe(true);
   const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, cell);
   if (!position) {
     throw new Error("No board hook available to locate the tower cell");
@@ -76,7 +83,8 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   await expect(page.locator("#menuAiPlayers")).toHaveValue("0");
   await expect(page.locator("#menuAiPlayers")).toBeDisabled();
   await expect(page.locator(".menu-hint")).toContainText("Coming later");
-  await page.locator("#menuSeed").fill("777");
+  await page.locator("#menuSeed").fill("43");
+  await expect(page.locator("#menuPlayerName1")).toHaveAttribute("maxlength", "24");
   await page.locator("#menuPlayerName1").fill("Alpha");
   await page.locator("#menuPlayerName2").fill("Bravo");
   await page.getByRole("button", { name: "Start Match" }).click();
@@ -95,11 +103,11 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   const canvasBox = await page.locator("#board canvas").boundingBox();
   expect(guideBox && canvasBox && guideBox.y + guideBox.height <= canvasBox.y).toBe(true);
 
-  await clickCellNearSpawn(page, 0);
+  await clickCellNearSpawn(page, 0, SEED_43_TOWER_CELLS);
   await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
 
   await page.locator("#playerId").selectOption("p2");
-  await clickCellNearSpawn(page, 1);
+  await clickCellNearSpawn(page, 1, SEED_43_TOWER_CELLS);
   await expect(page.locator("#playerCards")).toContainText("Alpha");
   await expect(page.locator("#playerCards")).toContainText("Bravo");
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
@@ -157,7 +165,7 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
     seed: number;
     players: Array<{ id: string; name: string }>;
   };
-  expect(rematchPayload.seed).toBe(778);
+  expect(rematchPayload.seed).toBe(44);
   expect(rematchPayload.players).toEqual([
     { id: "p1", name: "Alpha" },
     { id: "p2", name: "Bravo" }
@@ -505,7 +513,7 @@ test("hovering a tower shows its level and combat stats", async ({ page }) => {
 
   const tooltip = page.locator(".tower-tooltip");
   await expect(tooltip).toBeHidden();
-  const position = await page.evaluate(() => window.__testBoard?.cellToPixel(5, 16) ?? null);
+  const position = await page.evaluate(() => window.__testBoard?.cellToPixel(9, 6) ?? null);
   await page.locator("#board canvas").hover({ position: position! });
   await expect(tooltip).toBeVisible();
   for (const label of ["Level", "Range", "Damage", "DPS", "Accuracy"]) {
@@ -514,4 +522,70 @@ test("hovering a tower shows its level and combat stats", async ({ page }) => {
 
   await page.locator("#board canvas").hover({ position: { x: 2, y: 2 } });
   await expect(tooltip).toBeHidden();
+});
+
+test("player names are shown as text on the match-end overlay, never parsed as HTML", async ({ page }) => {
+  const hostile = "<img src=x onerror=window.__xss=1>";
+  const tricky = "Tom & <b>Jerry</b>";
+  await startMatch(page, "/");
+
+  const liveSnapshot = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const players = liveSnapshot.snapshot.players as Array<Record<string, unknown>>;
+  const endedSnapshot = {
+    ...liveSnapshot.snapshot,
+    phase: "ended",
+    winnerId: "p1",
+    endReason: "score-win",
+    players: [
+      { ...players[0], name: hostile, points: 1000 },
+      { ...players[0], id: "p2", name: tricky, points: 10 }
+    ]
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: endedSnapshot }) });
+  }, { times: 1 });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+
+  const scores = page.locator("#matchEndScores");
+  await expect(page.locator("#matchEndOverlay")).toBeVisible();
+  await expect(scores).toContainText(hostile);
+  await expect(scores).toContainText(tricky);
+  await expect(scores.locator("img, b")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
+});
+
+test("wall and target-mode controls follow the phase and a disabled wall button sends no command", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  // Prep: walls are off (with an explanation), target mode is available.
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#mode")).toBeEnabled();
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+  // Playwright treats aria-disabled as not actionable; the button stays clickable on purpose so it can explain itself.
+  await page.locator("#placeWallBtn").click({ force: true });
+  await expect(page.locator("#feedbackQueue")).toContainText("walls can only be placed during combat");
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-pressed", "false");
+  expect(commands).toEqual([]);
+
+  await page.locator("#mode").selectOption("nearest");
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toContain("set-target-mode");
+  await expect(page.locator("#feedbackQueue")).not.toContainText("rejected");
+  await expect(page.locator("#mode")).toHaveValue("nearest");
+
+  // Combat: walls become available once everyone is ready.
+  await page.locator("#playerId").selectOption("p2");
+  await clickCellNearSpawn(page, 1);
+  await page.locator("#readyBtn").click();
+  await page.locator("#playerId").selectOption("p1");
+  await page.locator("#readyBtn").click();
+  await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
 });
