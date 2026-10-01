@@ -8,11 +8,14 @@ import {
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   MAX_PLAYERS,
   WIN_SCORE,
+  BASE_TOWER_RANGE,
+  TOWER_RANGE_PER_LEVEL,
   type MatchEvent,
   type MatchSnapshot,
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
+  getTowerRange,
   getTowerUpgradeCost,
   getWallCost,
   getWaveClearBonus,
@@ -23,12 +26,32 @@ import {
   type Wall
 } from "@tower-defense/shared";
 import { generateMap } from "./procedural-map.js";
+import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+
+// Greedily places one tower per player so combinations that block the lane are skipped.
+function getPlaceableCellsNearSpawn(seed: number, count: number): Array<{ x: number; y: number }> {
+  const probe = createMatch({
+    players: Array.from({ length: count }, (_, index) => ({ id: `p${index + 1}`, name: `P${index + 1}` })),
+    seed
+  });
+  const picked: Array<{ x: number; y: number }> = [];
+  for (const cell of getBuildableCellsNearSpawn(seed)) {
+    if (picked.length === count) {
+      break;
+    }
+    const result = probe.applyCommand({ type: "place-tower", playerId: `p${picked.length + 1}`, x: cell.x, y: cell.y });
+    if (result.accepted) {
+      picked.push(cell);
+    }
+  }
+  assert.equal(picked.length, count, `expected at least ${count} placeable cells`);
+  return picked;
+}
 
 function getBuildableCoordinate(seed: number): { x: number; y: number } {
-  const map = generateMap(seed);
-  const cell = map.cells.find((entry) => entry.buildable);
+  const [cell] = getPlaceableCellsNearSpawn(seed, 1);
   assert.ok(cell, "expected at least one buildable cell");
-  return { x: cell.x, y: cell.y };
+  return cell;
 }
 
 function getNonBuildableCoordinate(seed: number): { x: number; y: number } {
@@ -42,17 +65,13 @@ function getSecondBuildableCoordinate(
   seed: number,
   first: { x: number; y: number }
 ): { x: number; y: number } {
-  const map = generateMap(seed);
-  const cell = map.cells.find((entry) => entry.buildable && (entry.x !== first.x || entry.y !== first.y));
+  const cell = getPlaceableCellsNearSpawn(seed, 2).find((entry) => entry.x !== first.x || entry.y !== first.y);
   assert.ok(cell, "expected at least one additional buildable cell");
-  return { x: cell.x, y: cell.y };
+  return cell;
 }
 
 function getBuildableCoordinates(seed: number, count: number): Array<{ x: number; y: number }> {
-  const map = generateMap(seed);
-  const cells = map.cells.filter((entry) => entry.buildable).slice(0, count);
-  assert.equal(cells.length, count, `expected at least ${count} buildable cells`);
-  return cells.map((cell) => ({ x: cell.x, y: cell.y }));
+  return getPlaceableCellsNearSpawn(seed, count);
 }
 
 function createSinglePlayerWaveSimulation(seed: number): ReturnType<typeof createMatch> {
@@ -2425,4 +2444,104 @@ test("creatures travel across the map instead of exiting after one cell", () => 
     }
     assert.ok(furthest > 1, `seed ${seed}: creature path is a single cell (furthest index ${furthest})`);
   }
+});
+
+test("tower range grows linearly with level and clamps below level 1", () => {
+  assert.equal(getTowerRange(1), BASE_TOWER_RANGE);
+  assert.equal(getTowerRange(3), BASE_TOWER_RANGE + (2 * TOWER_RANGE_PER_LEVEL));
+  assert.ok(getTowerRange(2) > getTowerRange(1));
+  assert.equal(getTowerRange(0), BASE_TOWER_RANGE);
+});
+
+test("tower range scales consistently for fractional levels", () => {
+  assert.equal(getTowerRange(1.5), BASE_TOWER_RANGE + (0.5 * TOWER_RANGE_PER_LEVEL));
+  assert.equal(getTowerRange(0.5), BASE_TOWER_RANGE);
+  assert.ok(getTowerRange(1.5) > getTowerRange(1) && getTowerRange(1.5) < getTowerRange(2));
+});
+
+type TargetMode = "first" | "last" | "strongest" | "nearest";
+
+// Finds a tower cell whose distance to the first spawned creature lies in (minExclusive, maxInclusive].
+function findTowerCellAtDistance(
+  seed: number,
+  minExclusive: number,
+  maxInclusive: number
+): { x: number; y: number } {
+  const probeMap = generateMap(seed);
+  for (const cell of probeMap.cells.filter((entry) => entry.buildable)) {
+    const probe = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+    if (!probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
+      continue;
+    }
+    probe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+    probe.applyCommand({ type: "advance-wave" });
+    const creature = probe.getSnapshot().creatures[0];
+    if (!creature) {
+      continue;
+    }
+    const distance = Math.hypot(cell.x - creature.x, cell.y - creature.y);
+    if (distance > minExclusive && distance <= maxInclusive) {
+      return { x: cell.x, y: cell.y };
+    }
+  }
+  assert.fail("no suitable tower cell found");
+}
+
+function firstTickTarget(
+  seed: number,
+  cell: { x: number; y: number },
+  mode: TargetMode,
+  upgrades: number
+): string | null {
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y });
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode });
+  for (let level = 1; level <= upgrades; level += 1) {
+    simulation.awardPoints("p1", getTowerUpgradeCost(level));
+    assert.equal(
+      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" }).accepted,
+      true
+    );
+  }
+  simulation.applyCommand({ type: "advance-wave" });
+  return simulation.getSnapshot().targetAssignments[0]?.targetCreatureId ?? null;
+}
+
+test("towers ignore creatures outside range in every target mode", () => {
+  const seed = 40;
+  const outOfRange = findTowerCellAtDistance(seed, getTowerRange(1), getTowerRange(2));
+  for (const mode of ["first", "last", "strongest", "nearest"] as const) {
+    assert.equal(firstTickTarget(seed, outOfRange, mode, 0), null, mode);
+  }
+});
+
+test("range boundary is inclusive: creature at exactly range distance is targetable", () => {
+  const seed = 40;
+  const range = getTowerRange(1);
+  // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance.
+  const exact = findTowerCellAtDistance(seed, range - 1e-9, range);
+  assert.equal(firstTickTarget(seed, exact, "first", 0), "wave-1-creature-1");
+});
+
+test("creature just beyond range is not targetable", () => {
+  const seed = 40;
+  const range = getTowerRange(1);
+  const beyond = findTowerCellAtDistance(seed, range + 1e-9, range + 1);
+  assert.equal(firstTickTarget(seed, beyond, "first", 0), null);
+});
+
+test("towers target creatures inside range in every target mode", () => {
+  const seed = 40;
+  const inRange = findTowerCellAtDistance(seed, 0, getTowerRange(1));
+  for (const mode of ["first", "last", "strongest", "nearest"] as const) {
+    assert.equal(firstTickTarget(seed, inRange, mode, 0), "wave-1-creature-1", mode);
+  }
+});
+
+test("upgrading a tower extends its range to a previously out-of-range creature", () => {
+  const seed = 40;
+  const cell = findTowerCellAtDistance(seed, getTowerRange(1), getTowerRange(2));
+  assert.equal(firstTickTarget(seed, cell, "first", 0), null);
+  assert.equal(firstTickTarget(seed, cell, "first", 1), "wave-1-creature-1");
 });

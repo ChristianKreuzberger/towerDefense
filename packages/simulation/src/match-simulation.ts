@@ -12,6 +12,7 @@ import {
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
+  getTowerRange,
   type CommandResult,
   type BalanceAnalysisSnapshot,
   type CumulativeTelemetrySnapshot,
@@ -1004,11 +1005,11 @@ export class MatchSimulation {
   }
 
   private selectCreatureTargetForTower(tower: Tower): Creature | undefined {
-    if (this.state.creatures.length === 0) {
-      return undefined;
-    }
-
-    const creatures = [...this.state.creatures].sort((a, b) => a.id.localeCompare(b.id));
+    // Squared comparison keeps the range check free of sqrt and float drift.
+    const range = getTowerRange(tower.level);
+    const creatures = this.state.creatures
+      .filter((creature) => this.getSquaredDistance(tower, creature) <= range * range)
+      .sort((a, b) => a.id.localeCompare(b.id));
     let best = creatures[0];
     if (!best) {
       return undefined;

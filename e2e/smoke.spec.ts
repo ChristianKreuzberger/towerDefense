@@ -29,6 +29,24 @@ async function clickBuildableCell(page: Page, index = 0): Promise<void> {
   await page.locator("#board canvas").click({ position: await cellPixel(page, index) });
 }
 
+// Towers have a limited range, so tests that need combat place them beside seed 777's spawn lane.
+const SEED_777_TOWER_CELLS = [{ x: 0, y: 17 }, { x: 1, y: 15 }];
+
+async function clickCellNearSpawn(page: Page, slot: 0 | 1): Promise<void> {
+  const cell = SEED_777_TOWER_CELLS[slot]!;
+  // Fail with a clear message if map generation changes, instead of a silent "tower never fires" later.
+  const { snapshot } = (await (await page.request.get("/api/snapshot")).json()) as {
+    snapshot: { map: { cells: Array<{ x: number; y: number; buildable: boolean }> } };
+  };
+  const buildable = snapshot.map.cells.some((entry) => entry.x === cell.x && entry.y === cell.y && entry.buildable);
+  expect(buildable, `SEED_777_TOWER_CELLS[${slot}] (${cell.x},${cell.y}) is no longer buildable on seed 777; update the cells`).toBe(true);
+  const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, cell);
+  if (!position) {
+    throw new Error("No board hook available to locate the tower cell");
+  }
+  await page.locator("#board canvas").click({ position });
+}
+
 async function startMatch(page: Page, path: string): Promise<void> {
   // Register before goto so the load-time snapshot response can't be missed.
   const reconnect = page.waitForResponse((response) => response.url().includes("/api/snapshot"));
@@ -76,11 +94,11 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   const canvasBox = await page.locator("#board canvas").boundingBox();
   expect(guideBox && canvasBox && guideBox.y + guideBox.height <= canvasBox.y).toBe(true);
 
-  await clickBuildableCell(page);
+  await clickCellNearSpawn(page, 0);
   await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
 
   await page.locator("#playerId").selectOption("p2");
-  await clickBuildableCell(page);
+  await clickCellNearSpawn(page, 1);
   await expect(page.locator("#playerCards")).toContainText("Alpha");
   await expect(page.locator("#playerCards")).toContainText("Bravo");
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
@@ -148,10 +166,10 @@ test("debug mode: pause, manual ticks, wall mode, and snapshot panel", async ({ 
   await expect(page.locator("#snapshot")).toBeVisible();
   await expect(page.locator("#advanceBtn")).toBeVisible();
 
-  await clickBuildableCell(page);
+  await clickCellNearSpawn(page, 0);
   await expect(page.locator("#snapshot")).toHaveValue(/"hasPlacedTower": true/);
   await page.locator("#playerId").selectOption("p2");
-  await clickBuildableCell(page);
+  await clickCellNearSpawn(page, 1);
 
   // Pause (keyboard) before combat so manual ticks are deterministic.
   await page.keyboard.press("p");

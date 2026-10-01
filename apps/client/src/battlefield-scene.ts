@@ -1,6 +1,11 @@
 import Phaser from "phaser";
 
-import { CREATURE_ARCHETYPE_STATS, MOVEMENT_PROGRESS_UNITS_PER_CELL, PATH_CELL_MAX_WEAR } from "@tower-defense/shared";
+import {
+  CREATURE_ARCHETYPE_STATS,
+  MOVEMENT_PROGRESS_UNITS_PER_CELL,
+  PATH_CELL_MAX_WEAR,
+  getTowerRange
+} from "@tower-defense/shared";
 import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
 
 import { Effects } from "./art/fx";
@@ -392,6 +397,7 @@ class BattlefieldScene extends Phaser.Scene {
       if (hovered) {
         hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
         hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
+        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerRange(hovered.level));
       }
     }
 
@@ -418,11 +424,21 @@ class BattlefieldScene extends Phaser.Scene {
       } else {
         ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
         ghostTurret.setTexture(KEY.turret(index, 1)).setPosition(cx, cy).setVisible(true);
+        // Placement is one-shot, so show the coverage before the player commits.
+        this.drawRangeCircle(hover, cx, cy, getTowerRange(1));
       }
     }
   }
 
-  // Hovering a tower links it to its current target; towers have no range limit in the simulation, so there is no range ring.
+  private drawRangeCircle(graphics: Phaser.GameObjects.Graphics, cx: number, cy: number, rangeCells: number): void {
+    const radius = rangeCells * this.cellSize;
+    graphics.fillStyle(UI_COLORS.hover, 0.08);
+    graphics.fillCircle(cx, cy, radius);
+    graphics.lineStyle(Math.max(2, this.cellSize * 0.06), UI_COLORS.hover, 0.5);
+    graphics.strokeCircle(cx, cy, radius);
+  }
+
+  // Hovering a tower links it to its current target; the range circle itself is drawn with the hover highlight.
   private drawTowerLink(): void {
     const graphics = this.linkGraphics;
     if (!graphics) {

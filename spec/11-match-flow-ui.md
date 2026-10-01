@@ -68,7 +68,7 @@ Terrain
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
-- The turret turns toward the creature in `targetAssignments`. Towers have no range limit in the simulation, so no range ring is drawn; hovering a tower highlights it and draws a line to its current target
+- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
 Creatures
 - Four silhouettes, readable without text: runner (slim, pointed), swarm (small round bug), armored (plated hex), tank (large square with tracks and cannon)
