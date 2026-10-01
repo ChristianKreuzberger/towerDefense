@@ -1,5 +1,5 @@
 import { MAX_PLAYER_NAME_LENGTH, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
-import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
+import type { MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
 import { paintHero } from "./art/hero";
@@ -7,17 +7,18 @@ import { applyPaletteCssVars } from "./art/palette";
 import { cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
 import type { SoundId } from "./audio/index";
 import { createBattlefieldMount } from "./battlefield-scene";
-import { BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, DAMAGE_TYPE_OPTIONS, DEBUG, EVENT_LOG_CAPACITY, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, MAX_TICKS_PER_REQUEST, PLAYBACK_CHECK_INTERVAL_MS, PLAYBACK_SPEEDS, RETAINED_EVENT_TYPES, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
+import { BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, DAMAGE_TYPE_OPTIONS, DEBUG, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, MAX_TICKS_PER_REQUEST, PLAYBACK_CHECK_INTERVAL_MS, PLAYBACK_SPEEDS, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
 import { clampCoord, coordValue } from "./coord";
 import { createDemo } from "./demo";
 import { app, el, must } from "./dom";
 import { REJECT_REASON_TEXT, addFeedback, setMenuMessage, setStatus } from "./feedback";
+import { hydrateSnapshot, resetMatchCaches } from "./hydrate";
 import { perfTimeApply } from "./perf";
 import { resolvePlacementCell } from "./placement";
 import { playerNumber, playerTowerId, selectedPlayerId, towerColorClass } from "./player-util";
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
-import type { MapCache, PlayerChipRefs } from "./state";
+import type { PlayerChipRefs } from "./state";
 import { getToolbarState } from "./toolbar-state";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import { formatWavePreview } from "./wave-preview";
@@ -259,90 +260,6 @@ function runGuideAction(action: GuideAction): void {
   }
 
   setPlaying(!store.playing);
-}
-
-function mapKeyOf(map: { seed: number; width: number; height: number }): string {
-  return `${map.seed}:${map.width}x${map.height}`;
-}
-
-function resetMatchCaches(): void {
-  store.eventLog = [];
-  store.eventCursor = 0;
-}
-
-function buildMapCache(key: string, cells: MapCell[]): MapCache {
-  const byKey = new Map<string, MapCell>();
-  const buildable: MapCell[] = [];
-  const worn: MapCell[] = [];
-  for (const cell of cells) {
-    byKey.set(`${cell.x},${cell.y}`, cell);
-    if (cell.buildable) {
-      buildable.push(cell);
-    }
-    if (cell.pathWear > 0) {
-      worn.push(cell);
-    }
-  }
-  return { key, cells, byKey, buildable, worn };
-}
-
-// Turns a wire snapshot (possibly lite) into a full MatchSnapshot. Returns null when a lite snapshot
-// arrives for a map whose cells we do not have, so the caller can fall back to a full fetch.
-function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEvents: MatchEvent[] } | null {
-  const key = mapKeyOf(wire.map);
-  let cache: MapCache;
-  if (wire.map.cells) {
-    cache = buildMapCache(key, wire.map.cells);
-    store.mapCache = cache;
-  } else if (!store.mapCache || store.mapCache.key !== key) {
-    return null;
-  } else {
-    cache = store.mapCache;
-    // The cached cell objects are mutated in place so the scene and lookups always see current wear.
-    for (const cell of cache.worn) {
-      cell.pathWear = 0;
-    }
-    cache.worn = [];
-    for (const entry of wire.map.wornCells ?? []) {
-      const cell = cache.byKey.get(`${entry.x},${entry.y}`);
-      if (cell) {
-        cell.pathWear = entry.pathWear;
-        cache.worn.push(cell);
-      }
-    }
-  }
-
-  const offset = wire.eventsOffset ?? 0;
-  const tail = wire.events;
-  const total = wire.eventsTotal ?? offset + tail.length;
-  let newEvents: MatchEvent[];
-  if (total < store.eventCursor) {
-    // The host restarted its match behind our back; drop history rather than replaying it.
-    store.eventLog = [];
-    newEvents = [];
-  } else {
-    newEvents = tail.slice(Math.max(0, store.eventCursor - offset));
-  }
-  store.eventCursor = total;
-  const retained = newEvents.filter((event) => RETAINED_EVENT_TYPES.has(event.type));
-  if (retained.length > 0) {
-    store.eventLog = [...store.eventLog, ...retained].slice(-EVENT_LOG_CAPACITY);
-  }
-
-  const snapshot: MatchSnapshot = {
-    ...wire,
-    map: {
-      schemaVersion: wire.map.schemaVersion,
-      width: wire.map.width,
-      height: wire.map.height,
-      seed: wire.map.seed,
-      cells: cache.cells,
-      ...(wire.map.spawn ? { spawn: wire.map.spawn } : {}),
-      ...(wire.map.goal ? { goal: wire.map.goal } : {})
-    },
-    events: store.eventLog
-  };
-  return { snapshot, newEvents };
 }
 
 // Applies a host response unless a newer one was already applied. Returns false when a full refetch is needed.
