@@ -25,8 +25,8 @@
       "waveTelemetry": {
         "wave": 1,
         "tick": 17,
-        "movementProgressUnits": 2700,
-        "movementSteps": 27,
+        "movementProgressUnits": 2210,
+        "movementSteps": 21,
         "creaturesSpawned": 3,
         "creaturesDefeated": 3,
         "creaturesExited": 0,
@@ -45,8 +45,8 @@
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
-        "movementProgressUnits": 2700,
-        "movementSteps": 27,
+        "movementProgressUnits": 2210,
+        "movementSteps": 21,
         "creaturesSpawned": 3,
         "creaturesDefeated": 3,
         "creaturesExited": 0,
@@ -129,12 +129,12 @@
       "matchSeed": 19,
       "exportOrdinal": 2,
       "wave": 2,
-      "tick": 20,
+      "tick": 21,
       "waveTelemetry": {
         "wave": 2,
-        "tick": 20,
-        "movementProgressUnits": 3500,
-        "movementSteps": 35,
+        "tick": 21,
+        "movementProgressUnits": 2920,
+        "movementSteps": 27,
         "creaturesSpawned": 4,
         "creaturesDefeated": 4,
         "creaturesExited": 0,
@@ -153,8 +153,8 @@
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
-        "movementProgressUnits": 6200,
-        "movementSteps": 62,
+        "movementProgressUnits": 5130,
+        "movementSteps": 48,
         "creaturesSpawned": 7,
         "creaturesDefeated": 7,
         "creaturesExited": 0,
@@ -229,7 +229,7 @@
         "livingWalls": 1,
         "totalTowerHealth": 200,
         "totalWallHealth": 60,
-        "mapPathWearTotal": 0
+        "mapPathWearTotal": 5
       }
     }
   ]
