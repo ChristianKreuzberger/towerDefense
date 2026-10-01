@@ -645,6 +645,22 @@ test("the damage type selector follows the tower, is sent as a command and locks
   await expect(page.locator("#damageType")).toHaveValue("magic");
 });
 
+async function showEndedOverlay(page: Page): Promise<void> {
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const ended = {
+    ...live.snapshot,
+    phase: "ended",
+    winnerId: "p1",
+    endReason: "score-win",
+    players: (live.snapshot.players as Array<Record<string, unknown>>).map((player) => ({ ...player, points: player.id === "p1" ? 1000 : 0 }))
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: ended }) });
+  });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#matchEndOverlay")).toBeVisible();
+}
+
 test("match-end modal is a real dialog: focus moves in, Tab stays inside, Escape closes it for good", async ({ page }) => {
   await startMatch(page, "/");
   const modal = page.locator(".match-end-modal");
