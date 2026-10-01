@@ -1,5 +1,7 @@
 import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import { getToolbarState } from "./toolbar-state.js";
+import { resolvePlacementCell } from "./placement.js";
+import { formatWavePreview } from "./wave-preview.js";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode, UpgradeTrack } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
@@ -158,6 +160,8 @@ let tickDebt = 0;
 let playbackInFlight = false;
 let playbackErrors = 0;
 let wallMode = false;
+// Whether the player picked a tile (click or arrows) since this match began; see resolvePlacementCell.
+let cursorChosen = false;
 let playerSignature = "";
 let chipStructureSignature = "";
 interface PlayerChipRefs {
@@ -209,6 +213,7 @@ app.innerHTML = `
         <div id="menuPlayerNames" class="menu-player-names"></div>
         <div class="menu-actions">
           <button id="menuStartBtn" class="primary">Start Match</button>
+          <button id="menuResumeBtn" class="primary hidden">Resume Match</button>
           <button id="menuRefreshBtn" class="ghost">Refresh Existing Match</button>
           <button id="menuSettingsBtn" class="ghost menu-settings">Settings</button>
         </div>
@@ -232,6 +237,8 @@ app.innerHTML = `
           <button class="speed-btn" data-speed="4" aria-pressed="false">4x</button>
         </div>
       </header>
+
+      <div class="wave-preview" id="wavePreview" aria-live="polite"></div>
 
       <div id="guideOverlay" class="guide-overlay guide-idle" aria-live="polite">
         <div id="guideCard" class="guide-card hint">
@@ -364,6 +371,8 @@ const el = {
   settingsBtn: must<HTMLButtonElement>("settingsBtn"),
   menuStartBtn: must<HTMLButtonElement>("menuStartBtn"),
   menuRefreshBtn: must<HTMLButtonElement>("menuRefreshBtn"),
+  menuResumeBtn: must<HTMLButtonElement>("menuResumeBtn"),
+  wavePreview: must<HTMLElement>("wavePreview"),
   playerId: must<HTMLSelectElement>("playerId"),
   x: must<HTMLInputElement>("x"),
   y: must<HTMLInputElement>("y"),
@@ -388,6 +397,7 @@ const el = {
   guideCloseBtn: must<HTMLButtonElement>("guideCloseBtn"),
   status: must<HTMLElement>("status"),
   placeTowerBtn: must<HTMLButtonElement>("placeTowerBtn"),
+  readyBtn: must<HTMLButtonElement>("readyBtn"),
   upgradeBtns: {
     range: must<HTMLButtonElement>("upgradeRangeBtn"),
     damage: must<HTMLButtonElement>("upgradeDamageBtn"),
@@ -474,6 +484,8 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
 }
 
 function showMenuScreen(): void {
+  // The match keeps running on the host; offer a way back unless it is already over.
+  el.menuResumeBtn.classList.toggle("hidden", !current || current.phase === "ended");
   el.menuScreen.classList.remove("hidden");
   el.gameScreen.classList.add("hidden");
   stopPlayback();
@@ -1032,7 +1044,8 @@ function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0, eve
 
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
   const wallHint = wallMode ? " • Wall mode: click a buildable tile (Esc to leave)" : "";
-  el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active${wallHint}`;
+  const toSpawn = snapshot.phase === "wave" ? ` • ${snapshot.creaturesToSpawn} still to spawn` : "";
+  el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active${toSpawn}${wallHint}`;
 }
 
 function syncPlacementContext(snapshot: MatchSnapshot | null): void {
@@ -1114,6 +1127,18 @@ function announceWaveEnd(events: MatchEvent[]): void {
 }
 
 // Costs come from the shared cost functions so the UI can never drift from what the simulation charges.
+// Dimmed and aria-disabled: still clickable (so a press explains itself), but hotkeys skip it. After the match
+// ended the button is really disabled, so closing the end modal never leaves live controls behind.
+function setAvailability(button: HTMLButtonElement, enabled: boolean, ended: boolean): void {
+  button.classList.toggle("dim", !enabled);
+  button.setAttribute("aria-disabled", String(!enabled));
+  button.disabled = ended;
+}
+
+function isActionAvailable(button: HTMLButtonElement): boolean {
+  return !button.disabled && button.getAttribute("aria-disabled") !== "true";
+}
+
 function renderToolbar(snapshot: MatchSnapshot | null): void {
   if (!snapshot) {
     return;
@@ -1147,7 +1172,8 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   if (!state.wallEnabled && wallMode) {
     setWallMode(false);
   }
-  el.placeTowerBtn.classList.toggle("dim", Boolean(tower) || snapshot.phase !== "placement");
+  setAvailability(el.placeTowerBtn, state.placeTowerEnabled, snapshot.phase === "ended");
+  setAvailability(el.readyBtn, state.readyEnabled, snapshot.phase === "ended");
   el.mode.disabled = !state.targetModeEnabled;
   if (tower) {
     el.mode.value = tower.targetMode;
@@ -1329,8 +1355,9 @@ function phaseSubText(snapshot: MatchSnapshot): string {
   }
 
   if (snapshot.phase === "ended") {
-    return snapshot.winnerId
-      ? `Winner ${snapshot.winnerId} • ${snapshot.endReason ?? "match concluded"}`
+    const winnerName = snapshot.players.find((player) => player.id === snapshot.winnerId)?.name ?? snapshot.winnerId;
+    return winnerName
+      ? `Winner ${winnerName} • ${snapshot.endReason ?? "match concluded"}`
       : "No winner • the match ended in a draw-like state.";
   }
 
@@ -1342,6 +1369,7 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
     el.phaseBanner.className = "phase-banner";
     el.phaseLabel.textContent = "NO MATCH";
     el.phaseSub.textContent = "Start a local match to play.";
+    el.wavePreview.textContent = "";
     el.shortcutBar.style.display = "flex";
     el.playbackControls.classList.add("hidden");
     stopPlayback();
@@ -1364,6 +1392,7 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
 
   el.phaseLabel.textContent = label;
   el.phaseSub.textContent = sub;
+  el.wavePreview.textContent = snapshot.phase === "placement" ? formatWavePreview(snapshot.wave) : "";
   el.shortcutBar.style.display = snapshot.phase === "ended" ? "none" : "flex";
 
   if (snapshot.phase === "wave") {
@@ -1473,6 +1502,7 @@ async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnaps
 
 function startFreshMatch(wire: WireSnapshot): void {
   resetMatchCaches();
+  cursorChosen = false;
   guideDismissedKey = null;
   playing = true;
   syncPlaybackControls();
@@ -1481,6 +1511,9 @@ function startFreshMatch(wire: WireSnapshot): void {
 }
 
 async function startMatchFromMenu(): Promise<void> {
+  if (current && current.phase !== "ended" && !window.confirm("Replace the running match?")) {
+    return;
+  }
   closeOverlay();
   setMenuMessage("");
 
@@ -1556,20 +1589,6 @@ function selectedPlayerId(): string {
   return value;
 }
 
-function currentCommandCoords(snapshot: MatchSnapshot | null): { x: number; y: number } {
-  const nextCell = firstFreeBuildableCoord(snapshot);
-  if (nextCell) {
-    el.x.value = String(nextCell.x);
-    el.y.value = String(nextCell.y);
-    return nextCell;
-  }
-
-  return {
-    x: coordValue(el.x),
-    y: coordValue(el.y)
-  };
-}
-
 function occupiedCellKeys(snapshot: MatchSnapshot): Set<string> {
   const occupied = new Set<string>();
   for (const tower of snapshot.towers) {
@@ -1621,6 +1640,7 @@ function clampCoord(value: number, max: number): number {
 }
 
 function adjustCoord(dx: number, dy: number): void {
+  cursorChosen = true;
   const width = current?.map?.width ?? 64;
   const height = current?.map?.height ?? 64;
   const nextX = clampCoord(coordValue(el.x) + dx, width);
@@ -1645,6 +1665,7 @@ function handleCellSelected(x: number, y: number): void {
   if (!current) {
     return;
   }
+  cursorChosen = true;
 
   el.x.value = String(x);
   el.y.value = String(y);
@@ -1734,6 +1755,10 @@ el.menuPlayerCount.addEventListener("change", renderMenuPlayerInputs);
 el.menuStartBtn.addEventListener("click", () => {
   void startMatchFromMenu();
 });
+el.menuResumeBtn.addEventListener("click", () => {
+  showGameScreen();
+  void fetchSnapshot();
+});
 el.menuRefreshBtn.addEventListener("click", () => {
   void fetchSnapshot();
 });
@@ -1812,7 +1837,24 @@ el.rematchBtn.addEventListener("click", () => {
 
 function placeTowerForSelectedPlayer(): void {
   const playerId = selectedPlayerId();
-  const coords = currentCommandCoords(current);
+  const snapshot = current;
+  const coords = snapshot
+    ? resolvePlacementCell({
+        cursor: { x: coordValue(el.x), y: coordValue(el.y) },
+        cursorChosen,
+        isFreeBuildable: (cell) =>
+          Boolean(mapCache?.byKey.get(`${cell.x},${cell.y}`)?.buildable)
+          && !occupiedCellKeys(snapshot).has(`${cell.x},${cell.y}`)
+          && !isInSpawnProtection(snapshot.map, cell.x, cell.y),
+        firstFree: () => firstFreeBuildableCoord(snapshot)
+      })
+    : null;
+  if (!coords) {
+    addFeedback("info", "Click a free buildable tile first, then place your tower");
+    return;
+  }
+  el.x.value = String(coords.x);
+  el.y.value = String(coords.y);
   void sendCommand({
     type: "place-tower",
     playerId,
@@ -1821,7 +1863,7 @@ function placeTowerForSelectedPlayer(): void {
   });
 }
 
-must<HTMLButtonElement>("readyBtn").addEventListener("click", () => {
+el.readyBtn.addEventListener("click", () => {
   void sendCommand({ type: "ready-for-wave", playerId: selectedPlayerId() });
 });
 
@@ -1962,22 +2004,33 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  // Game hotkeys only make sense inside a running match, and only for actions that are available right now.
+  if (!inMatch) {
+    return;
+  }
+
   const key = event.key.toLowerCase();
   if (key === "r") {
     event.preventDefault();
-    must<HTMLButtonElement>("readyBtn").click();
+    if (isActionAvailable(el.readyBtn)) {
+      el.readyBtn.click();
+    }
     return;
   }
 
   if (key === "t") {
     event.preventDefault();
-    placeTowerForSelectedPlayer();
+    if (isActionAvailable(el.placeTowerBtn)) {
+      placeTowerForSelectedPlayer();
+    }
     return;
   }
 
   if (key === "w") {
     event.preventDefault();
-    el.placeWallBtn.click();
+    if (isActionAvailable(el.placeWallBtn)) {
+      el.placeWallBtn.click();
+    }
     return;
   }
 
@@ -1992,10 +2045,18 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.key === "Escape" && !el.guideOverlay.classList.contains("guide-idle")) {
+    guideDismissedKey = lastGuideKey;
+    hideGuideOverlay();
+    return;
+  }
+
   const hotkeyTrack = ({ u: "range", i: "damage", o: "accuracy" } as const)[key as "u" | "i" | "o"];
   if (hotkeyTrack) {
     event.preventDefault();
-    el.upgradeBtns[hotkeyTrack].click();
+    if (isActionAvailable(el.upgradeBtns[hotkeyTrack])) {
+      el.upgradeBtns[hotkeyTrack].click();
+    }
     return;
   }
 
@@ -2040,7 +2101,11 @@ showMenuScreen();
 setStatus("No match yet.");
 setMenuMessage("Create a local match or reconnect to an existing one.");
 hideGuideOverlay();
-void fetchSnapshot({ silentStatus: true });
+// Hide both screens until the reconnect check answers, so a running match does not flash the menu first.
+app.classList.add("booting");
+const endBoot = (): void => app.classList.remove("booting");
+setTimeout(endBoot, 1200);
+void fetchSnapshot({ silentStatus: true }).finally(endBoot);
 
 // Read-only test hook so Playwright can locate buildable cells without DOM grid elements.
 function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {

@@ -56,6 +56,8 @@ async function clickCellNearSpawn(
 }
 
 async function startMatch(page: Page, path: string): Promise<void> {
+  // Starting over a running match asks for confirmation; the helper always agrees.
+  page.on("dialog", (dialog) => void dialog.accept());
   // Register before goto so the load-time snapshot response can't be missed.
   const reconnect = page.waitForResponse((response) => response.url().includes("/api/snapshot"));
   await page.goto(path);
@@ -679,4 +681,83 @@ test("the guide close button has an accessible name and the shortcut bar matches
   for (const text of ["ready", "tower", "wall mode", "upgrade", "switch player", "pause", "mute", "move cursor"]) {
     await expect(bar).toContainText(text);
   }
+});
+
+test("the prep banner previews the next wave and combat shows creatures still to spawn", async ({ page }) => {
+  await startMatch(page, "/");
+  await expect(page.locator("#wavePreview")).toHaveText("Next wave 1: 1x Runner, 1x Swarm, 1x Armored");
+
+  await clickCellNearSpawn(page, 0);
+  await page.locator("#playerId").selectOption("p2");
+  await clickCellNearSpawn(page, 1);
+  await page.locator("#readyBtn").click();
+  await page.locator("#playerId").selectOption("p1");
+  await page.locator("#readyBtn").click();
+
+  await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
+  await expect(page.locator("#wavePreview")).toHaveText("");
+  await expect(page.locator("#battlefieldMeta")).toContainText("still to spawn");
+  await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE", { timeout: 20_000 });
+  await expect(page.locator("#wavePreview")).toHaveText(/^Next wave 2: .*Tank/);
+});
+
+test("hotkeys do nothing when the action is not available", async ({ page }) => {
+  await startMatch(page, "/");
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+
+  // No tower yet: ready, wall and upgrades are not available.
+  for (const key of ["r", "w", "u", "i", "o"]) {
+    await page.keyboard.press(key);
+  }
+  await page.waitForTimeout(300);
+  expect(commands).toEqual([]);
+
+  // After placing, T (place tower) is no longer available either.
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  commands.length = 0;
+  await page.keyboard.press("t");
+  await page.waitForTimeout(300);
+  expect(commands).toEqual([]);
+});
+
+test("starting a match over a running one asks first, and the menu offers to resume", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  await page.getByRole("button", { name: "Back To Menu" }).click();
+  await expect(page.locator("#menuScreen")).toBeVisible();
+  await expect(page.locator("#menuResumeBtn")).toBeVisible();
+
+  // Cancelling the confirmation leaves the running match untouched.
+  let asked = "";
+  page.removeAllListeners("dialog");
+  page.once("dialog", (dialog) => {
+    asked = dialog.message();
+    void dialog.dismiss();
+  });
+  await page.getByRole("button", { name: "Start Match" }).click();
+  await expect.poll(() => asked).toBe("Replace the running match?");
+  await expect(page.locator("#menuScreen")).toBeVisible();
+
+  await page.locator("#menuResumeBtn").click();
+  await expect(page.locator("#gameScreen")).toBeVisible();
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+});
+
+test("after the match ended the ready and place-tower buttons are disabled and the status names the winner", async ({ page }) => {
+  await startMatch(page, "/");
+  await showEndedOverlay(page);
+  await expect(page.locator("#phaseSub")).toContainText("Winner Alpha");
+  await expect(page.locator("#readyBtn")).toBeDisabled();
+  await expect(page.locator("#placeTowerBtn")).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+  await expect(page.locator("#readyBtn")).toBeDisabled();
 });

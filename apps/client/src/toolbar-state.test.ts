@@ -54,3 +54,14 @@ test("when the match ended nothing is enabled", () => {
   assert.equal(state.targetModeEnabled, false);
   assert.deepEqual(state.upgrades, { range: none, damage: none, accuracy: none });
 });
+
+test("ready needs a tower and prep; placing needs prep and no tower yet", () => {
+  assert.equal(getToolbarState(prep).readyEnabled, true);
+  assert.equal(getToolbarState(prep).placeTowerEnabled, false);
+  assert.equal(getToolbarState({ ...prep, upgrades: null }).readyEnabled, false);
+  assert.equal(getToolbarState({ ...prep, upgrades: null }).placeTowerEnabled, true);
+  assert.equal(getToolbarState({ ...prep, readyForWave: true }).readyEnabled, false);
+  assert.equal(getToolbarState({ ...prep, phase: "wave" }).readyEnabled, false);
+  assert.equal(getToolbarState({ ...prep, phase: "ended" }).readyEnabled, false);
+  assert.equal(getToolbarState({ ...prep, phase: "ended", upgrades: null }).placeTowerEnabled, false);
+});

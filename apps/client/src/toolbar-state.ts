@@ -16,6 +16,8 @@ export interface ToolbarState {
   upgrades: Record<UpgradeTrack, UpgradeButtonState>;
   wallEnabled: boolean;
   targetModeEnabled: boolean;
+  readyEnabled: boolean;
+  placeTowerEnabled: boolean;
 }
 
 // Mirrors what the simulation accepts, so a control looks usable only when its command would be accepted.
@@ -30,6 +32,8 @@ export function getToolbarState(input: ToolbarInput): ToolbarState {
   return {
     upgrades,
     wallEnabled: !input.eliminated && input.phase === "wave",
-    targetModeEnabled: hasLivingTower && input.phase !== "ended"
+    targetModeEnabled: hasLivingTower && input.phase !== "ended",
+    readyEnabled: canBuyNow,
+    placeTowerEnabled: input.upgrades === null && !input.eliminated && input.phase === "placement"
   };
 }
