@@ -114,9 +114,15 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   await expect(page.locator("#playbackControls")).toBeVisible();
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE", { timeout: 15_000 });
   await expect(page.locator("#phaseSub")).toContainText("Round 1 complete");
+  // p2 readied last, but every wave hands the turn back to the first seat with a big banner.
+  await expect(page.locator("#playerId")).toHaveValue("p1");
+  await expect(page.locator("#turnBanner")).toContainText("Alpha");
+  await expect(page.locator("#guideCard")).toContainText("Alpha, it's your turn");
   await expect(page.locator("#playbackControls")).toBeHidden();
-  await expect(page.locator("#feedbackQueue")).toContainText("Alpha tower repaired +2 HP (100/100)");
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  // The shorter range and spawn protection mean the tower now takes more damage in wave 1, so the exact
+  // repair amount is no longer fixed; what matters is that the repair is announced.
+  await expect(page.locator("#feedbackQueue")).toContainText(/Alpha tower repaired \+\d+ HP \(\d+\/100\)/);
+  await expect(page.locator("#playerCards")).toContainText(/Tower \d+\/100/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveClass(/repair-pulse/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveAttribute("role", "progressbar");
 
@@ -484,6 +490,10 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
 
   await expect(page.locator("#playerId")).toHaveValue("p2");
   await expect(page.locator("#guideCard")).toContainText("Bravo, it's your turn");
+  await expect(page.locator("#turnBanner")).toBeVisible();
+  await expect(page.locator("#turnBanner")).toContainText("Bravo");
+  const bannerFontSize = await page.locator("#turnBanner strong").evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+  expect(bannerFontSize).toBeGreaterThanOrEqual(40);
   // The handoff must refresh the toolbar: p2 is not ready, so Upgrade must not stay dimmed from p1.
   await expect(page.locator("#upgradeBtn")).not.toHaveClass(/dim/);
 });

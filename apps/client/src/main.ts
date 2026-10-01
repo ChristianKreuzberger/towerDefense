@@ -10,7 +10,7 @@ import { createDemo } from "./demo";
 import { perfRecordBytes, perfTimeApply } from "./perf";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
-import { nextPendingPlayerId } from "./turn";
+import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import "./style.css";
 
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
@@ -116,6 +116,8 @@ interface MenuPlayerInput {
 const TOAST_CAPACITY = 5;
 const TOAST_LIFETIME_MS = 4500;
 const BANNER_LIFETIME_MS = 2600;
+// Longer than the wave banner: the player has to notice whose turn it is and hand over the screen.
+const TURN_BANNER_LIFETIME_MS = 3500;
 // 5 ticks/s at 1x: creatures cover up to 5 cells/s, slow enough to follow and fast enough that a wave is over in seconds.
 const BASE_TICKS_PER_SECOND = 5;
 const PLAYBACK_SPEEDS = [1, 2, 4] as const;
@@ -138,6 +140,7 @@ const DEBUG = searchParams.get("debug") === "1";
 
 let current: MatchSnapshot | null = null;
 let bannerTimer: ReturnType<typeof setTimeout> | null = null;
+let turnBannerTimer: ReturnType<typeof setTimeout> | null = null;
 let menuPlayers: MenuPlayerInput[] = [];
 let guideDismissedKey: string | null = null;
 let lastGuideKey = "";
@@ -244,6 +247,7 @@ app.innerHTML = `
         <div class="board-frame">
           <div id="board" class="board-grid"></div>
           <div id="waveBanner" class="wave-banner" aria-live="polite"><strong></strong><span></span></div>
+          <div id="turnBanner" class="turn-banner" aria-live="polite"><strong></strong><span></span></div>
         </div>
         <div class="small battlefield-meta" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
       </section>
@@ -381,6 +385,7 @@ const el = {
   wallCost: must<HTMLElement>("wallCost"),
   upgradeCost: must<HTMLElement>("upgradeCost"),
   waveBanner: must<HTMLElement>("waveBanner"),
+  turnBanner: must<HTMLElement>("turnBanner"),
   demoBtn: must<HTMLButtonElement>("demoBtn"),
   feedbackQueue: must<HTMLElement>("feedbackQueue"),
   board: must<HTMLElement>("board"),
@@ -811,6 +816,7 @@ function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): v
   syncCursorToBuildableCell(current);
   updateBattlefield(current, glideMs, fxEvents);
   announceWaveEnd(fxEvents);
+  resetTurnAfterWave(previous, snapshot);
   renderToolbar(current);
   renderPlayerCards(current, newEvents);
   renderPhase(current);
@@ -1031,6 +1037,38 @@ function showWaveBanner(title: string, sub: string): void {
     clearTimeout(bannerTimer);
   }
   bannerTimer = setTimeout(() => el.waveBanner.classList.remove("show"), BANNER_LIFETIME_MS);
+}
+
+function showTurnBanner(player: { id: string; name: string }): void {
+  const strong = el.turnBanner.querySelector("strong");
+  const span = el.turnBanner.querySelector("span");
+  if (strong) strong.textContent = player.name;
+  if (span) span.textContent = "it's your turn";
+  el.turnBanner.style.setProperty("--turn-color", `var(--${towerColorClass(player.id)})`);
+  el.turnBanner.classList.remove("show");
+  void el.turnBanner.offsetWidth;
+  el.turnBanner.classList.add("show");
+  if (turnBannerTimer !== null) {
+    clearTimeout(turnBannerTimer);
+  }
+  turnBannerTimer = setTimeout(() => el.turnBanner.classList.remove("show"), TURN_BANNER_LIFETIME_MS);
+}
+
+// Every wave hands the table back to the first seat. Detected from the phase change between two snapshots, so a
+// fresh load (no previous snapshot) or replayed events can never trigger it, and each transition fires once.
+function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: MatchSnapshot): void {
+  if (!previous || previous.phase !== "wave" || snapshot.phase !== "placement") {
+    return;
+  }
+  const firstId = firstPendingPlayerId(snapshot.players);
+  const first = snapshot.players.find((player) => player.id === firstId);
+  if (!first) {
+    return;
+  }
+  setActivePlayer(first.id);
+  if (snapshot.players.length > 1) {
+    showTurnBanner(first);
+  }
 }
 
 function announceWaveEnd(events: MatchEvent[]): void {
@@ -1649,7 +1687,7 @@ function passTurnAfterReady(readyPlayerId: string): void {
   setActivePlayer(nextId);
   const next = current.players.find((player) => player.id === nextId);
   if (next) {
-    addFeedback("info", `${next.name}, it's your turn`);
+    showTurnBanner(next);
   }
 }
 

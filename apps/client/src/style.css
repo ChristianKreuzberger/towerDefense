@@ -663,6 +663,62 @@ kbd {
   }
 }
 
+/* Turn banner: bigger and lower than the wave banner so both can show when a wave ends. */
+.turn-banner {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  max-width: 90%;
+  padding: 18px 40px;
+  border: 3px solid var(--turn-color, var(--ink));
+  border-radius: 16px;
+  background: rgba(21, 18, 26, 0.94);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.turn-banner strong {
+  font-size: clamp(28px, 6vw, 44px);
+  font-weight: 900;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+  color: var(--turn-color, var(--gold));
+}
+
+.turn-banner span {
+  font-size: clamp(18px, 3.5vw, 26px);
+  font-weight: 800;
+  color: var(--text);
+}
+
+.turn-banner.show {
+  opacity: 1;
+  animation: turn-banner-in 3.5s ease both;
+}
+
+@keyframes turn-banner-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.9);
+  }
+  8% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* ---------------------------------------------------------------- guide */
 
 .guide-overlay {
@@ -699,7 +755,7 @@ kbd {
 }
 
 .guide-title {
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 800;
 }
 
@@ -974,7 +1030,8 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 
-  .wave-banner.show {
+  .wave-banner.show,
+  .turn-banner.show {
     animation: none;
   }
 }
