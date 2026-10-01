@@ -234,3 +234,120 @@ runServerSmokeTest("lite snapshots omit map cells and return only new events", a
     child.kill();
   }
 });
+
+type ErrorBody = { ok?: boolean; error?: string; message?: string };
+
+async function withServer(run: () => Promise<void>): Promise<void> {
+  TEST_PORT = await findOpenPort();
+  SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
+  const child = spawn(process.execPath, ["dist/index.js"], {
+    cwd: process.cwd(),
+    env: { ...process.env, PORT: String(TEST_PORT), PORT_MAX: String(TEST_PORT + 20) },
+    stdio: "ignore"
+  });
+  try {
+    await waitForServer(child);
+    await run();
+  } finally {
+    child.kill();
+  }
+}
+
+async function postRaw(path: string, body: string): Promise<{ status: number; body: ErrorBody }> {
+  const response = await fetch(`${SERVER_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body
+  });
+  return { status: response.status, body: (await response.json()) as ErrorBody };
+}
+
+function assertRejected(result: { status: number; body: ErrorBody }, error: string): void {
+  assert.equal(result.status, 400);
+  assert.equal(result.body.ok, false);
+  assert.equal(result.body.error, error);
+  assert.equal(typeof result.body.message, "string");
+}
+
+const twoPlayers = [
+  { id: "p1", name: "Alpha" },
+  { id: "p2", name: "Bravo" }
+];
+
+runServerSmokeTest("malformed JSON is rejected with invalid-json", async () => {
+  await withServer(async () => {
+    assertRejected(await postRaw("/api/start", "{not json"), "invalid-json");
+  });
+});
+
+runServerSmokeTest("start rejects duplicate player ids and bad seeds", async () => {
+  await withServer(async () => {
+    assertRejected(
+      await postJson("/api/start", { players: [{ id: "p1", name: "A" }, { id: "p1", name: "B" }] }),
+      "invalid-setup"
+    );
+
+    for (const seed of [null, "abc", 1.5, ""]) {
+      assertRejected(await postRaw("/api/start", JSON.stringify({ seed, players: twoPlayers })), "invalid-seed");
+    }
+    assertRejected(await postRaw("/api/start", '{"seed":1e999,"players":[{"id":"p1"}]}'), "invalid-seed");
+    assertRejected(await postJson("/api/start", { players: [] }), "invalid-setup");
+
+    const defaulted = await postJson("/api/start", { players: twoPlayers });
+    assert.equal(defaulted.status, 200);
+  });
+});
+
+runServerSmokeTest("commands reject bad coordinates, target modes and payloads", async () => {
+  await withServer(async () => {
+    const start = await postJson("/api/start", { seed: 777, players: twoPlayers });
+    const width = (start.body.snapshot?.map as { width?: number } | undefined)?.width ?? 0;
+    assert.ok(width > 0);
+
+    const bad: Array<Record<string, unknown>> = [
+      { x: 1.5, y: 2 },
+      { x: "3", y: 2 },
+      { x: null, y: 2 },
+      { x: 2 },
+      { x: -1, y: 2 },
+      { x: width, y: 0 },
+      { x: 0, y: 100000 }
+    ];
+    for (const type of ["place-tower", "place-wall"]) {
+      for (const coords of bad) {
+        const result = await postJson("/api/command", { command: { type, playerId: "p1", ...coords } });
+        assertRejected(result, "invalid-coordinates");
+      }
+    }
+
+    assertRejected(
+      await postJson("/api/command", { command: { type: "set-target-mode", playerId: "p1", towerId: "t", mode: "bogus" } }),
+      "invalid-target-mode"
+    );
+    assertRejected(
+      await postJson("/api/command", { command: { type: "set-target-mode", playerId: "p1", towerId: "t" } }),
+      "invalid-target-mode"
+    );
+    assertRejected(await postJson("/api/command", { command: { type: "explode" } }), "invalid-command");
+    assertRejected(await postJson("/api/command", {}), "invalid-command");
+    assertRejected(await postRaw("/api/command", "nope"), "invalid-json");
+  });
+});
+
+runServerSmokeTest("CORS headers are sent and OPTIONS preflight succeeds", async () => {
+  await withServer(async () => {
+    const preflight = await fetch(`${SERVER_URL}/api/command`, {
+      method: "OPTIONS",
+      headers: { Origin: "http://localhost:5173", "Access-Control-Request-Method": "POST" }
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+    assert.match(preflight.headers.get("access-control-allow-methods") ?? "", /POST/);
+    assert.match(preflight.headers.get("access-control-allow-headers") ?? "", /Content-Type/i);
+
+    const health = await fetch(`${SERVER_URL}/health`);
+    assert.equal(health.headers.get("access-control-allow-origin"), "*");
+    const error = await fetch(`${SERVER_URL}/api/snapshot`);
+    assert.equal(error.headers.get("access-control-allow-origin"), "*");
+  });
+});

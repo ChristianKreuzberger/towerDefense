@@ -23,6 +23,29 @@ The offline MVP host exposes a small JSON API used by the browser client:
 - POST /api/command { command } -> { result, snapshot }
 - POST /api/advance-many { ticks } -> { acceptedTicks, stoppedReason, snapshot } (ticks clamped to 1..500, stops when the phase leaves "wave")
 
+### Input validation and errors
+
+The host validates input and rejects bad values instead of coercing them. Every
+rejected request returns HTTP 400 with `{ ok: false, error, message }`:
+
+- `invalid-json`: the body is not valid JSON.
+- `invalid-setup`: /api/start with a player count outside 1..8 or duplicate player ids.
+- `invalid-seed`: /api/start with a `seed` that is not a finite integer (omitted defaults to 777).
+- `invalid-command`: missing or malformed `command`, or an unsupported command type.
+- `invalid-coordinates`: place-tower / place-wall `x`/`y` that are not integers inside the map.
+- `invalid-target-mode`: set-target-mode `mode` not one of first, last, strongest, nearest.
+- `match-not-started`, `not-found`: as before.
+
+Game-rule rejections (for example `tower-already-placed`) are unchanged: they
+return 200 with `result.accepted: false`.
+
+### CORS
+
+All responses carry `Access-Control-Allow-Origin: *` and OPTIONS requests are
+answered with 204 plus the allowed methods and headers, so a client served from
+another origin (for example Vite dev with `VITE_API_BASE_URL`) can call the API.
+This is meant for the local offline host only; revisit before any online mode.
+
 ### Lite snapshots
 
 A full snapshot is about 130 KB because it repeats the static map, the entire

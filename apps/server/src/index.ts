@@ -31,6 +31,20 @@ const CLIENT_ASSET_PREFIX = "/assets/";
 let simulation: MatchSimulation | null = null;
 let setup: MatchSetup | null = null;
 
+// Validation failures carry a machine-readable code so clients get {ok:false, error, message}.
+class ApiError extends Error {
+	constructor(readonly code: string, message: string) {
+		super(message);
+	}
+}
+
+// Permissive on purpose: the host is a local dev server and the Vite client may be on another origin.
+const CORS_HEADERS: Record<string, string> = {
+	"Access-Control-Allow-Origin": "*",
+	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+	"Access-Control-Allow-Headers": "Content-Type"
+};
+
 function writeJson(response: ServerResponse, statusCode: number, payload: unknown): void {
 	response.statusCode = statusCode;
 	response.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -48,15 +62,20 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 		return {};
 	}
 
-	return JSON.parse(bodyText) as unknown;
+	try {
+		return JSON.parse(bodyText) as unknown;
+	} catch {
+		throw new ApiError("invalid-json", "request body is not valid JSON");
+	}
 }
 
 function normalizeSetup(body: unknown): MatchSetup {
 	const source = typeof body === "object" && body ? (body as Record<string, unknown>) : {};
 
-	const seed = typeof source.seed === "number" && Number.isInteger(source.seed)
-		? source.seed
-		: Number(source.seed ?? 777);
+	const seed = source.seed === undefined ? 777 : source.seed;
+	if (typeof seed !== "number" || !Number.isInteger(seed)) {
+		throw new ApiError("invalid-seed", "seed must be a finite integer");
+	}
 
 	const inputPlayers = Array.isArray(source.players) ? source.players : [];
 	const players = inputPlayers
@@ -78,7 +97,11 @@ function normalizeSetup(body: unknown): MatchSetup {
 		.filter((entry): entry is { id: string; name: string } => entry !== null);
 
 	if (players.length < 1 || players.length > 8) {
-		throw new Error("player count must be between 1 and 8");
+		throw new ApiError("invalid-setup", "player count must be between 1 and 8");
+	}
+
+	if (new Set(players.map((player) => player.id)).size !== players.length) {
+		throw new ApiError("invalid-setup", "player ids must be unique");
 	}
 
 	return { players, seed };
@@ -246,14 +269,21 @@ function findOpenPort(startPort: number, endPort: number): Promise<number> {
 	return probe(startPort);
 }
 
-function parseCommand(body: unknown): SimulationCommand {
+function parseCoordinate(value: unknown, limit: number, axis: string): number {
+	if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value >= limit) {
+		throw new ApiError("invalid-coordinates", `${axis} must be an integer between 0 and ${limit - 1}`);
+	}
+	return value;
+}
+
+function parseCommand(body: unknown, mapSize: { width: number; height: number }): SimulationCommand {
 	const source = typeof body === "object" && body ? (body as Record<string, unknown>) : {};
 	const commandSource = typeof source.command === "object" && source.command
 		? (source.command as Record<string, unknown>)
 		: null;
 
 	if (!commandSource || typeof commandSource.type !== "string") {
-		throw new Error("invalid command payload");
+		throw new ApiError("invalid-command", "invalid command payload");
 	}
 
 	const type = commandSource.type;
@@ -262,8 +292,8 @@ function parseCommand(body: unknown): SimulationCommand {
 		return {
 			type,
 			playerId: String(commandSource.playerId ?? ""),
-			x: Number(commandSource.x),
-			y: Number(commandSource.y)
+			x: parseCoordinate(commandSource.x, mapSize.width, "x"),
+			y: parseCoordinate(commandSource.y, mapSize.height, "y")
 		};
 	}
 
@@ -276,16 +306,16 @@ function parseCommand(body: unknown): SimulationCommand {
 	}
 
 	if (type === "set-target-mode") {
-		const requestedMode = String(commandSource.mode ?? "first");
-		const normalizedMode: TowerTargetMode = TARGET_MODES.includes(requestedMode as TowerTargetMode)
-			? (requestedMode as TowerTargetMode)
-			: "first";
+		const requestedMode = commandSource.mode;
+		if (typeof requestedMode !== "string" || !TARGET_MODES.includes(requestedMode as TowerTargetMode)) {
+			throw new ApiError("invalid-target-mode", `mode must be one of: ${TARGET_MODES.join(", ")}`);
+		}
 
 		return {
 			type,
 			playerId: String(commandSource.playerId ?? ""),
 			towerId: String(commandSource.towerId ?? ""),
-			mode: normalizedMode
+			mode: requestedMode as TowerTargetMode
 		};
 	}
 
@@ -300,7 +330,7 @@ function parseCommand(body: unknown): SimulationCommand {
 		return { type };
 	}
 
-	throw new Error(`unsupported command type: ${type}`);
+	throw new ApiError("invalid-command", `unsupported command type: ${type}`);
 }
 
 function logPhaseTransition(previous: MatchSnapshot, next: MatchSnapshot): void {
@@ -321,6 +351,16 @@ const server = createServer(async (request, response) => {
 	const method = request.method ?? "GET";
 	const requestUrl = request.url ?? "/";
 	const { pathname, searchParams } = new URL(requestUrl, "http://localhost");
+
+	for (const [name, value] of Object.entries(CORS_HEADERS)) {
+		response.setHeader(name, value);
+	}
+
+	if (method === "OPTIONS") {
+		response.statusCode = 204;
+		response.end();
+		return;
+	}
 
 	try {
 		if (method === "GET") {
@@ -377,8 +417,8 @@ const server = createServer(async (request, response) => {
 			}
 
 			const body = await readJsonBody(request);
-			const command = parseCommand(body);
 			const previousSnapshot = activeSimulation.getSnapshot();
+			const command = parseCommand(body, previousSnapshot.map);
 			const result = activeSimulation.applyCommand(command);
 			const nextSnapshot = activeSimulation.getSnapshot();
 			logPhaseTransition(previousSnapshot, nextSnapshot);
@@ -437,7 +477,7 @@ const server = createServer(async (request, response) => {
 		logger.error({ event: "request-error", method, pathname, message }, "request failed");
 		writeJson(response, 400, {
 			ok: false,
-			error: "bad-request",
+			error: error instanceof ApiError ? error.code : "bad-request",
 			message
 		});
 	}
