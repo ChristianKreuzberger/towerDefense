@@ -30,8 +30,8 @@ async function clickBuildableCell(page: Page, index = 0): Promise<void> {
 }
 
 // Towers have a limited range, so tests that need combat place them just outside the protected area
-// around seed 777's monster cave at (0, 17).
-const SEED_777_TOWER_CELLS = [{ x: 5, y: 16 }, { x: 7, y: 17 }];
+// around seed 777's monster cave at (0, 0). They are isolated pads inside the maze walls, so they never cut the route.
+const SEED_777_TOWER_CELLS = [{ x: 9, y: 6 }, { x: 6, y: 10 }];
 
 async function clickCellNearSpawn(page: Page, slot: 0 | 1): Promise<void> {
   const cell = SEED_777_TOWER_CELLS[slot]!;
@@ -294,7 +294,7 @@ test("debug demo combat shows synthetic creatures and stops cleanly", async ({ p
   await startMatch(page, "/?debug=1");
   await clickBuildableCell(page, 10);
   await page.locator("#playerId").selectOption("p2");
-  await clickBuildableCell(page, 200);
+  await clickBuildableCell(page, 20);
 
   await page.locator("#demoBtn").click();
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");

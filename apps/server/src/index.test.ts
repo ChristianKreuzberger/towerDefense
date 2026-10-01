@@ -6,6 +6,20 @@ import test from "node:test";
 let TEST_PORT = 4190;
 let SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 
+// Maze corridors are the only creature route, so a tower there is rejected. An isolated buildable pad
+// outside the cave's protected area is always a legal spot.
+function findTowerPad(cells: Array<{ buildable: boolean; x: number; y: number }>): { x: number; y: number } | undefined {
+  const open = new Set(cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
+  return cells.find(
+    (cell) =>
+      cell.buildable &&
+      cell.x > 8 &&
+      [`${cell.x + 1},${cell.y}`, `${cell.x - 1},${cell.y}`, `${cell.x},${cell.y + 1}`, `${cell.x},${cell.y - 1}`].every(
+        (key) => !open.has(key)
+      )
+  );
+}
+
 async function findOpenPort(startPort = 4190, endPort = 4299): Promise<number> {
   for (let port = startPort; port <= endPort; port += 1) {
     const probe = await new Promise<boolean>((resolve) => {
@@ -112,7 +126,7 @@ runServerSmokeTest("server start, snapshot, and command flow preserves rejection
     if (!startSnapshot.map.cells) {
       throw new Error("expected start map cells");
     }
-    const buildableCell = startSnapshot.map.cells.find((cell) => cell.buildable);
+    const buildableCell = findTowerPad(startSnapshot.map.cells);
     assert.ok(buildableCell, "expected a buildable cell in the start snapshot");
 
     const snapshotResponse = await fetch(`${SERVER_URL}/api/snapshot`);
@@ -194,7 +208,7 @@ runServerSmokeTest("lite snapshots omit map cells and return only new events", a
     await waitForServer(child);
     const start = await postJson("/api/start", { seed: 777, players: [{ id: "p1", name: "Alpha" }] });
     const cells = start.body.snapshot?.map?.cells ?? [];
-    const buildable = cells.find((cell) => cell.buildable);
+    const buildable = findTowerPad(cells);
     assert.ok(buildable);
     await postJson("/api/command", { command: { type: "place-tower", playerId: "p1", x: buildable.x, y: buildable.y } });
     await postJson("/api/command", { command: { type: "ready-for-wave", playerId: "p1" } });

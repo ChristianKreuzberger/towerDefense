@@ -1885,8 +1885,15 @@ function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {
 
   const occupied = occupiedCellKeys(current);
   const map = current.map;
+  const open = new Set(mapCache.buildable.map((cell) => `${cell.x},${cell.y}`));
+  // Maze corridors are the creatures' only route, so placements there are usually rejected.
+  // Isolated pads (no walkable neighbour) are always legal spots for tests to click.
+  const isPad = (cell: { x: number; y: number }): boolean =>
+    [`${cell.x + 1},${cell.y}`, `${cell.x - 1},${cell.y}`, `${cell.x},${cell.y + 1}`, `${cell.x},${cell.y - 1}`].every(
+      (key) => !open.has(key)
+    );
   return mapCache.buildable
-    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`) && !isInSpawnProtection(map, cell.x, cell.y))
+    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`) && !isInSpawnProtection(map, cell.x, cell.y) && isPad(cell))
     .map((cell) => ({ x: cell.x, y: cell.y }));
 }
 

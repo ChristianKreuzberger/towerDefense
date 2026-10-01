@@ -159,6 +159,44 @@ test("generates deterministic maps for identical seeds", () => {
   assert.deepEqual(first, second);
 });
 
+function shortestRouteLength(map: ReturnType<typeof generateMap>): number {
+  const open = new Set(map.cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
+  const spawn = map.spawn;
+  assert.ok(spawn);
+  const distance = new Map<string, number>([[`${spawn.x},${spawn.y}`, 1]]);
+  const queue = [spawn];
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    assert.ok(current);
+    const steps = distance.get(`${current.x},${current.y}`) ?? 0;
+    if (current.x === map.width - 1) {
+      return steps;
+    }
+    for (const next of [
+      { x: current.x + 1, y: current.y },
+      { x: current.x - 1, y: current.y },
+      { x: current.x, y: current.y + 1 },
+      { x: current.x, y: current.y - 1 }
+    ]) {
+      const key = `${next.x},${next.y}`;
+      if (open.has(key) && !distance.has(key)) {
+        distance.set(key, steps + 1);
+        queue.push(next);
+      }
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+test("the creature route winds through the map like a maze", () => {
+  for (const seed of [1, 42, 99, 2024, 777]) {
+    const map = generateMap(seed);
+    const length = shortestRouteLength(map);
+    assert.ok(length >= map.width * 3, `seed ${seed}: route of ${length} cells is too direct`);
+    assert.ok(length < Number.POSITIVE_INFINITY, `seed ${seed}: no route to the right edge`);
+  }
+});
+
 test("every map has a monster cave on the left edge, on a walkable cell", () => {
   for (const seed of [1, 42, 99, 2024, 777]) {
     const map = generateMap(seed);
@@ -921,11 +959,7 @@ test("rejects unsupported tower target mode", () => {
 });
 
 test("keeps placement phase until every player has placed and readied for wave", () => {
-  const map = generateMap(1);
-  const buildableCells = map.cells.filter((cell) => cell.buildable);
-  assert.ok(buildableCells.length >= 2, "expected at least two buildable cells for the test");
-  const firstCell = buildableCells[0];
-  const secondCell = buildableCells[1];
+  const [firstCell, secondCell] = getBuildableCoordinates(1, 2);
   assert.ok(firstCell && secondCell, "expected two defined buildable cells");
 
   const simulation = createMatch({
@@ -2498,10 +2532,8 @@ test("generated maps always contain a connected buildable lane from the left to 
 
 test("creatures travel across the map instead of exiting after one cell", () => {
   for (const seed of LANE_SEEDS) {
-    const map = generateMap(seed);
-    const towerCell = map.cells.find((cell) => cell.buildable && cell.x === 0 && cell.y === 0) ??
-      map.cells.find((cell) => cell.buildable);
-    assert.ok(towerCell);
+    // The corridor cells are the only route, so the tower goes on a cell that does not cut it.
+    const towerCell = getBuildableCoordinate(seed);
     const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
     simulation.applyCommand({ type: "place-tower", playerId: "p1", x: towerCell.x, y: towerCell.y });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
