@@ -54,6 +54,7 @@
 - Attack range: a short per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower or wall cell, and inclusive (a target exactly at range can be hit)
 - Creatures cannot move through walls
 - Archetypes: runner, tank, armored, swarm
+- Wave size and composition are fixed and public: wave N has N + 2 creatures, spawned one every 2 ticks, cycling runner, swarm, armored, tank in that order (so wave 1 is runner, swarm, armored; wave 2 adds a tank). The same rule gives the composition shown in the next-wave preview. The snapshot carries `creaturesToSpawn`, the number of creatures of the current wave that have not spawned yet
 - Spawn protection: a creature is untargetable and takes no damage for its first 1 second (`CREATURE_SPAWN_PROTECTION_SECONDS`, 5 simulation ticks at the client's 5 ticks per second) after it appears at the monster cave. It still moves and can attack normally; towers just skip it until the protection ends
 - Later archetypes can include shield or split-on-death
 
