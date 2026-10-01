@@ -41,6 +41,9 @@ import {
   getWallCost,
   getTowerUpgradeCost,
   getWaveClearBonus,
+  getCatchUpBonus,
+  type CreatureArchetype,
+  SWARM_KILL_INCOME_CAP_PER_WAVE,
   getWaveCreatureArchetype,
   getWaveCreatureCount,
   WAVE_SPAWN_INTERVAL_TICKS,
@@ -78,6 +81,11 @@ interface InternalMatchState {
   playerSpentOnUpgradesCurrentWave: Record<string, number>;
   playerWaveClearBonusTotal: Record<string, number>;
   playerWaveClearBonusCurrentWave: Record<string, number>;
+  playerCatchUpBonusTotal: Record<string, number>;
+  playerCatchUpBonusCurrentWave: Record<string, number>;
+  playerSwarmIncomeCurrentWave: Record<string, number>;
+  playerSwarmIncomeCappedTotal: Record<string, number>;
+  playerSwarmIncomeCappedCurrentWave: Record<string, number>;
   events: MatchEvent[];
   winnerId?: string;
   endReason?: "score-win" | "all-towers-destroyed";
@@ -112,7 +120,9 @@ function createWaveTelemetrySnapshot(wave: number, tick: number): WaveTelemetryS
     wallDamageIntake: 0,
     towerRepairApplied: 0,
     wallRepairApplied: 0,
-    waveClearBonusAwarded: 0
+    waveClearBonusAwarded: 0,
+    catchUpBonusAwarded: 0,
+    swarmIncomeCapped: 0
   };
 }
 
@@ -137,7 +147,9 @@ function createEmptyCumulativeTelemetrySnapshot(): CumulativeTelemetrySnapshot {
     wallDamageIntake: 0,
     towerRepairApplied: 0,
     wallRepairApplied: 0,
-    waveClearBonusAwarded: 0
+    waveClearBonusAwarded: 0,
+    catchUpBonusAwarded: 0,
+    swarmIncomeCapped: 0
   };
 }
 
@@ -161,6 +173,8 @@ function accumulateWaveTelemetry(
   target.towerRepairApplied += waveTelemetry.towerRepairApplied;
   target.wallRepairApplied += waveTelemetry.wallRepairApplied;
   target.waveClearBonusAwarded += waveTelemetry.waveClearBonusAwarded;
+  target.catchUpBonusAwarded += waveTelemetry.catchUpBonusAwarded;
+  target.swarmIncomeCapped += waveTelemetry.swarmIncomeCapped;
 }
 
 function cloneCumulativeTelemetrySnapshot(snapshot: CumulativeTelemetrySnapshot): CumulativeTelemetrySnapshot {
@@ -303,6 +317,11 @@ export class MatchSimulation {
       playerSpentOnUpgradesCurrentWave: createPlayerCounterMap(setup.players),
       playerWaveClearBonusTotal: createPlayerCounterMap(setup.players),
       playerWaveClearBonusCurrentWave: createPlayerCounterMap(setup.players),
+      playerCatchUpBonusTotal: createPlayerCounterMap(setup.players),
+      playerCatchUpBonusCurrentWave: createPlayerCounterMap(setup.players),
+      playerSwarmIncomeCurrentWave: createPlayerCounterMap(setup.players),
+      playerSwarmIncomeCappedTotal: createPlayerCounterMap(setup.players),
+      playerSwarmIncomeCappedCurrentWave: createPlayerCounterMap(setup.players),
       events: [],
       players: setup.players.map((player) => ({
         id: player.id,
@@ -693,6 +712,9 @@ export class MatchSimulation {
       this.state.playerAwardedPointsCurrentWave[player.id] = 0;
       this.state.playerSpentOnWallsCurrentWave[player.id] = 0;
       this.state.playerWaveClearBonusCurrentWave[player.id] = 0;
+      this.state.playerCatchUpBonusCurrentWave[player.id] = 0;
+      this.state.playerSwarmIncomeCurrentWave[player.id] = 0;
+      this.state.playerSwarmIncomeCappedCurrentWave[player.id] = 0;
     }
     this.currentWaveSpawned = 0;
     this.currentWavePath.length = 0;
@@ -964,8 +986,7 @@ export class MatchSimulation {
 
       if (creature.hp <= 0) {
         creaturesById.delete(creature.id);
-        const rewardPoints = getCreatureRewardPoints(creature.archetype);
-        this.awardPoints(tower.playerId, rewardPoints);
+        const rewardPoints = this.awardCreatureKillIncome(tower.playerId, creature.archetype, creature.id);
         this.state.telemetry.currentWave.creaturesDefeated += 1;
         this.state.telemetry.currentWave.killsByArchetype[creature.archetype] += 1;
         this.updateCurrentWaveTelemetryTick();
@@ -1437,6 +1458,7 @@ export class MatchSimulation {
     this.repairWallsBetweenWaves();
     this.repairPathWearBetweenWaves();
     this.awardWaveClearBonus(waveCleared);
+    this.awardCatchUpBonus();
     this.emitTelemetrySnapshotEvent();
     const completedWaveTelemetry = cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave);
     this.state.telemetry.completedWaves.push(completedWaveTelemetry);
@@ -1466,6 +1488,77 @@ export class MatchSimulation {
   private isWaveCleared(): boolean {
     const telemetry = this.state.telemetry.currentWave;
     return telemetry.creaturesSpawned > 0 && telemetry.creaturesExited === 0;
+  }
+
+  // Pays a kill reward, except swarm points beyond the per-player per-wave cap (spec/06). Returns the points paid.
+  private awardCreatureKillIncome(playerId: string, archetype: CreatureArchetype, creatureId: string): number {
+    const reward = getCreatureRewardPoints(archetype);
+    let paid = reward;
+    if (archetype === "swarm") {
+      const earned = this.state.playerSwarmIncomeCurrentWave[playerId] ?? 0;
+      paid = Math.max(0, Math.min(reward, SWARM_KILL_INCOME_CAP_PER_WAVE - earned));
+      this.state.playerSwarmIncomeCurrentWave[playerId] = earned + paid;
+      const forfeited = reward - paid;
+      if (forfeited > 0) {
+        this.state.playerSwarmIncomeCappedTotal[playerId] =
+          (this.state.playerSwarmIncomeCappedTotal[playerId] ?? 0) + forfeited;
+        this.state.playerSwarmIncomeCappedCurrentWave[playerId] =
+          (this.state.playerSwarmIncomeCappedCurrentWave[playerId] ?? 0) + forfeited;
+        this.state.telemetry.currentWave.swarmIncomeCapped += forfeited;
+        this.state.events.push({
+          type: "swarm-income-capped",
+          wave: this.state.wave,
+          tick: this.state.waveTick,
+          playerId,
+          creatureId,
+          forfeitedPoints: forfeited
+        });
+      }
+    }
+    this.awardPoints(playerId, paid);
+    return paid;
+  }
+
+  // Trailing survivors get a capped fraction of their gap to the leader. Runs after the wave-clear bonus and never
+  // after a score win, and it stops short of WIN_SCORE so it cannot end the match by itself.
+  private awardCatchUpBonus(): void {
+    if (this.state.phase === "ended") {
+      return;
+    }
+    const recipients = this.state.players
+      .filter((player) => !player.eliminated)
+      .filter((player) => this.state.towers.some((tower) => tower.playerId === player.id && tower.health > 0))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (recipients.length === 0) {
+      return;
+    }
+    // Everyone is measured against the same leader score, taken before any catch-up points are paid.
+    const leaderPoints = Math.max(...recipients.map((player) => player.points));
+
+    for (const player of recipients) {
+      const gap = leaderPoints - player.points;
+      const bonus = Math.min(getCatchUpBonus(gap), WIN_SCORE - 1 - player.points);
+      if (bonus <= 0) {
+        continue;
+      }
+      player.points += bonus;
+      this.state.playerAwardedPointsTotal[player.id] = (this.state.playerAwardedPointsTotal[player.id] ?? 0) + bonus;
+      this.state.playerAwardedPointsCurrentWave[player.id] =
+        (this.state.playerAwardedPointsCurrentWave[player.id] ?? 0) + bonus;
+      this.state.playerCatchUpBonusTotal[player.id] = (this.state.playerCatchUpBonusTotal[player.id] ?? 0) + bonus;
+      this.state.playerCatchUpBonusCurrentWave[player.id] =
+        (this.state.playerCatchUpBonusCurrentWave[player.id] ?? 0) + bonus;
+      this.state.telemetry.currentWave.catchUpBonusAwarded += bonus;
+      this.updateCurrentWaveTelemetryTick();
+      this.state.events.push({
+        type: "catch-up-bonus",
+        wave: this.state.wave,
+        tick: this.state.waveTick,
+        playerId: player.id,
+        bonus,
+        gap
+      });
+    }
   }
 
   private awardWaveClearBonus(cleared: boolean): void {
@@ -1656,6 +1749,10 @@ export class MatchSimulation {
         const spentUpgradesThisWave = this.state.playerSpentOnUpgradesCurrentWave[player.id] ?? 0;
         const waveClearBonusThisWave = this.state.playerWaveClearBonusCurrentWave[player.id] ?? 0;
         const waveClearBonusTotal = this.state.playerWaveClearBonusTotal[player.id] ?? 0;
+        const catchUpBonusThisWave = this.state.playerCatchUpBonusCurrentWave[player.id] ?? 0;
+        const catchUpBonusTotal = this.state.playerCatchUpBonusTotal[player.id] ?? 0;
+        const swarmIncomeCappedThisWave = this.state.playerSwarmIncomeCappedCurrentWave[player.id] ?? 0;
+        const swarmIncomeCappedTotal = this.state.playerSwarmIncomeCappedTotal[player.id] ?? 0;
         const netThisWave = awardedThisWave - spentWallsThisWave - spentUpgradesThisWave;
         const netTotal = awardedTotal - spentWallsTotal - spentUpgradesTotal;
 
@@ -1674,6 +1771,10 @@ export class MatchSimulation {
           endingPoints: player.points,
           waveClearBonusThisWave,
           waveClearBonusTotal,
+          catchUpBonusThisWave,
+          catchUpBonusTotal,
+          swarmIncomeCappedThisWave,
+          swarmIncomeCappedTotal,
           towerLevel: tower?.level ?? 0,
           towerHealth: tower?.health ?? 0,
           wallCount: playerWalls.length,
@@ -1693,6 +1794,10 @@ export class MatchSimulation {
       endingPoints: players.reduce((total, player) => total + player.endingPoints, 0),
       waveClearBonusThisWave: players.reduce((total, player) => total + player.waveClearBonusThisWave, 0),
       waveClearBonusTotal: players.reduce((total, player) => total + player.waveClearBonusTotal, 0),
+      catchUpBonusThisWave: players.reduce((total, player) => total + player.catchUpBonusThisWave, 0),
+      catchUpBonusTotal: players.reduce((total, player) => total + player.catchUpBonusTotal, 0),
+      swarmIncomeCappedThisWave: players.reduce((total, player) => total + player.swarmIncomeCappedThisWave, 0),
+      swarmIncomeCappedTotal: players.reduce((total, player) => total + player.swarmIncomeCappedTotal, 0),
       livingTowers: this.state.towers.filter((tower) => tower.health > 0).length,
       livingWalls: this.state.walls.filter((wall) => wall.health > 0).length,
       totalTowerHealth: this.state.towers.reduce((total, tower) => total + Math.max(0, tower.health), 0),

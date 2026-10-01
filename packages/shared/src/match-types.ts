@@ -69,6 +69,8 @@ export interface WaveTelemetrySnapshot {
   towerRepairApplied: number;
   wallRepairApplied: number;
   waveClearBonusAwarded: number;
+  catchUpBonusAwarded: number;
+  swarmIncomeCapped: number;
 }
 
 export interface MatchTelemetrySnapshot {
@@ -90,6 +92,8 @@ export interface CumulativeTelemetrySnapshot {
   towerRepairApplied: number;
   wallRepairApplied: number;
   waveClearBonusAwarded: number;
+  catchUpBonusAwarded: number;
+  swarmIncomeCapped: number;
 }
 
 export interface BalanceAnalysisPlayerSnapshot {
@@ -107,6 +111,10 @@ export interface BalanceAnalysisPlayerSnapshot {
   endingPoints: number;
   waveClearBonusThisWave: number;
   waveClearBonusTotal: number;
+  catchUpBonusThisWave: number;
+  catchUpBonusTotal: number;
+  swarmIncomeCappedThisWave: number;
+  swarmIncomeCappedTotal: number;
   towerLevel: number;
   towerHealth: number;
   wallCount: number;
@@ -134,6 +142,10 @@ export interface BalanceAnalysisSnapshot {
     endingPoints: number;
     waveClearBonusThisWave: number;
     waveClearBonusTotal: number;
+    catchUpBonusThisWave: number;
+    catchUpBonusTotal: number;
+    swarmIncomeCappedThisWave: number;
+    swarmIncomeCappedTotal: number;
     livingTowers: number;
     livingWalls: number;
     totalTowerHealth: number;
@@ -195,6 +207,24 @@ export type MatchEvent =
       playerId: string;
       bonus: number;
       cleared: boolean;
+    }
+  | {
+      type: "catch-up-bonus";
+      wave: number;
+      tick: number;
+      playerId: string;
+      bonus: number;
+      // Points behind the leader when the bonus was paid.
+      gap: number;
+    }
+  | {
+      type: "swarm-income-capped";
+      wave: number;
+      tick: number;
+      playerId: string;
+      creatureId: string;
+      // Reward points the kill would have paid but did not, because of the per-wave swarm income cap.
+      forfeitedPoints: number;
     }
   | {
       type: "tower-repaired";

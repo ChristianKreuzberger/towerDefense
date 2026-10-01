@@ -133,7 +133,8 @@ const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]> = new Set([
   "tower-repaired",
   "wall-repaired",
   "path-repaired",
-  "wave-clear-bonus"
+  "wave-clear-bonus",
+  "catch-up-bonus"
 ]);
 const EVENT_LOG_CAPACITY = 200;
 const MAX_FX_EVENT_BACKLOG = 300;
@@ -907,6 +908,12 @@ function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["ev
       const playerName = playerNames.get(event.playerId) ?? event.playerId;
       const clearLabel = event.cleared ? "full clear" : "wave completed";
       addFeedback("accepted", `${playerName} earned wave-clear bonus +${event.bonus} pts (${clearLabel})`);
+      continue;
+    }
+
+    if (event.type === "catch-up-bonus") {
+      const playerName = playerNames.get(event.playerId) ?? event.playerId;
+      addFeedback("accepted", `${playerName} earned catch-up bonus +${event.bonus} pts (${event.gap} behind the leader)`);
     }
   }
 }

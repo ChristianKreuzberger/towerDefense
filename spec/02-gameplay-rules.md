@@ -71,6 +71,7 @@
 - Killing a creature gives points to the responsible player (or shared split if configured)
 - Points are spent on tower upgrades and wall placement
 - Upgrade and wall costs scale over time to preserve challenge
+- Anti-snowball (spec/06): trailing players get a catch-up bonus at wave end, and each player's points from swarm kills are capped per wave
 
 ## Win and lose conditions
 

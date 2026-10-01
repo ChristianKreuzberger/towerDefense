@@ -13,6 +13,7 @@
 - Each player must place exactly one tower before wave start
 - Tower cannot be sold; it cannot be moved except for the single free move unlocked after 5 rounds (rejected before that, rejected a second time, rejected after ready or during a wave)
 - Wall placement blocks movement but never invalidates all tower paths
+- Anti-snowball: trailing player gets the catch-up bonus and the leader does not; the swarm income cap applies exactly at the boundary; same seed gives the same result; a wave-clear score win still ends the match after normal end-of-wave events
 - Creature kill increments points and ends match at 1000 points
 - End-of-round automatic tower repair is applied and announced
 - Upgrade and wall cost calculations remain deterministic
