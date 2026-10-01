@@ -928,15 +928,16 @@ test("moves creatures forward by one path index on each wave tick", () => {
   simulation.applyCommand({ type: "advance-wave" });
   snapshot = simulation.getSnapshot();
   const firstCreatureAfterTickTwo = snapshot.creatures.find((creature) => creature.id === "wave-1-creature-1");
-  const firstCreatureExitTickTwo = snapshot.events.find(
-    (event) => event.type === "creature-exited" && event.creatureId === "wave-1-creature-1"
+  const firstCreatureDefeatedTickTwo = snapshot.events.find(
+    (event) => event.type === "creature-defeated" && event.creatureId === "wave-1-creature-1"
   );
 
   if (firstCreatureAfterTickTwo) {
     assert.equal(firstCreatureAfterTickTwo.pathIndex, 1);
   } else {
-    assert.ok(firstCreatureExitTickTwo);
-    assert.equal(firstCreatureExitTickTwo.tick, 2);
+    // The tower can kill it before it moves on now that the lane is long enough to cross the map.
+    assert.ok(firstCreatureDefeatedTickTwo);
+    assert.equal(firstCreatureDefeatedTickTwo.tick, 2);
   }
 });
 
@@ -1722,7 +1723,7 @@ test("wall destruction removes wall and emits deterministic lifecycle events", (
   const wallHitEvents = snapshot.events.filter(
     (event): event is Extract<MatchEvent, { type: "wall-hit" }> => event.type === "wall-hit"
   );
-  assert.ok(wallHitEvents.length >= DEFAULT_WALL_HEALTH);
+  assert.ok(wallHitEvents.reduce((total, event) => total + event.damage, 0) >= DEFAULT_WALL_HEALTH);
   const lastWallHit = wallHitEvents[wallHitEvents.length - 1];
   assert.ok(lastWallHit);
   assert.equal(lastWallHit.remainingHp, 0);
@@ -2281,6 +2282,9 @@ test("awards wave-clear bonus to every surviving player after a full clear", () 
 
 test("does not award wave-clear bonus when creatures leak", () => {
   const simulation = createSinglePlayerWaveSimulation(36);
+  // Towers now kill every creature long before it crosses the map, so force a leak by cutting the lane short.
+  const internals = simulation as unknown as { currentWavePath: Array<{ x: number; y: number }> };
+  internals.currentWavePath.length = 1;
   tickUntil(
     simulation,
     () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2,
@@ -2345,5 +2349,57 @@ test("records wave-clear bonus in telemetry and balance-analysis exports", () =>
     assert.equal(player.waveClearBonusThisWave, getWaveClearBonus());
     assert.equal(player.waveClearBonusTotal, getWaveClearBonus());
     assert.ok(player.awardedPointsThisWave >= getWaveClearBonus());
+  }
+});
+
+const LANE_SEEDS = [1, 19, 42, 777, 2024, 31337, 99999];
+
+test("generated maps always contain a connected buildable lane from the left to the right edge", () => {
+  for (const seed of LANE_SEEDS) {
+    const map = generateMap(seed);
+    const open = new Set(map.cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
+    const queue: string[] = [];
+    const seen = new Set<string>();
+    for (let y = 0; y < map.height; y += 1) {
+      if (open.has(`0,${y}`)) {
+        queue.push(`0,${y}`);
+        seen.add(`0,${y}`);
+      }
+    }
+    let reachedRightEdge = false;
+    for (let index = 0; index < queue.length; index += 1) {
+      const [x, y] = (queue[index] as string).split(",").map(Number) as [number, number];
+      reachedRightEdge ||= x === map.width - 1;
+      for (const key of [`${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`]) {
+        if (open.has(key) && !seen.has(key)) {
+          seen.add(key);
+          queue.push(key);
+        }
+      }
+    }
+    assert.ok(reachedRightEdge, `seed ${seed}: no connected lane to the right edge`);
+  }
+});
+
+test("creatures travel across the map instead of exiting after one cell", () => {
+  for (const seed of LANE_SEEDS) {
+    const map = generateMap(seed);
+    const towerCell = map.cells.find((cell) => cell.buildable && cell.x === 0 && cell.y === 0) ??
+      map.cells.find((cell) => cell.buildable);
+    assert.ok(towerCell);
+    const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+    simulation.applyCommand({ type: "place-tower", playerId: "p1", x: towerCell.x, y: towerCell.y });
+    simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+
+    let furthest = 0;
+    for (let step = 0; step < 40; step += 1) {
+      simulation.applyCommand({ type: "advance-wave" });
+      for (const event of simulation.getSnapshot().events) {
+        if (event.type === "movement-resolved") {
+          furthest = Math.max(furthest, event.toPathIndex);
+        }
+      }
+    }
+    assert.ok(furthest > 1, `seed ${seed}: creature path is a single cell (furthest index ${furthest})`);
   }
 });

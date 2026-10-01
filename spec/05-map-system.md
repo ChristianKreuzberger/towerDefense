@@ -31,6 +31,13 @@
 - On tower or wall placement, run path viability check from creature spawns to each live tower
 - Reject placement if no valid path remains to all required tower targets
 
+## Creature lane
+
+- Creatures walk over buildable cells only (the walkable layer).
+- Procedural generation guarantees one connected lane of buildable cells from the left edge (x = 0) to the right edge (x = width - 1), carved deterministically from the seed. The remaining cells are random buildable noise.
+- Every generated map therefore has a spawn-to-goal route of at least `width` cells, so creatures visibly cross the map and walls and path wear matter.
+- Towers and walls may be placed on lane cells, but the placement path checks reject any placement that would cut the last route.
+
 ## Versioning
 
 - Include schemaVersion in map file
