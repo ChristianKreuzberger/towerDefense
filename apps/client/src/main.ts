@@ -1,32 +1,32 @@
 import { UPGRADE_TRACKS, isInSpawnProtection } from "@tower-defense/shared";
-import type { MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
+import type { MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
+import { applySnapshot, applyWireSnapshot } from "./apply";
 import { paintHero } from "./art/hero";
 import { applyPaletteCssVars } from "./art/palette";
-import { cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
+import { cueForCommandResult } from "./audio/index";
 import type { SoundId } from "./audio/index";
-import { adjustCoord, battlefieldMount, firstFreeBuildableCoord, occupiedCellKeys, renderSnapshot, setCellClickHandler, setMoveMode, setWallMode, syncCursorToBuildableCell, updateBattlefield } from "./board";
-import { DAMAGE_TYPE_OPTIONS, DEBUG, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, PLAYBACK_SPEEDS, TARGET_MODES } from "./constants";
+import { adjustCoord, battlefieldMount, firstFreeBuildableCoord, occupiedCellKeys, setCellClickHandler, setMoveMode, setWallMode } from "./board";
+import { DAMAGE_TYPE_OPTIONS, DEBUG, MAX_PLAYBACK_ERRORS, PLAYBACK_SPEEDS, TARGET_MODES } from "./constants";
 import { coordValue } from "./coord";
 import { createDemo } from "./demo";
 import { app, el, must } from "./dom";
-import { closeOverlay, isEndOverlayOpen, renderEndOverlay } from "./end-overlay";
+import { closeOverlay, isEndOverlayOpen } from "./end-overlay";
 import { REJECT_REASON_TEXT, addFeedback, setMenuMessage, setStatus } from "./feedback";
-import { hideGuideOverlay, syncGuideOverlay } from "./guide";
+import { hideGuideOverlay } from "./guide";
 import type { GuideAction } from "./guide";
-import { hydrateSnapshot, resetMatchCaches } from "./hydrate";
+import { resetMatchCaches } from "./hydrate";
 import { menuPlayersToSetupPlayers, renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
-import { perfTimeApply } from "./perf";
-import { announceWaveEnd, renderPhase } from "./phase";
+import { renderPhase } from "./phase";
 import { resolvePlacementCell } from "./placement";
 import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, syncPlaybackControls } from "./playback";
 import { playerNumber, playerTowerId, selectedPlayerId } from "./player-util";
-import { renderPlayerCards, setChipSelectHandler, updatePlayerOptions } from "./scoreboard";
+import { setChipSelectHandler } from "./scoreboard";
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
-import { isActionAvailable, renderToolbar } from "./toolbar";
-import { applyActivePlayerChange, passTurnAfterReady, resetTurnAfterWave, setActivePlayer } from "./turns";
+import { isActionAvailable } from "./toolbar";
+import { applyActivePlayerChange, passTurnAfterReady, setActivePlayer } from "./turns";
 
 import "./style.css";
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
@@ -85,90 +85,6 @@ function runGuideAction(action: GuideAction): void {
   }
 
   setPlaying(!store.playing);
-}
-
-// Applies a host response unless a newer one was already applied. Returns false when a full refetch is needed.
-function applyWireSnapshot(wire: WireSnapshot, seq: number): boolean {
-  if (seq < store.appliedSeq) {
-    return true;
-  }
-  const hydrated = hydrateSnapshot(wire);
-  if (!hydrated) {
-    return false;
-  }
-  store.appliedSeq = seq;
-  applySnapshot(hydrated.snapshot, hydrated.newEvents);
-  return true;
-}
-
-function applySnapshot(snapshot: MatchSnapshot, newEvents: MatchEvent[]): void {
-  perfTimeApply(() => applySnapshotInner(snapshot, newEvents));
-}
-
-function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): void {
-  const previous = store.current;
-  store.current = snapshot;
-  // Real ticks between snapshots set how long creatures glide; anything else (new wave, rewind) snaps quickly.
-  const ticksElapsed = previous && previous.wave === snapshot.wave && previous.phase === "wave" && snapshot.phase === "wave"
-    ? snapshot.waveTick - previous.waveTick
-    : 0;
-  const glideMs = ticksElapsed > 0 ? ticksElapsed * msPerTick() : MANUAL_TRANSITION_MS;
-
-  // A fresh load or reconnect delivers the whole event history; replaying that as toasts or effects would be noise.
-  const fxEvents = previous !== null && newEvents.length <= MAX_FX_EVENT_BACKLOG ? newEvents : [];
-  announceRepairEvents(snapshot, fxEvents);
-  soundEngine.playCues(
-    cuesForSnapshotChange({ previous, next: snapshot, events: fxEvents, suppress: previous === null || newEvents.length > MAX_FX_EVENT_BACKLOG }),
-    glideMs
-  );
-  showGameScreen();
-  updatePlayerOptions(store.current);
-  syncCursorToBuildableCell(store.current);
-  updateBattlefield(store.current, glideMs, fxEvents);
-  announceWaveEnd(fxEvents);
-  resetTurnAfterWave(previous, snapshot);
-  renderToolbar(store.current);
-  renderPlayerCards(store.current, newEvents);
-  renderPhase(store.current);
-  renderEndOverlay(store.current);
-  renderSnapshot(store.current);
-  syncGuideOverlay(store.current);
-}
-
-function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["events"]): void {
-  const playerNames = new Map(snapshot.players.map((player) => [player.id, player.name]));
-  for (const event of events) {
-    if (event.type === "tower-repaired") {
-      const playerName = playerNames.get(event.playerId) ?? event.playerId;
-      const tower = snapshot.towers.find((entry) => entry.id === event.towerId);
-      const maxHealth = tower?.maxHealth ?? event.remainingHp;
-      addFeedback("info", `${playerName} tower repaired +${event.repairAmount} HP (${event.remainingHp}/${maxHealth})`);
-      continue;
-    }
-
-    if (event.type === "wall-repaired") {
-      const playerName = playerNames.get(event.playerId) ?? event.playerId;
-      addFeedback("info", `${playerName} wall repaired +${event.repairAmount} HP (${event.remainingHp})`);
-      continue;
-    }
-
-    if (event.type === "path-repaired") {
-      addFeedback("info", `Path wear repaired on ${event.repairs.length} cell${event.repairs.length === 1 ? "" : "s"}`);
-      continue;
-    }
-
-    if (event.type === "wave-clear-bonus") {
-      const playerName = playerNames.get(event.playerId) ?? event.playerId;
-      const clearLabel = event.cleared ? "full clear" : "wave completed";
-      addFeedback("accepted", `${playerName} earned wave-clear bonus +${event.bonus} pts (${clearLabel})`);
-      continue;
-    }
-
-    if (event.type === "catch-up-bonus") {
-      const playerName = playerNames.get(event.playerId) ?? event.playerId;
-      addFeedback("accepted", `${playerName} earned catch-up bonus +${event.bonus} pts (${event.gap} behind the leader)`);
-    }
-  }
 }
 
 async function advanceTicks(ticks: number): Promise<void> {
