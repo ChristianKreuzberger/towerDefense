@@ -391,3 +391,83 @@ test("board renders 20% larger by default and clicks stay accurate", async ({ pa
   const after = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ x: number; y: number }> } };
   expect(after.snapshot.towers[0]).toMatchObject({ x: cell.x, y: cell.y });
 });
+
+test("settings from the menu persist volume and mute across reload", async ({ page }) => {
+  await startMatch(page, "/");
+  await page.getByRole("button", { name: "Back To Menu" }).click();
+  const opener = page.locator("#menuSettingsBtn");
+  await opener.click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#settingsVolume")).toHaveValue("70");
+
+  await page.locator("#settingsVolume").fill("35");
+  await expect(page.locator("#settingsVolumeValue")).toHaveText("35%");
+  await page.locator("#settingsMuteBtn").click();
+  await expect(page.locator("#settingsMuteBtn")).toHaveAttribute("aria-pressed", "true");
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(opener).toBeFocused();
+
+  const stored = await page.evaluate(() => localStorage.getItem("towerDefense.settings.v1"));
+  expect(JSON.parse(stored ?? "null")).toEqual({ version: 1, effectsVolume: 0.35, muted: true });
+
+  await page.reload();
+  await page.locator("#settingsBtn").click();
+  await expect(page.locator("#settingsVolume")).toHaveValue("35");
+  await expect(page.locator("#settingsMuteBtn")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("in-match settings dialog closes with Esc and blocks hotkeys while open", async ({ page }) => {
+  await startMatch(page, "/");
+  const select = page.locator("#playerId");
+  await expect(select).toHaveValue("p1");
+  await page.locator("#settingsBtn").click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
+
+  await expect(page.locator("#gameScreen")).toHaveAttribute("inert", "");
+  for (let i = 0; i < 6; i += 1) {
+    await page.keyboard.press("Tab");
+    expect(await page.evaluate(() => {
+      const active = document.activeElement;
+      // With the page inert, Tab can only land in the dialog or leave the document (body).
+      return active === document.body || active?.closest("#settingsRoot") != null;
+    })).toBe(true);
+  }
+
+  await page.locator("#settingsCloseBtn").focus();
+  await page.keyboard.press("2");
+  await page.keyboard.press("w");
+  await page.keyboard.press("m");
+  await expect(select).toHaveValue("p1");
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#settingsMuteBtn")).toHaveAttribute("aria-pressed", "false");
+
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
+  await expect(page.locator("#settingsBtn")).toBeFocused();
+
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("m");
+  const stored = await page.evaluate(() => localStorage.getItem("towerDefense.settings.v1"));
+  expect(JSON.parse(stored ?? "null").muted).toBe(true);
+});
+
+test("the game runs without Web Audio", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const scope = window as unknown as Record<string, unknown>;
+    delete scope.AudioContext;
+    delete scope.webkitAudioContext;
+  });
+  await startMatch(page, "/");
+  await clickBuildableCell(page);
+  await page.locator("#settingsBtn").click();
+  await page.locator("#settingsVolume").fill("20");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#gameScreen")).toBeVisible();
+  expect(errors).toEqual([]);
+});

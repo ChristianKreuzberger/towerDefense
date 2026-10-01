@@ -8,7 +8,8 @@
     "typecheck": "tsc -b --pretty false",
     "dev": "vite",
     "preview": "vite preview",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "node --test dist/*.test.js"
   },
   "dependencies": {
     "@tower-defense/shared": "0.1.0",

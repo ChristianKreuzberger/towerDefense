@@ -25,6 +25,7 @@
 - Simulation core owns authoritative game state in offline MVP
 - Transport adapter boundary allows online mode to be added later
 - Shared package prevents drift in formulas and types
+- Client audio (procedural Web Audio) and settings are presentation-only modules under `apps/client/src/audio` and `settings`; they consume snapshots/events and never touch the simulation or transport
 
 ## Build tools
 

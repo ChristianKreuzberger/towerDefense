@@ -2,10 +2,14 @@ import { WIN_SCORE, getTowerUpgradeCost, getWallCost } from "@tower-defense/shar
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
+import { cueForCommandResult, cuesForSnapshotChange, createSoundEngine } from "./audio/index";
+import type { SoundId } from "./audio/index";
 import { paintHero } from "./art/hero";
 import { createBattlefieldMount } from "./battlefield-scene";
 import { createDemo } from "./demo";
 import { perfRecordBytes, perfTimeApply } from "./perf";
+import { createSettingsStore } from "./settings/settings";
+import { mountSettingsDialog } from "./settings/settings-dialog";
 import "./style.css";
 
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
@@ -194,6 +198,7 @@ app.innerHTML = `
         <div class="menu-actions">
           <button id="menuStartBtn" class="primary">Start Match</button>
           <button id="menuRefreshBtn" class="ghost">Refresh Existing Match</button>
+          <button id="menuSettingsBtn" class="ghost menu-settings">Settings</button>
         </div>
         <div id="menuMessage" class="menu-message"></div>
       </div>
@@ -256,16 +261,16 @@ app.innerHTML = `
       </div>
 
       <div class="toolbar" role="group" aria-label="Actions">
-        <button id="placeTowerBtn" class="tool" title="Place your tower on the highlighted tile (T)">
+        <button id="placeTowerBtn" data-sfx="none" class="tool" title="Place your tower on the highlighted tile (T)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 12h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="tool-label">Place Tower</span><span class="tool-cost">free</span><kbd>T</kbd>
         </button>
         <button id="placeWallBtn" class="tool" aria-pressed="false" title="Toggle wall mode, then click tiles (W)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M9 5v7M15 12v7" stroke="currentColor" stroke-width="2"/></svg><span class="tool-label">Place Wall</span><span class="tool-cost" id="wallCost">25</span><kbd>W</kbd>
         </button>
-        <button id="upgradeBtn" class="tool" title="Upgrade your tower (U)">
+        <button id="upgradeBtn" data-sfx="none" class="tool" title="Upgrade your tower (U)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 9h-5v9H9v-9H4z" fill="currentColor"/></svg><span class="tool-label">Upgrade Tower</span><span class="tool-cost" id="upgradeCost">50</span><kbd>U</kbd>
         </button>
-        <button id="readyBtn" class="tool good" title="Lock in your setup (R)">
+        <button id="readyBtn" data-sfx="none" class="tool good" title="Lock in your setup (R)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tool-label">Ready For Wave</span><span class="tool-cost">&nbsp;</span><kbd>R</kbd>
         </button>
       </div>
@@ -291,6 +296,7 @@ app.innerHTML = `
       <div class="session-row">
         <button id="refreshBtn" class="ghost">Refresh Snapshot</button>
         <button id="backToMenuBtn" class="ghost">Back To Menu</button>
+        <button id="settingsBtn" class="ghost">Settings</button>
       </div>
     </aside>
 
@@ -301,8 +307,10 @@ app.innerHTML = `
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd> upgrade <kbd>P</kbd> pause <kbd>Arrows</kbd> move cursor</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd> upgrade <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
   </footer>
+
+  <div id="settingsRoot"></div>
 
   <div id="feedbackQueue" class="toasts" role="status" aria-live="polite"></div>
 
@@ -320,6 +328,11 @@ app.innerHTML = `
   </div>
 `;
 
+const settingsStore = createSettingsStore();
+const soundEngine = createSoundEngine({ settings: settingsStore });
+soundEngine.bindUnlock(document);
+const settingsDialog = mountSettingsDialog({ root: must<HTMLElement>("settingsRoot"), settings: settingsStore, engine: soundEngine });
+
 const el = {
   menuScreen: must<HTMLElement>("menuScreen"),
   gameScreen: must<HTMLElement>("gameScreen"),
@@ -328,6 +341,8 @@ const el = {
   menuAiPlayers: must<HTMLInputElement>("menuAiPlayers"),
   menuPlayerNames: must<HTMLElement>("menuPlayerNames"),
   menuMessage: must<HTMLElement>("menuMessage"),
+  menuSettingsBtn: must<HTMLButtonElement>("menuSettingsBtn"),
+  settingsBtn: must<HTMLButtonElement>("settingsBtn"),
   menuStartBtn: must<HTMLButtonElement>("menuStartBtn"),
   menuRefreshBtn: must<HTMLButtonElement>("menuRefreshBtn"),
   playerId: must<HTMLSelectElement>("playerId"),
@@ -764,6 +779,10 @@ function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): v
   // A fresh load or reconnect delivers the whole event history; replaying that as toasts or effects would be noise.
   const fxEvents = previous !== null && newEvents.length <= MAX_FX_EVENT_BACKLOG ? newEvents : [];
   announceRepairEvents(snapshot, fxEvents);
+  soundEngine.playCues(
+    cuesForSnapshotChange({ previous, next: snapshot, events: fxEvents, suppress: previous === null || newEvents.length > MAX_FX_EVENT_BACKLOG }),
+    glideMs
+  );
   showGameScreen();
   updatePlayerOptions(current);
   syncCursorToBuildableCell(current);
@@ -1499,6 +1518,10 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
   try {
     const data = await postJson<ApiCommandPayload>("/api/command", { command, lite: true, eventsSince: eventCursor });
     const result = data.result;
+    const cue = cueForCommandResult(command.type, result?.accepted === true);
+    if (cue) {
+      soundEngine.play(cue);
+    }
     if (!result?.accepted) {
       setStatus(`rejected: ${result?.reason ?? "unknown"}`);
       addFeedback("rejected", "Command rejected", command.type, result?.reason);
@@ -1682,8 +1705,38 @@ must<HTMLButtonElement>("autoBtn").addEventListener("click", async () => {
   }
 });
 
+el.menuSettingsBtn.addEventListener("click", () => settingsDialog.open(el.menuSettingsBtn));
+el.settingsBtn.addEventListener("click", () => settingsDialog.open(el.settingsBtn));
+
+// Menu and in-match buttons share one click sound; data-sfx="none" opts out and any other value names a SoundId.
+app.addEventListener("click", (event) => {
+  const button = event.target instanceof Element ? event.target.closest("button") : null;
+  if (!button || button.disabled || !app.contains(button)) {
+    return;
+  }
+  const sfx = button.dataset.sfx;
+  if (sfx === "none") {
+    return;
+  }
+  soundEngine.play({ id: (sfx as SoundId | undefined) ?? "ui-click" });
+});
+
 document.addEventListener("keydown", (event) => {
+  if (settingsDialog.isOpen()) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      settingsDialog.close();
+    }
+    return;
+  }
+
   if (isFormField(event.target)) {
+    return;
+  }
+
+  if (event.key.toLowerCase() === "m" && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault();
+    settingsStore.set({ muted: !settingsStore.get().muted });
     return;
   }
 
