@@ -15,7 +15,10 @@ import {
   type MatchSnapshot,
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
+  getCreatureAttackDamage,
   getCreatureAttackRange,
+  type Creature,
+  type CreatureArchetype,
   isWithinCreatureAttackRange,
   getCreatureMovementSpeedUnits,
   getTowerRange,
@@ -1539,14 +1542,77 @@ test("creature target selection is deterministic by distance then hp then towerI
   assert.deepEqual(creatureTargetEvent.assignments, rerunCreatureTargetEvent.assignments);
 });
 
+// Calls the private selector directly: with live waves the sticky spawn target and the towers killing creatures
+// early make the distance/hp/id tie-breaks unreachable, so they are pinned on hand-built state instead.
+test("creature tower selection among in-range towers breaks ties by distance, then hp, then towerId", () => {
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed: 34 });
+  const select = (
+    simulation as unknown as {
+      selectTowerTargetForCreature: (creature: Creature, towers: Map<string, Tower>) => Tower | undefined;
+    }
+  ).selectTowerTargetForCreature.bind(simulation);
+
+  const tower = (id: string, x: number, y: number, health = 100): Tower => ({
+    id,
+    playerId: id,
+    x,
+    y,
+    health,
+    maxHealth: 100,
+    level: 1,
+    targetMode: "first"
+  });
+  const towers = (...entries: Tower[]): Map<string, Tower> => new Map(entries.map((entry) => [entry.id, entry]));
+  // "tower-missing" means no sticky target, like after the assigned tower died.
+  const tank: Creature = {
+    id: "c1",
+    archetype: "tank",
+    hp: 5,
+    x: 10,
+    y: 10,
+    pathIndex: 0,
+    pathProgressUnits: 0,
+    spawnTick: 0,
+    targetTowerId: "tower-missing"
+  };
+
+  // Distance wins over lower hp and lower id.
+  assert.equal(select(tank, towers(tower("a", 11, 11, 1), tower("b", 11, 10, 100)))?.id, "b");
+  // Equal distance: lower hp wins over lower id.
+  assert.equal(select(tank, towers(tower("a", 11, 10, 100), tower("b", 10, 11, 40)))?.id, "b");
+  // Equal distance and hp: lowest towerId wins, independent of map insertion order.
+  assert.equal(select(tank, towers(tower("b", 11, 10), tower("a", 10, 11)))?.id, "a");
+  assert.equal(select(tank, towers(tower("a", 11, 10), tower("b", 10, 11)))?.id, "a");
+  // Out-of-range towers never win, even when they would win every tie-break.
+  assert.equal(select(tank, towers(tower("a", 14, 10, 1), tower("b", 11, 11)))?.id, "b");
+  assert.equal(select(tank, towers(tower("a", 14, 10, 1))), undefined);
+  // A runner (range 1) reaches an adjacent cell (exactly at range) but not the diagonal (1.41).
+  assert.equal(select({ ...tank, archetype: "runner" }, towers(tower("a", 11, 10)))?.id, "a");
+  assert.equal(select({ ...tank, archetype: "runner" }, towers(tower("a", 11, 11))), undefined);
+  // A sticky target is kept only while in range, and then wins over a closer tower.
+  assert.equal(select({ ...tank, targetTowerId: "b" }, towers(tower("a", 10, 10), tower("b", 11, 11)))?.id, "b");
+  assert.equal(select({ ...tank, targetTowerId: "b" }, towers(tower("a", 11, 10), tower("b", 14, 14)))?.id, "a");
+});
+
 test("emits creature-attack event and reduces tower hp", () => {
   const simulation = createSinglePlayerWaveSimulationBesideLane(35);
 
   // Creatures start at the cave, far from the tower, so the first attack happens a few ticks into the wave.
+  // Remember each creature's archetype per tick: the attacker may already be gone from the final snapshot.
+  const archetypeById = new Map<string, CreatureArchetype>();
   tickUntil(
     simulation,
-    () => simulation.getSnapshot().events.some((event) => event.type === "creature-attack"),
-    120
+    () => {
+      const current = simulation.getSnapshot();
+      if (current.events.some((event) => event.type === "creature-attack")) {
+        return true;
+      }
+      for (const creature of current.creatures) {
+        archetypeById.set(creature.id, creature.archetype);
+      }
+      return false;
+    },
+    1200
   );
 
   const snapshot = simulation.getSnapshot();
@@ -1554,13 +1620,20 @@ test("emits creature-attack event and reduces tower hp", () => {
     (event): event is Extract<MatchEvent, { type: "creature-attack" }> => event.type === "creature-attack"
   );
   assert.ok(attackEvents.length >= 1);
-  assert.equal(attackEvents[0]?.targetTowerId, "tower-p1");
-  assert.ok((attackEvents[0]?.damage ?? 0) >= 1);
+  const firstAttack = attackEvents[0];
+  assert.ok(firstAttack);
+  assert.equal(firstAttack.targetTowerId, "tower-p1");
+
+  // Damage is exact per attacker archetype, not just bounded.
+  const attackerArchetype = archetypeById.get(firstAttack.creatureId);
+  assert.ok(attackerArchetype, `archetype of ${firstAttack.creatureId} was seen before it attacked`);
+  assert.equal(firstAttack.damage, getCreatureAttackDamage(attackerArchetype));
 
   const tower = snapshot.towers.find((entry) => entry.id === "tower-p1");
   assert.ok(tower);
   assert.equal(tower.health, DEFAULT_TOWER_HEALTH - attackEvents.reduce((total, event) => total + event.damage, 0));
   assert.equal(attackEvents[attackEvents.length - 1]?.remainingHp, tower.health);
+  assert.equal(firstAttack.remainingHp, DEFAULT_TOWER_HEALTH - firstAttack.damage);
 });
 
 test("destroys tower, marks player eliminated, and rejects further player commands", () => {
