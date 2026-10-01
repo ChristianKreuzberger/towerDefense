@@ -502,8 +502,11 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
   await expect(page.locator("#turnBanner")).toContainText("Bravo");
   const bannerFontSize = await page.locator("#turnBanner strong").evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
   expect(bannerFontSize).toBeGreaterThanOrEqual(40);
-  // The handoff must refresh the toolbar: p2 is not ready, so Upgrade must not stay dimmed from p1.
-  await expect(page.locator("#upgradeBtn")).not.toHaveClass(/dim/);
+  // The handoff must refresh the toolbar: p2 is not ready, so the upgrade buttons must not stay dimmed from p1.
+  await expect(page.locator(".upgrade-btn")).toHaveCount(3);
+  for (const id of ["#upgradeRangeBtn", "#upgradeDamageBtn", "#upgradeAccuracyBtn"]) {
+    await expect(page.locator(id)).not.toHaveClass(/dim/);
+  }
 });
 
 test("hovering a tower shows its level and combat stats", async ({ page }) => {
