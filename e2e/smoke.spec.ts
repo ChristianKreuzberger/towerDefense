@@ -77,6 +77,7 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   await expect(page.locator("#menuAiPlayers")).toBeDisabled();
   await expect(page.locator(".menu-hint")).toContainText("Coming later");
   await page.locator("#menuSeed").fill("777");
+  await expect(page.locator("#menuPlayerName1")).toHaveAttribute("maxlength", "24");
   await page.locator("#menuPlayerName1").fill("Alpha");
   await page.locator("#menuPlayerName2").fill("Bravo");
   await page.getByRole("button", { name: "Start Match" }).click();
@@ -514,4 +515,70 @@ test("hovering a tower shows its level and combat stats", async ({ page }) => {
 
   await page.locator("#board canvas").hover({ position: { x: 2, y: 2 } });
   await expect(tooltip).toBeHidden();
+});
+
+test("player names are shown as text on the match-end overlay, never parsed as HTML", async ({ page }) => {
+  const hostile = "<img src=x onerror=window.__xss=1>";
+  const tricky = "Tom & <b>Jerry</b>";
+  await startMatch(page, "/");
+
+  const liveSnapshot = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const players = liveSnapshot.snapshot.players as Array<Record<string, unknown>>;
+  const endedSnapshot = {
+    ...liveSnapshot.snapshot,
+    phase: "ended",
+    winnerId: "p1",
+    endReason: "score-win",
+    players: [
+      { ...players[0], name: hostile, points: 1000 },
+      { ...players[0], id: "p2", name: tricky, points: 10 }
+    ]
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: endedSnapshot }) });
+  }, { times: 1 });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+
+  const scores = page.locator("#matchEndScores");
+  await expect(page.locator("#matchEndOverlay")).toBeVisible();
+  await expect(scores).toContainText(hostile);
+  await expect(scores).toContainText(tricky);
+  await expect(scores.locator("img, b")).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
+});
+
+test("wall and target-mode controls follow the phase and a disabled wall button sends no command", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  // Prep: walls are off (with an explanation), target mode is available.
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#mode")).toBeEnabled();
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+  // Playwright treats aria-disabled as not actionable; the button stays clickable on purpose so it can explain itself.
+  await page.locator("#placeWallBtn").click({ force: true });
+  await expect(page.locator("#feedbackQueue")).toContainText("walls can only be placed during combat");
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-pressed", "false");
+  expect(commands).toEqual([]);
+
+  await page.locator("#mode").selectOption("nearest");
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toContain("set-target-mode");
+  await expect(page.locator("#feedbackQueue")).not.toContainText("rejected");
+  await expect(page.locator("#mode")).toHaveValue("nearest");
+
+  // Combat: walls become available once everyone is ready.
+  await page.locator("#playerId").selectOption("p2");
+  await clickCellNearSpawn(page, 1);
+  await page.locator("#readyBtn").click();
+  await page.locator("#playerId").selectOption("p1");
+  await page.locator("#readyBtn").click();
+  await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
+  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
 });

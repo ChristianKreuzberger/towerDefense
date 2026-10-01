@@ -1,5 +1,7 @@
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 8;
+// Names are shown in the HUD and the end screen; the cap keeps those layouts intact.
+export const MAX_PLAYER_NAME_LENGTH = 24;
 export const WIN_SCORE = 1000;
 export const DEFAULT_MAP_WIDTH = 50;
 export const DEFAULT_MAP_HEIGHT = 50;
@@ -36,6 +38,7 @@ export const MAX_TOWER_LEVEL = 5;
 export const GAME_RULES = {
   minPlayers: MIN_PLAYERS,
   maxPlayers: MAX_PLAYERS,
+  maxPlayerNameLength: MAX_PLAYER_NAME_LENGTH,
   winScore: WIN_SCORE,
   towersPerPlayer: 1,
   mapWidth: DEFAULT_MAP_WIDTH,

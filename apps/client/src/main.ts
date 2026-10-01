@@ -1,4 +1,4 @@
-import { TICKS_PER_SECOND, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import { getToolbarState } from "./toolbar-state.js";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
@@ -549,19 +549,30 @@ function renderMenuPlayerInputs(): void {
     defaultName: `Player ${index + 1}`
   }));
 
-  el.menuPlayerNames.innerHTML = menuPlayers.map((player, index) => (
-    `<div class="menu-player">` +
-    `<span class="swatch ${player.id}" aria-hidden="true">${index + 1}</span>` +
-    `<label class="sr-only" for="${player.inputId}">${player.id.toUpperCase()} Name</label>` +
-    `<input id="${player.inputId}" value="${player.defaultName}" />` +
-    `</div>`
-  )).join("");
+  el.menuPlayerNames.replaceChildren(...menuPlayers.map((player, index) => {
+    const row = document.createElement("div");
+    row.className = "menu-player";
+    const swatch = document.createElement("span");
+    swatch.className = `swatch ${player.id}`;
+    swatch.setAttribute("aria-hidden", "true");
+    swatch.textContent = String(index + 1);
+    const label = document.createElement("label");
+    label.className = "sr-only";
+    label.htmlFor = player.inputId;
+    label.textContent = `${player.id.toUpperCase()} Name`;
+    const input = document.createElement("input");
+    input.id = player.inputId;
+    input.maxLength = MAX_PLAYER_NAME_LENGTH;
+    input.value = player.defaultName;
+    row.append(swatch, label, input);
+    return row;
+  }));
 }
 
 function menuPlayersToSetupPlayers(): MatchSetup["players"] {
   return menuPlayers.map((player, index) => {
     const element = must<HTMLInputElement>(player.inputId);
-    const name = element.value.trim();
+    const name = element.value.trim().slice(0, MAX_PLAYER_NAME_LENGTH);
     return {
       id: `p${index + 1}`,
       name: name.length > 0 ? name : player.defaultName
@@ -1359,9 +1370,14 @@ function renderEndOverlay(snapshot: MatchSnapshot | null): void {
   el.overlaySummary.textContent = `${winnerText} secured the win${snapshot.endReason ? ` • ${snapshot.endReason}` : ""}.`;
 
   const ranked = [...snapshot.players].sort((a, b) => b.points - a.points || a.id.localeCompare(b.id));
-  el.overlayScores.innerHTML = ranked
-    .map((player) => `<div>${player.name}</div><div>${player.points} pts</div>`)
-    .join("");
+  // Names are user input: build text nodes, never parse them as HTML.
+  el.overlayScores.replaceChildren(...ranked.flatMap((player) => {
+    const name = document.createElement("div");
+    name.textContent = player.name;
+    const points = document.createElement("div");
+    points.textContent = `${player.points} pts`;
+    return [name, points];
+  }));
 
   el.overlay.style.display = "flex";
 }
