@@ -40,6 +40,9 @@ import {
   getWallCost,
   getTowerUpgradeCost,
   getWaveClearBonus,
+  getWaveCreatureArchetype,
+  getWaveCreatureCount,
+  WAVE_SPAWN_INTERVAL_TICKS,
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
@@ -82,8 +85,6 @@ interface WaveSpawnPlan {
   totalCreatures: number;
   spawnIntervalTicks: number;
 }
-
-const WAVE_SPAWN_ARCHETYPES: readonly Creature["archetype"][] = ["runner", "swarm", "armored", "tank"];
 
 function createEmptyKillsByArchetype(): TelemetryKillsByArchetype {
   return {
@@ -564,6 +565,9 @@ export class MatchSimulation {
       phase: this.state.phase,
       wave: this.state.wave,
       waveTick: this.state.waveTick,
+      creaturesToSpawn: this.state.phase === "wave"
+        ? Math.max(0, getWaveCreatureCount(this.state.wave) - this.currentWaveSpawned)
+        : this.state.phase === "placement" ? getWaveCreatureCount(this.state.wave) : 0,
       allPlayersReadyForWave: this.areSurvivorsReadyForWave(),
       telemetry: {
         currentWave: cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave),
@@ -623,8 +627,8 @@ export class MatchSimulation {
 
   private getWaveSpawnPlan(): WaveSpawnPlan {
     return {
-      totalCreatures: this.state.wave + 2,
-      spawnIntervalTicks: 2
+      totalCreatures: getWaveCreatureCount(this.state.wave),
+      spawnIntervalTicks: WAVE_SPAWN_INTERVAL_TICKS
     };
   }
 
@@ -644,7 +648,7 @@ export class MatchSimulation {
     }
 
     const spawnOrdinal = this.currentWaveSpawned + 1;
-    const archetype = WAVE_SPAWN_ARCHETYPES[(spawnOrdinal - 1) % WAVE_SPAWN_ARCHETYPES.length] ?? "runner";
+    const archetype = getWaveCreatureArchetype(spawnOrdinal);
     const creature: Creature = {
       id: `wave-${this.state.wave}-creature-${spawnOrdinal}`,
       archetype,

@@ -23,6 +23,7 @@ import {
   getCreatureMovementSpeedUnits,
   getTowerRange,
   getCreatureBaseHp,
+  getWaveCreatureCount,
   getTowerUpgradeCost,
   MAX_TOWER_LEVEL,
   getWallCost,
@@ -3567,4 +3568,32 @@ test("a miss deals no damage and carries the creature cell", () => {
   assert.ok(miss && miss.type === "tower-miss");
   assert.equal(typeof miss.x, "number");
   assert.equal(events.some((event) => event.type === "tower-hit" && event.tick === miss.tick && event.towerId === miss.towerId), false);
+});
+
+test("creaturesToSpawn counts down during a wave and previews the next wave in prep", () => {
+  const simulation = createPrepMatchWithTower(31);
+  assert.equal(simulation.getSnapshot().creaturesToSpawn, getWaveCreatureCount(1));
+
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().creaturesToSpawn, getWaveCreatureCount(1));
+  const seen: number[] = [];
+  tickUntil(
+    simulation,
+    () => {
+      const snapshot = simulation.getSnapshot();
+      if (snapshot.phase === "wave") {
+        seen.push(snapshot.creaturesToSpawn);
+      }
+      return snapshot.phase !== "wave";
+    },
+    400
+  );
+  assert.equal(Math.min(...seen), 0);
+  assert.ok(seen.every((value, index) => index === 0 || value <= (seen[index - 1] ?? Infinity)), "never goes back up mid-wave");
+  assert.ok(seen.includes(getWaveCreatureCount(1) - 1), "passes through partial counts");
+
+  const afterWave = simulation.getSnapshot();
+  assert.equal(afterWave.phase, "placement");
+  assert.equal(afterWave.wave, 2);
+  assert.equal(afterWave.creaturesToSpawn, getWaveCreatureCount(2));
 });
