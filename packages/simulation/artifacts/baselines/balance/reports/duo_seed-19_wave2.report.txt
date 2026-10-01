@@ -3,37 +3,37 @@ schemaVersion=1
 matchSeed=19
 snapshots=2
 
-=== Wave 1 (export=1, tick=6) ===
-DPS proxy: 1.00 dmg/tick (dealt=6, ticks=6)
+=== Wave 1 (export=1, tick=11) ===
+DPS proxy: 0.55 dmg/tick (dealt=6, ticks=11)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=3, exited=0)
-Damage intake: towers=2 walls=0
-Repairs: towers=2 walls=0
+Damage intake: towers=4 walls=0
+Repairs: towers=4 walls=0
 Economy delta: awarded=62 spentWalls=0 spentUpgrades=0 net=62
 Wave-clear bonus: awarded=30
 Players:
 - p1 (Alpha) status=active delta=37 bonus=15 total=37 ending=37 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p2 (Beta) status=active delta=25 bonus=15 total=25 ending=25 towerLv=1 towerHp=100 walls=0 wallHp=0
 
-=== Wave 2 (export=2, tick=8) ===
-DPS proxy: 1.63 dmg/tick (dealt=13, ticks=8)
+=== Wave 2 (export=2, tick=13) ===
+DPS proxy: 1.00 dmg/tick (dealt=13, ticks=13)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=1 (defeated=4, spawned=4, exited=0)
-Damage intake: towers=3 walls=3
-Repairs: towers=3 walls=4
-Economy delta: awarded=137 spentWalls=25 spentUpgrades=80 net=32
+Damage intake: towers=8 walls=0
+Repairs: towers=8 walls=1
+Economy delta: awarded=82 spentWalls=25 spentUpgrades=80 net=-23
 Wave-clear bonus: awarded=30
 Players:
 - p1 (Alpha) status=active delta=-2 bonus=15 total=35 ending=35 towerLv=1 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=34 bonus=15 total=59 ending=59 towerLv=2 towerHp=100 walls=0 wallHp=0
+- p2 (Beta) status=active delta=-21 bonus=15 total=59 ending=59 towerLv=2 towerHp=100 walls=0 wallHp=0
 
 === Cumulative Summary ===
 Waves completed: 2
-DPS proxy: 1.36 dmg/tick (dealt=19, ticks=14)
+DPS proxy: 0.79 dmg/tick (dealt=19, ticks=24)
 Kills by archetype: runner=2 swarm=2 armored=2 tank=1
-Damage intake totals: towers=5 walls=3
-Repairs totals: towers=5 walls=4
+Damage intake totals: towers=12 walls=0
+Repairs totals: towers=12 walls=1
 Wave-clear bonus total: 60
 Economy totals: awarded=199 spentWalls=25 spentUpgrades=80 net=94 ending=94
 Structures: livingTowers=2 livingWalls=1 towerHp=200 wallHp=60 pathWearTotal=0
 Players (final):
 - p1 (Alpha) status=active delta=-2 bonus=15 total=35 ending=35 towerLv=1 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=34 bonus=15 total=59 ending=59 towerLv=2 towerHp=100 walls=0 wallHp=0
+- p2 (Beta) status=active delta=-21 bonus=15 total=59 ending=59 towerLv=2 towerHp=100 walls=0 wallHp=0
