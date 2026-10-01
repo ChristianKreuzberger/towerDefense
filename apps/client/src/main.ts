@@ -7,7 +7,7 @@ import { applyPaletteCssVars } from "./art/palette";
 import { cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
 import type { SoundId } from "./audio/index";
 import { adjustCoord, battlefieldMount, firstFreeBuildableCoord, occupiedCellKeys, renderSnapshot, setCellClickHandler, setMoveMode, setWallMode, syncCursorToBuildableCell, updateBattlefield } from "./board";
-import { BANNER_LIFETIME_MS, DAMAGE_TYPE_OPTIONS, DEBUG, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, PLAYBACK_SPEEDS, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
+import { DAMAGE_TYPE_OPTIONS, DEBUG, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, PLAYBACK_SPEEDS, TARGET_MODES } from "./constants";
 import { coordValue } from "./coord";
 import { createDemo } from "./demo";
 import { app, el, must } from "./dom";
@@ -16,15 +16,15 @@ import { hideGuideOverlay, syncGuideOverlay } from "./guide";
 import type { GuideAction } from "./guide";
 import { hydrateSnapshot, resetMatchCaches } from "./hydrate";
 import { perfTimeApply } from "./perf";
+import { announceWaveEnd, renderPhase, showTurnBanner } from "./phase";
 import { resolvePlacementCell } from "./placement";
-import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, startPlayback, stopPlayback, syncPlaybackControls } from "./playback";
-import { playerNumber, playerTowerId, selectedPlayerId, towerColorClass } from "./player-util";
+import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, stopPlayback, syncPlaybackControls } from "./playback";
+import { playerNumber, playerTowerId, selectedPlayerId } from "./player-util";
 import { renderPlayerCards, setChipSelectHandler, updatePlayerOptions } from "./scoreboard";
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
 import { isActionAvailable, renderToolbar } from "./toolbar";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
-import { formatWavePreview } from "./wave-preview";
 
 import "./style.css";
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
@@ -243,35 +243,6 @@ async function advanceTicks(ticks: number): Promise<void> {
   }
 }
 
-function showWaveBanner(title: string, sub: string): void {
-  const strong = el.waveBanner.querySelector("strong");
-  const span = el.waveBanner.querySelector("span");
-  if (strong) strong.textContent = title;
-  if (span) span.textContent = sub;
-  el.waveBanner.classList.remove("show");
-  void el.waveBanner.offsetWidth;
-  el.waveBanner.classList.add("show");
-  if (store.bannerTimer !== null) {
-    clearTimeout(store.bannerTimer);
-  }
-  store.bannerTimer = setTimeout(() => el.waveBanner.classList.remove("show"), BANNER_LIFETIME_MS);
-}
-
-function showTurnBanner(player: { id: string; name: string }): void {
-  const strong = el.turnBanner.querySelector("strong");
-  const span = el.turnBanner.querySelector("span");
-  if (strong) strong.textContent = player.name;
-  if (span) span.textContent = "it's your turn";
-  el.turnBanner.style.setProperty("--turn-color", `var(--${towerColorClass(player.id)})`);
-  el.turnBanner.classList.remove("show");
-  void el.turnBanner.offsetWidth;
-  el.turnBanner.classList.add("show");
-  if (store.turnBannerTimer !== null) {
-    clearTimeout(store.turnBannerTimer);
-  }
-  store.turnBannerTimer = setTimeout(() => el.turnBanner.classList.remove("show"), TURN_BANNER_LIFETIME_MS);
-}
-
 // Every wave hands the table back to the first seat. Detected from the phase change between two snapshots, so a
 // fresh load (no previous snapshot) or replayed events can never trigger it, and each transition fires once.
 function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: MatchSnapshot): void {
@@ -286,91 +257,6 @@ function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: MatchSnaps
   setActivePlayer(first.id);
   if (snapshot.players.length > 1) {
     showTurnBanner(first);
-  }
-}
-
-function announceWaveEnd(events: MatchEvent[]): void {
-  const end = events.find((event) => event.type === "wave-end");
-  if (!end) {
-    return;
-  }
-  const bonus = events.find((event) => event.type === "wave-clear-bonus");
-  const sub = bonus && bonus.type === "wave-clear-bonus" ? `Full clear: +${bonus.bonus} points each` : "Towers repaired, prepare the next wave";
-  showWaveBanner(`Wave ${end.wave} ${bonus ? "cleared" : "complete"}`, sub);
-}
-
-function phaseSubText(snapshot: MatchSnapshot): string {
-  if (snapshot.phase === "placement") {
-    const repairEvents = snapshot.events.filter(
-      (event) => event.type === "tower-repaired" || event.type === "wall-repaired" || event.type === "path-repaired"
-    );
-    const latestRepairWave = repairEvents.at(-1)?.wave;
-    if (latestRepairWave !== undefined && latestRepairWave === snapshot.wave - 1) {
-      const repairCount = repairEvents.filter((event) => event.wave === latestRepairWave).length;
-      return `Round ${latestRepairWave} complete. Automatic repairs applied (${repairCount} update${repairCount === 1 ? "" : "s"}).`;
-    }
-
-    const unplaced = snapshot.players.filter((player) => !player.hasPlacedTower);
-    if (unplaced.length > 0) {
-      const names = unplaced.map((player) => player.name).slice(0, 2).join(", ");
-      const suffix = unplaced.length > 2 ? ", …" : "";
-      return `Waiting on ${names}${suffix}. Place your tower to keep the setup moving.`;
-    }
-
-    return "All towers are set. Buy upgrades now, then lock in readiness to start the first wave.";
-  }
-
-  if (snapshot.phase === "wave") {
-    return "Combat is live. Use walls and target modes to hold the lane.";
-  }
-
-  if (snapshot.phase === "ended") {
-    const winnerName = snapshot.players.find((player) => player.id === snapshot.winnerId)?.name ?? snapshot.winnerId;
-    return winnerName
-      ? `Winner ${winnerName} • ${snapshot.endReason ?? "match concluded"}`
-      : "No winner • the match ended in a draw-like state.";
-  }
-
-  return "Prepare for the next round.";
-}
-
-function renderPhase(snapshot: MatchSnapshot | null): void {
-  if (!snapshot) {
-    el.phaseBanner.className = "phase-banner";
-    el.phaseLabel.textContent = "NO MATCH";
-    el.phaseSub.textContent = "Start a local match to play.";
-    el.wavePreview.textContent = "";
-    el.shortcutBar.style.display = "flex";
-    el.playbackControls.classList.add("hidden");
-    stopPlayback();
-    return;
-  }
-
-  let label = "PLACEMENT PHASE";
-  const sub = phaseSubText(snapshot);
-  el.phaseBanner.className = "phase-banner";
-
-  if (snapshot.phase === "wave") {
-    el.phaseBanner.classList.add("wave");
-    label = `WAVE ${snapshot.wave} COMBAT`;
-  }
-
-  if (snapshot.phase === "ended") {
-    el.phaseBanner.classList.add("ended");
-    label = "MATCH ENDED";
-  }
-
-  el.phaseLabel.textContent = label;
-  el.phaseSub.textContent = sub;
-  el.wavePreview.textContent = snapshot.phase === "placement" ? formatWavePreview(snapshot.wave) : "";
-  el.shortcutBar.style.display = snapshot.phase === "ended" ? "none" : "flex";
-
-  if (snapshot.phase === "wave") {
-    el.playbackControls.classList.remove("hidden");
-    startPlayback();
-  } else {
-    el.playbackControls.classList.add("hidden");
-    stopPlayback();
   }
 }
 
