@@ -107,6 +107,14 @@ Settings dialog
 - `M` toggles mute from anywhere except form fields (key repeat is ignored). It is listed in the shortcut bar
 - Settings persist in `localStorage` (see 08-data-persistence.md) and apply immediately
 
+Match-end modal
+- Same pattern as the settings dialog: `role="dialog"`, `aria-modal="true"`, labelled by its "Match Ended" title
+- Focus moves to the Rematch button when it opens and the rest of the page is `inert` (no Tab or pointer access behind it)
+- Esc or the Close button dismisses it; focus returns to the element that had it before (or the Settings button if that is gone). Once dismissed it does not reopen on later snapshot refreshes of the same ended match; a new match or rematch resets that
+- While it is open game hotkeys are ignored
+- The guide's close button is a "×" with an accessible name and a `title` tooltip ("Dismiss guidance")
+- The shortcut bar lists exactly the hotkeys that exist: R, T, W, U/I/O, 1-8 (switch player), P, M and the arrow keys
+
 Engine rules
 - The `AudioContext` is created lazily, never at import time, and unlocked (resumed) on the first `pointerdown`, `keydown` or `touchend`; the listeners are removed once the context is running and re-armed if the context later leaves the running state (for example Safari interruptions)
 - If Web Audio is unavailable or throws, audio is a permanent no-op and nothing else is affected
