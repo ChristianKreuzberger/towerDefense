@@ -25,7 +25,7 @@
 - The "Active Player" select stays and is kept in sync with the chips in both directions
 - Hot-seat turn handover: when a player's ready command is accepted during placement, the active player automatically switches to the next player (wrapping around) who is neither ready nor eliminated, and a toast plus the guide card announce "<name>, it's your turn". Nothing switches when no such player remains or the ready came from another phase
 - Show active wave and remaining creatures
-- Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy
+- Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; the Upgrade button is enabled only in prep for a player who has not readied
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
 ## Real-time playback
@@ -34,7 +34,7 @@
 - Default is playing at 1x whenever the match is in the combat phase
 - Base rate is 5 simulation ticks per second at 1x; 2x and 4x run 10 and 20 ticks per second
 - Controls: Play/Pause toggle and 1x / 2x / 4x speed buttons, visible during combat
-- Pausing stops tick requests only; placing walls, upgrades and target modes stay available while paused
+- Pausing stops tick requests only; placing walls and target modes stay available while paused
 - Ticks are requested in small batches (at most 4 per request, one request in flight) so a slow response never queues work
 - Playback never runs while the browser tab is hidden and does not catch up on return
 - Playback stops when the phase leaves combat (round end, match end) and resumes automatically when the next wave starts
