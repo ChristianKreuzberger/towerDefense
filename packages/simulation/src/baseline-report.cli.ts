@@ -51,7 +51,7 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
     players: [{ id: "p1", name: "Alpha" }],
     waveLoop: {
       completedWaves: 2,
-      maxAdvanceSteps: 200
+      maxAdvanceSteps: 400
     }
   },
   {
