@@ -23,7 +23,11 @@ function isFormField(target: EventTarget | null): boolean {
 export function installHotkeys(): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
     if (mapPreview.isOpen()) {
-      // The dialog handles Esc and Tab itself; game hotkeys stay off while it is open.
+      // Game hotkeys stay off while it is open. Esc also works after a backdrop click moved focus out of the dialog.
+      if (event.key === "Escape") {
+        event.preventDefault();
+        mapPreview.close();
+      }
       return;
     }
 

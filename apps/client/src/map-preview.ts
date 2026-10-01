@@ -1,3 +1,4 @@
+import { lockPageBehind } from "./modal-inert.js";
 import { isInSpawnProtection, type GameMap, type MatchSnapshot } from "@tower-defense/shared";
 
 export type PreviewCellKind = "pad" | "lane" | "blocked" | "cave";
@@ -106,15 +107,14 @@ export function mountMapPreview(options: { root: HTMLElement; playerNumber(playe
   const canvas = query<HTMLCanvasElement>("mapPreviewCanvas");
   const players = query<HTMLElement>("mapPreviewPlayers");
   const continueBtn = query<HTMLButtonElement>("mapPreviewContinueBtn");
-  let inerted: Element[] = [];
+  let release: (() => void) | null = null;
 
   function setBackgroundInert(on: boolean): void {
     if (on) {
-      inerted = [...(root.parentElement?.children ?? [])].filter((node) => node !== root && !node.hasAttribute("inert"));
-      inerted.forEach((node) => node.setAttribute("inert", ""));
+      release = lockPageBehind(root);
     } else {
-      inerted.forEach((node) => node.removeAttribute("inert"));
-      inerted = [];
+      release?.();
+      release = null;
     }
   }
 
@@ -142,6 +142,9 @@ export function mountMapPreview(options: { root: HTMLElement; playerNumber(playe
 
   return {
     open(snapshot) {
+      if (!root.hidden) {
+        return;
+      }
       meta.textContent = `Seed ${snapshot.map.seed} • ${snapshot.map.width}x${snapshot.map.height} tiles`;
       drawMapPreview(canvas, snapshot.map);
       players.replaceChildren(

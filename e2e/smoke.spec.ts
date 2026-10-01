@@ -866,3 +866,14 @@ test("starting further matches replaces the board instead of leaking canvases an
   await expect(page.locator("#status")).toHaveText("accepted");
   expect(pageErrors).toEqual([]);
 });
+
+test("the map preview still closes with Esc after a click on its backdrop moved focus away", async ({ page }) => {
+  await openMenu(page, "/");
+  await page.getByRole("button", { name: "Start Match" }).click();
+  const dialog = page.locator("#mapPreviewRoot");
+  await expect(dialog).toBeVisible();
+  await dialog.click({ position: { x: 4, y: 4 } });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
+});

@@ -85,3 +85,13 @@ test("damage type is selectable only in prep, before ready, with a living tower"
   assert.equal(getToolbarState({ ...prep, upgrades: null }).damageTypeEnabled, false);
   assert.equal(getToolbarState({ ...prep, eliminated: true }).damageTypeEnabled, false);
 });
+
+test("the move button explains why it is off, from state", () => {
+  assert.match(getToolbarState(prep).moveHint, /unlocks after round 5/);
+  const ready = getToolbarState({ ...prep, wave: 6, towerMoveAvailable: true, readyForWave: true });
+  assert.equal(ready.moveLabel, "ready");
+  assert.match(ready.moveHint, /before you ready/);
+  assert.match(getToolbarState({ ...prep, wave: 8 }).moveHint, /already used/);
+  assert.equal(getToolbarState({ ...prep, wave: 6, towerMoveAvailable: true }).moveHint, "");
+  assert.match(getToolbarState({ ...prep, phase: "wave" }).moveHint, /during prep/);
+});

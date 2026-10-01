@@ -1,5 +1,5 @@
 import type { MatchSnapshot } from "@tower-defense/shared";
-import { syncCursorToBuildableCell, updateBattlefield } from "./board";
+import { setMoveMode, syncCursorToBuildableCell, updateBattlefield } from "./board";
 import { el } from "./dom";
 import { hideGuideOverlay, syncGuideOverlay } from "./guide";
 import { showTurnBanner } from "./phase";
@@ -29,6 +29,10 @@ export function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: Mat
 }
 
 export function applyActivePlayerChange(): void {
+  // Move mode belongs to the player who pressed it; the next hot-seat player starts clean.
+  if (store.moveMode) {
+    setMoveMode(false);
+  }
   store.guideDismissedKey = null;
   hideGuideOverlay();
   syncCursorToBuildableCell(store.current);

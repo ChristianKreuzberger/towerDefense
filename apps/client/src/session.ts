@@ -91,7 +91,6 @@ export async function startMatchFromMenu(): Promise<void> {
   if (store.current && store.current.phase !== "ended" && !window.confirm("Replace the running match?")) {
     return;
   }
-  closeOverlay();
   setMenuMessage("");
 
   const players = menuPlayersToSetupPlayers();
@@ -116,6 +115,7 @@ export async function startMatchFromMenu(): Promise<void> {
 
     setStatus(`match-started: players=${players.length} seed=${payload.seed}`);
     addFeedback("info", `Match started with ${players.length} players`);
+    closeOverlay();
     startFreshMatch(data.snapshot);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start match";
@@ -138,7 +138,6 @@ export async function rematchWithSamePlayers(): Promise<void> {
     players
   };
 
-  closeOverlay();
   matchStartInFlight = true;
   try {
     const data = await postJson<ApiStartPayload>("/api/start", payload);
@@ -150,6 +149,8 @@ export async function rematchWithSamePlayers(): Promise<void> {
 
     setStatus(`rematch-started: seed=${payload.seed}`);
     addFeedback("info", `Rematch started with seed ${payload.seed}`);
+    // Only now is the ended match replaced; a failed request leaves its modal reachable.
+    closeOverlay();
     startFreshMatch(data.snapshot);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to start rematch";

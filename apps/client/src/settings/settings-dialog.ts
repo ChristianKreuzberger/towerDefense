@@ -1,3 +1,4 @@
+import { lockPageBehind } from "../modal-inert.js";
 import type { SoundEngine } from "../audio/sound-engine.js";
 import type { SettingsStore } from "./settings.js";
 
@@ -41,16 +42,15 @@ export function mountSettingsDialog(options: { root: HTMLElement; settings: Sett
   const muteBtn = query<HTMLButtonElement>("settingsMuteBtn");
   const closeBtn = query<HTMLButtonElement>("settingsCloseBtn");
   let opener: HTMLElement | null = null;
-  let inerted: Element[] = [];
+  let release: (() => void) | null = null;
 
   // aria-modal alone does not stop Tab or screen readers reaching the page behind, so the siblings are made inert.
   function setBackgroundInert(on: boolean): void {
     if (on) {
-      inerted = [...(root.parentElement?.children ?? [])].filter((node) => node !== root && !node.hasAttribute("inert"));
-      inerted.forEach((node) => node.setAttribute("inert", ""));
+      release = lockPageBehind(root);
     } else {
-      inerted.forEach((node) => node.removeAttribute("inert"));
-      inerted = [];
+      release?.();
+      release = null;
     }
   }
 

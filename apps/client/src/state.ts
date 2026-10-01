@@ -57,6 +57,6 @@ export const store = {
   playerChips: new Map<string, PlayerChipRefs>(),
   // The match-end modal is dismissable; once dismissed it stays closed for this ended match.
   endOverlayDismissed: false,
-  endOverlayInerted: [] as Element[],
+  endOverlayRelease: null as (() => void) | null,
   endOverlayOpener: null as HTMLElement | null
 };

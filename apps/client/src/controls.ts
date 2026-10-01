@@ -107,8 +107,7 @@ export function installControls(): void {
 
   el.moveTowerBtn.addEventListener("click", () => {
     if (el.moveTowerBtn.getAttribute("aria-disabled") === "true") {
-      const used = el.moveTowerCost.textContent === "used";
-      addFeedback("info", used ? "You already used your free tower move" : "Moving your tower unlocks after round 5 and only in prep, before you ready");
+      addFeedback("info", el.moveTowerBtn.dataset.hint || "Your tower cannot be moved right now");
       return;
     }
     setMoveMode(!store.moveMode);

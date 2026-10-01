@@ -130,14 +130,14 @@ Damage type selector
 
 Move tower
 - A "Move Tower" button (hotkey `V`, cost shown as "free") appears in the toolbar. It is available only when the simulation would accept a move (`towerMoveAvailable` for the player, prep phase, not ready); before the unlock it is dimmed and a press explains "unlocks after round 5"
-- Pressing it enters move mode (like wall mode: the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted or the phase changes
+- Pressing it enters move mode (like wall mode: the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted, the phase changes or the active player changes
 - The tower glides to its new tile with a short pop; the used token is shown by the button reading "used"
 
 Match lifecycle and hotkeys
 - "Back To Menu" leaves the match running on the host and stops playback. While a match that has not ended exists, the menu shows a "Resume Match" button that returns to it
 - "Start Match" asks for confirmation ("Replace the running match?") when a match that has not ended exists; cancelling leaves it untouched
 - Guide "Place Tower" and the `T` key place the tower on the tile the player chose (the board cursor, which a click also sets), not the first free tile
-- Hotkeys R, T, W, U, I and O do nothing when their action is not available (wrong phase, already ready, tower already placed, match ended) and while any dialog is open. Esc dismisses the guide card
+- Hotkeys R, T, W, V, U, I and O do nothing when their action is not available (wrong phase, already ready, tower already placed, match ended) and while any dialog is open. Esc dismisses the guide card
 - When the match has ended the Ready and Place Tower buttons are disabled, so closing the end modal never leaves live controls behind
 - On page load the menu and game screens stay hidden until the reconnect check has answered (at most about a second), so a running match does not flash the menu first
 
@@ -147,7 +147,7 @@ Match-end modal
 - Esc or the Close button dismisses it; focus returns to the element that had it before (or the Settings button if that is gone). Once dismissed it does not reopen on later snapshot refreshes of the same ended match; a new match or rematch resets that
 - While it is open game hotkeys are ignored
 - The guide's close button is a "×" with an accessible name and a `title` tooltip ("Dismiss guidance")
-- The shortcut bar lists exactly the hotkeys that exist: R, T, W, U/I/O, 1-8 (switch player), P, M and the arrow keys
+- The shortcut bar lists exactly the hotkeys that exist: R, T, W, V, U/I/O, 1-8 (switch player), P, M and the arrow keys
 
 Engine rules
 - The `AudioContext` is created lazily, never at import time, and unlocked (resumed) on the first `pointerdown`, `keydown` or `touchend`; the listeners are removed once the context is running and re-armed if the context later leaves the running state (for example Safari interruptions)

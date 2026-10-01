@@ -25,16 +25,23 @@ export interface ToolbarState {
   moveEnabled: boolean;
   // What the move button's cost slot shows: "free", "after R5" (still locked), "used", or "-" outside prep.
   moveLabel: string;
+  // Why the move button is off right now (empty when it is available).
+  moveHint: string;
 }
 
-function moveLabel(input: ToolbarInput): string {
+// Label in the cost slot plus the sentence a press explains when the button is off, both from state (never from DOM text).
+function moveInfo(input: ToolbarInput): { label: string; hint: string } {
   if (input.phase !== "placement" || input.upgrades === null || input.eliminated) {
-    return "-";
+    return { label: "-", hint: "You can only move your tower during prep" };
   }
   if (input.towerMoveAvailable) {
-    return "free";
+    return input.readyForWave
+      ? { label: "ready", hint: "You are ready; you can only move your tower before you ready up" }
+      : { label: "free", hint: "" };
   }
-  return input.wave <= TOWER_MOVE_AFTER_WAVES ? `after R${TOWER_MOVE_AFTER_WAVES}` : "used";
+  return input.wave <= TOWER_MOVE_AFTER_WAVES
+    ? { label: `after R${TOWER_MOVE_AFTER_WAVES}`, hint: `Moving your tower unlocks after round ${TOWER_MOVE_AFTER_WAVES}` }
+    : { label: "used", hint: "You already used your free tower move" };
 }
 
 // Mirrors what the simulation accepts, so a control looks usable only when its command would be accepted.
@@ -55,6 +62,7 @@ export function getToolbarState(input: ToolbarInput): ToolbarState {
     readyEnabled: canBuyNow,
     placeTowerEnabled: input.upgrades === null && !input.eliminated && input.phase === "placement",
     moveEnabled: input.towerMoveAvailable && canBuyNow,
-    moveLabel: moveLabel(input)
+    moveLabel: moveInfo(input).label,
+    moveHint: moveInfo(input).hint
   };
 }

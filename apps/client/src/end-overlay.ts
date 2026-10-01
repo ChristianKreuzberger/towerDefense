@@ -1,5 +1,6 @@
 import type { MatchSnapshot } from "@tower-defense/shared";
 import { el, must } from "./dom";
+import { lockPageBehind } from "./modal-inert";
 import { store } from "./state";
 
 // Match-end modal: scores, focus handling and making the page behind it inert.
@@ -11,11 +12,10 @@ export function isEndOverlayOpen(): boolean {
 // aria-modal alone does not stop Tab or screen readers reaching the page behind, so the siblings are made inert.
 export function setEndOverlayBackgroundInert(on: boolean): void {
   if (on) {
-    store.endOverlayInerted = [...(el.overlay.parentElement?.children ?? [])].filter((node) => node !== el.overlay && !node.hasAttribute("inert"));
-    store.endOverlayInerted.forEach((node) => node.setAttribute("inert", ""));
+    store.endOverlayRelease = lockPageBehind(el.overlay);
   } else {
-    store.endOverlayInerted.forEach((node) => node.removeAttribute("inert"));
-    store.endOverlayInerted = [];
+    store.endOverlayRelease?.();
+    store.endOverlayRelease = null;
   }
 }
 

@@ -14,6 +14,6 @@ export const mapPreview = mountMapPreview({
   root: must<HTMLElement>("mapPreviewRoot"),
   playerNumber: (playerId) => playerNumber(playerId),
   // Placement for the first player starts once the preview is dismissed; the guide already points at them.
-  onContinue: () => el.guideActionBtn.focus()
+  onContinue: () => el.placeTowerBtn.focus()
 });
 export const settingsDialog = mountSettingsDialog({ root: must<HTMLElement>("settingsRoot"), settings: settingsStore, engine: soundEngine });

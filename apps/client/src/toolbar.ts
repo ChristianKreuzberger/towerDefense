@@ -59,6 +59,7 @@ export function renderToolbar(snapshot: MatchSnapshot | null): void {
   el.moveTowerBtn.classList.toggle("dim", !state.moveEnabled);
   el.moveTowerBtn.setAttribute("aria-disabled", String(!state.moveEnabled));
   el.moveTowerCost.textContent = state.moveLabel;
+  el.moveTowerBtn.dataset.hint = state.moveHint;
   if (!state.moveEnabled && store.moveMode) {
     setMoveMode(false);
   }
