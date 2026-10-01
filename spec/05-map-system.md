@@ -30,7 +30,7 @@
 - Maintain occupancy grid for walls
 - On tower or wall placement, run path viability check from creature spawns to each live tower
 - Reject placement if no valid path remains to all required tower targets
-- Wall placement additionally keeps a left-to-right route of walkable cells open (a wall may not remove the last one), same as tower placement
+- Wall placement additionally keeps a left-to-right route of walkable cells open (a wall may not remove the last one), using the same shared check as tower placement (left-to-right route plus per-tower reachability)
 
 ## Creature lane
 
