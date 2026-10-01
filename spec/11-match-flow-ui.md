@@ -111,6 +111,19 @@ Settings dialog
 - `M` toggles mute from anywhere except form fields (key repeat is ignored). It is listed in the shortcut bar
 - Settings persist in `localStorage` (see 08-data-persistence.md) and apply immediately
 
+Next-wave preview and HUD
+- During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner, 1x Swarm, 1x Armored, 1x Tank"; it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
+- The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
+- The ended status text names the winner (never the raw id)
+
+Match lifecycle and hotkeys
+- "Back To Menu" leaves the match running on the host and stops playback. While a match that has not ended exists, the menu shows a "Resume Match" button that returns to it
+- "Start Match" asks for confirmation ("Replace the running match?") when a match that has not ended exists; cancelling leaves it untouched
+- Guide "Place Tower" and the `T` key place the tower on the tile the player chose (the board cursor, which a click also sets), not the first free tile
+- Hotkeys R, T, W, U, I and O do nothing when their action is not available (wrong phase, already ready, tower already placed, match ended) and while any dialog is open. Esc dismisses the guide card
+- When the match has ended the Ready and Place Tower buttons are disabled, so closing the end modal never leaves live controls behind
+- On page load the menu and game screens stay hidden until the reconnect check has answered (at most about a second), so a running match does not flash the menu first
+
 Match-end modal
 - Same pattern as the settings dialog: `role="dialog"`, `aria-modal="true"`, labelled by its "Match Ended" title
 - Focus moves to the Rematch button when it opens and the rest of the page is `inert` (no Tab or pointer access behind it)
