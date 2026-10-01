@@ -966,9 +966,11 @@ class BattlefieldScene extends Phaser.Scene {
         case "tower-hit": {
           const tower = this.towerVisuals.get(event.towerId);
           const creature = this.creatureVisuals.get(event.creatureId);
-          if (tower && creature) {
+          if (tower) {
             const color = colorForPlayer(event.playerId);
-            fx.projectile(tower.baseX, tower.baseY, creature.curX * cellSize, creature.curY * cellSize, color, delay);
+            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
+            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
+            fx.projectile(tower.baseX, tower.baseY, x, y, color, delay);
             tower.recoilUntil = now + delay + RECOIL_MS;
             budget -= 1;
           }
@@ -976,15 +978,13 @@ class BattlefieldScene extends Phaser.Scene {
         }
         case "creature-defeated": {
           const creature = this.creatureVisuals.get(event.creatureId);
-          if (creature) {
-            const x = creature.curX * cellSize;
-            const y = creature.curY * cellSize;
-            const color = colorForPlayer(event.playerId);
-            fx.puff(x, y, 0xd9d2c0, delay + 120);
-            fx.burst(x, y, color, delay + 120);
-            fx.floatText(x, y - cellSize * 0.5, `+${event.rewardPoints}`, color, delay + 120);
-            budget -= 1;
-          }
+          const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
+          const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
+          const color = colorForPlayer(event.playerId);
+          fx.puff(x, y, 0xd9d2c0, delay + 120);
+          fx.burst(x, y, color, delay + 120);
+          fx.floatText(x, y - cellSize * 0.5, `+${event.rewardPoints}`, color, delay + 120);
+          budget -= 1;
           break;
         }
         case "creature-attack": {

@@ -233,6 +233,9 @@ export type MatchEvent =
       towerId: string;
       playerId: string;
       creatureId: string;
+      // Creature cell at impact: a creature killed within one batched response never shows up in a snapshot.
+      x: number;
+      y: number;
       damage: number;
       remainingHp: number;
     }
@@ -243,6 +246,8 @@ export type MatchEvent =
       towerId: string;
       playerId: string;
       creatureId: string;
+      x: number;
+      y: number;
       rewardPoints: number;
     }
   | {
