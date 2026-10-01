@@ -148,7 +148,7 @@ Event to sound table
 - Announce round completion
 - Trigger automatic repair for all surviving towers
 - Show repair results clearly (text and HP bar refill animation)
-- Return to short prep phase for upgrades and wall placement
+- Return to short prep phase for upgrades (walls stay combat-only)
 
 ## Combat communication rules
 

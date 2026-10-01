@@ -1610,6 +1610,7 @@ function applyActivePlayerChange(): void {
   syncCursorToBuildableCell(current);
   updateBattlefield(current);
   syncGuideOverlay(current);
+  renderToolbar(current);
   renderPlayerCards(current);
 }
 
