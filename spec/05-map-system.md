@@ -46,7 +46,8 @@
 - Every map has one monster cave on the left edge (x = 0), at the start cell of the carved lane. All creatures spawn there.
 - The cave is rendered as a visible cave mouth, and its protected area is shown as a faint warning tint.
 - Protected area: every cell within `SPAWN_PROTECTION_RADIUS` (5 cells, Euclidean) of the cave. Towers and walls may not be placed there (reject reason `spawn-protected`).
-- Why 5: towers have a range of 12, so towers just outside the area still cover the cave exit, but nobody can wall the cave in or stand next to it and kill monsters the moment they appear.
+- Why 5: a level 1 tower has a range of 6, so towers just outside the area (radius 5) reach only about 1 cell into it and barely cover the cave exit, and nobody can wall the cave in or stand next to it and kill monsters the moment they appear.
+- Why it is not enough alone: the protected radius only keeps towers away from the cave. Creatures are additionally invulnerable and untargetable for their first 1 second after spawning (see spec/02 and spec/06), so the cave exit cannot be camped even by a tower at the edge of its range.
 - The left-to-right route check starts from the cave cell, not from any cell on the left edge.
 
 ## Versioning

@@ -33,7 +33,7 @@
 - Cannot shoot other towers under any condition
 - Can shoot invading creatures based on tower range and targeting rules
 - Range is limited and measured in grid cells (Euclidean distance, inclusive); a creature exactly at range distance can be targeted
-- Range grows with upgrade level, so upgrading also extends what a tower can reach
+- Base (level 1) range is 6 cells and grows by 1.5 cells per upgrade level, so upgrading also extends what a tower can reach
 - A tower with no creature in range has no target and does not fire
 - Takes damage from creature attacks
 - Auto-repaired between rounds (must be clearly shown in UI)
@@ -47,9 +47,11 @@
 
 ## Enemy model
 
-- Creatures path toward towers and attempt to attack them
+- Creatures path toward towers and attempt to attack them. They keep walking the lane and only damage a tower or wall that is within their attack range; with nothing in range they have no target and just keep moving
+- Attack range: a short per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower or wall cell, and inclusive (a target exactly at range can be hit)
 - Creatures cannot move through walls
 - Archetypes: runner, tank, armored, swarm
+- Spawn protection: a creature is untargetable and takes no damage for its first 1 second (`CREATURE_SPAWN_PROTECTION_SECONDS`, 5 simulation ticks at the client's 5 ticks per second) after it appears at the monster cave. It still moves and can attack normally; towers just skip it until the protection ends
 - Later archetypes can include shield or split-on-death
 
 ## Damage and targeting

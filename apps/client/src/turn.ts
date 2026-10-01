@@ -15,3 +15,8 @@ export function nextPendingPlayerId(players: readonly TurnPlayer[], afterId: str
   }
   return null;
 }
+
+// After a wave every ready flag is cleared, so the round restarts with the first seat that can still act.
+export function firstPendingPlayerId(players: readonly TurnPlayer[]): string | null {
+  return players.find((player) => !player.readyForWave && !player.eliminated)?.id ?? null;
+}

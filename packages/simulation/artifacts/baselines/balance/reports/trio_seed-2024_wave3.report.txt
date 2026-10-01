@@ -3,11 +3,11 @@ schemaVersion=1
 matchSeed=2024
 snapshots=3
 
-=== Wave 1 (export=1, tick=6) ===
-DPS proxy: 1.00 dmg/tick (dealt=6, ticks=6)
+=== Wave 1 (export=1, tick=11) ===
+DPS proxy: 0.55 dmg/tick (dealt=6, ticks=11)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=3, exited=0)
-Damage intake: towers=2 walls=0
-Repairs: towers=2 walls=0
+Damage intake: towers=0 walls=0
+Repairs: towers=0 walls=0
 Economy delta: awarded=77 spentWalls=0 spentUpgrades=0 net=77
 Wave-clear bonus: awarded=45
 Players:
@@ -15,11 +15,11 @@ Players:
 - p2 (Beta) status=active delta=25 bonus=15 total=25 ending=25 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=15 bonus=15 total=15 ending=15 towerLv=1 towerHp=100 walls=0 wallHp=0
 
-=== Wave 2 (export=2, tick=8) ===
-DPS proxy: 1.38 dmg/tick (dealt=11, ticks=8)
+=== Wave 2 (export=2, tick=13) ===
+DPS proxy: 0.85 dmg/tick (dealt=11, ticks=13)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=1 (defeated=4, spawned=4, exited=0)
-Damage intake: towers=5 walls=5
-Repairs: towers=5 walls=6
+Damage intake: towers=0 walls=0
+Repairs: towers=0 walls=1
 Economy delta: awarded=97 spentWalls=25 spentUpgrades=0 net=72
 Wave-clear bonus: awarded=45
 Players:
@@ -27,28 +27,28 @@ Players:
 - p2 (Beta) status=active delta=25 bonus=15 total=50 ending=50 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=35 bonus=15 total=50 ending=50 towerLv=1 towerHp=100 walls=0 wallHp=0
 
-=== Wave 3 (export=3, tick=9) ===
-DPS proxy: 1.56 dmg/tick (dealt=14, ticks=9)
+=== Wave 3 (export=3, tick=14) ===
+DPS proxy: 1.00 dmg/tick (dealt=14, ticks=14)
 Kills by archetype: runner=2 swarm=1 armored=1 tank=1 (defeated=5, spawned=5, exited=0)
-Damage intake: towers=3 walls=3
-Repairs: towers=3 walls=5
-Economy delta: awarded=138 spentWalls=30 spentUpgrades=80 net=28
+Damage intake: towers=0 walls=0
+Repairs: towers=0 walls=2
+Economy delta: awarded=107 spentWalls=30 spentUpgrades=80 net=-3
 Wave-clear bonus: awarded=45
 Players:
-- p1 (Alpha) status=active delta=14 bonus=15 total=63 ending=63 towerLv=2 towerHp=100 walls=1 wallHp=60
+- p1 (Alpha) status=active delta=-17 bonus=15 total=63 ending=63 towerLv=2 towerHp=100 walls=1 wallHp=60
 - p2 (Beta) status=active delta=29 bonus=15 total=79 ending=79 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=-15 bonus=15 total=35 ending=35 towerLv=1 towerHp=100 walls=1 wallHp=60
 
 === Cumulative Summary ===
 Waves completed: 3
-DPS proxy: 1.35 dmg/tick (dealt=31, ticks=23)
+DPS proxy: 0.82 dmg/tick (dealt=31, ticks=38)
 Kills by archetype: runner=4 swarm=3 armored=3 tank=2
-Damage intake totals: towers=10 walls=8
-Repairs totals: towers=10 walls=11
+Damage intake totals: towers=0 walls=0
+Repairs totals: towers=0 walls=3
 Wave-clear bonus total: 135
 Economy totals: awarded=312 spentWalls=55 spentUpgrades=80 net=177 ending=177
 Structures: livingTowers=3 livingWalls=2 towerHp=300 wallHp=120 pathWearTotal=0
 Players (final):
-- p1 (Alpha) status=active delta=14 bonus=15 total=63 ending=63 towerLv=2 towerHp=100 walls=1 wallHp=60
+- p1 (Alpha) status=active delta=-17 bonus=15 total=63 ending=63 towerLv=2 towerHp=100 walls=1 wallHp=60
 - p2 (Beta) status=active delta=29 bonus=15 total=79 ending=79 towerLv=1 towerHp=100 walls=0 wallHp=0
 - p3 (Gamma) status=active delta=-15 bonus=15 total=35 ending=35 towerLv=1 towerHp=100 walls=1 wallHp=60

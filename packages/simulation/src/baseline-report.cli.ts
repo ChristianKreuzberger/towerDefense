@@ -161,27 +161,67 @@ function applyCommandOrThrow(
   }
 }
 
-// Slightly inside the gate column so the first towers cover the start of the lane; changing it shifts the balance baseline.
-const SPAWN_ANCHOR_X = 8;
+// Creatures only attack what is within about one cell of the lane, so baseline towers have to stand right beside
+// the lane to take any damage at all. Towers further away would never be touched and the intake numbers would be
+// meaningless. Changing the anchor or the placement order shifts the balance baseline.
+const SPAWN_ANCHOR_X = 0;
 
-function placeTowersDeterministically(simulation: ReturnType<typeof createMatch>, scenarioId: string): void {
+// The lane runs from the cave to the east edge and only detours around a tower standing on it, so a probe match
+// with a tower far from the lane reveals the lane the real match will use.
+function probeLane(seed: number): Array<{ x: number; y: number }> {
+  const probe = createMatch({ players: [{ id: "probe", name: "Probe" }], seed });
+  const cells = probe.getSnapshot().map.cells
+    .filter((cell) => cell.buildable)
+    .sort((a, b) => (b.x + b.y) - (a.x + a.y) || (a.y - b.y) || (a.x - b.x));
+  let placed = false;
+  for (const cell of cells) {
+    if (probe.applyCommand({ type: "place-tower", playerId: "probe", x: cell.x, y: cell.y }).accepted) {
+      placed = true;
+      break;
+    }
+  }
+  if (!placed) {
+    throw new Error(`could not place probe tower for seed ${seed}`);
+  }
+  probe.applyCommand({ type: "ready-for-wave", playerId: "probe" });
+
+  const lane: Array<{ x: number; y: number }> = [];
+  for (let tick = 0; tick < 400 && probe.applyCommand({ type: "advance-wave" }).accepted; tick += 1) {
+    const creature = probe.getSnapshot().creatures[0];
+    if (creature && !lane.some((cell) => cell.x === creature.x && cell.y === creature.y)) {
+      lane.push({ x: creature.x, y: creature.y });
+    }
+  }
+  return lane;
+}
+
+function placeTowersDeterministically(
+  simulation: ReturnType<typeof createMatch>,
+  scenario: BaselineScenario
+): void {
   const players = simulation.getSnapshot().players
     .filter((player) => !player.eliminated)
     .map((player) => player.id)
     .sort((a, b) => a.localeCompare(b));
 
-  for (const playerId of players) {
-    const snapshot = simulation.getSnapshot();
-    // Towers have limited range, so start from the cells closest to the left edge, where the monster cave sits.
-    // Kept as a fixed anchor (not the probe-based helper) so baseline placements stay stable.
-    const gate = snapshot.map.cells.filter((cell) => cell.buildable && cell.x === 0);
-    const gateY = gate.reduce((sum, cell) => sum + cell.y, 0) / Math.max(1, gate.length);
-    const available = snapshot.map.cells
-      .filter((cell) => cell.buildable)
-      .sort((a, b) => (Math.hypot(a.x - SPAWN_ANCHOR_X, a.y - gateY) - Math.hypot(b.x - SPAWN_ANCHOR_X, b.y - gateY)) || (a.y - b.y) || (a.x - b.x));
+  const lane = probeLane(scenario.seed);
+  // Cells beside the lane (not on it), walking the lane from the anchor column onward. Skips the cave area, which
+  // rejects towers anyway.
+  const candidates: Array<{ x: number; y: number }> = [];
+  for (const laneCell of lane.filter((cell) => cell.x >= SPAWN_ANCHOR_X)) {
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
+      const cell = { x: laneCell.x + dx, y: laneCell.y + dy };
+      const onLane = lane.some((entry) => entry.x === cell.x && entry.y === cell.y);
+      const known = candidates.some((entry) => entry.x === cell.x && entry.y === cell.y);
+      if (!onLane && !known) {
+        candidates.push(cell);
+      }
+    }
+  }
 
+  for (const playerId of players) {
     let placed = false;
-    for (const cell of available) {
+    for (const cell of candidates) {
       const result = simulation.applyCommand({
         type: "place-tower",
         playerId,
@@ -195,7 +235,7 @@ function placeTowersDeterministically(simulation: ReturnType<typeof createMatch>
     }
 
     if (!placed) {
-      throw new Error(`could not place tower for ${playerId} in scenario ${scenarioId}`);
+      throw new Error(`could not place tower for ${playerId} in scenario ${scenario.id}`);
     }
   }
 }
@@ -331,7 +371,7 @@ function runScenario(scenario: BaselineScenario, outputDir: string): ScenarioRes
     seed: scenario.seed
   });
 
-  placeTowersDeterministically(simulation, scenario.id);
+  placeTowersDeterministically(simulation, scenario);
 
   const maxWave = scenario.waveLoop.completedWaves;
   for (let wave = 1; wave <= maxWave; wave += 1) {
