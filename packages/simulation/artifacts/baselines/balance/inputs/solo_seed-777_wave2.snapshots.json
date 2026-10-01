@@ -121,9 +121,9 @@
           "tank": 1
         },
         "towerDamageDealt": 11,
-        "towerDamageIntake": 6,
+        "towerDamageIntake": 3,
         "wallDamageIntake": 0,
-        "towerRepairApplied": 6,
+        "towerRepairApplied": 3,
         "wallRepairApplied": 0,
         "waveClearBonusAwarded": 15
       },
@@ -141,9 +141,9 @@
           "tank": 1
         },
         "towerDamageDealt": 17,
-        "towerDamageIntake": 6,
+        "towerDamageIntake": 3,
         "wallDamageIntake": 0,
-        "towerRepairApplied": 6,
+        "towerRepairApplied": 3,
         "wallRepairApplied": 0,
         "waveClearBonusAwarded": 30
       },
