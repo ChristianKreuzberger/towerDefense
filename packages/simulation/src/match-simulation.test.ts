@@ -22,6 +22,7 @@ import {
   isWithinCreatureAttackRange,
   getCreatureMovementSpeedUnits,
   getTowerRange,
+  getCreatureBaseHp,
   getTowerUpgradeCost,
   MAX_TOWER_LEVEL,
   getWallCost,
@@ -1255,6 +1256,7 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "first" });
 
   // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
+  // Creature 1 is still alive then (it has more hp now) and is further along the lane, so "first" picks it.
   const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
   for (let tick = 0; tick < assignmentTick; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
@@ -1269,7 +1271,7 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
     );
   assert.ok(assignmentEvent);
   const assignment = assignmentEvent.assignments.find((entry) => entry.towerId === "tower-p1");
-  assert.equal(assignment?.targetCreatureId, "wave-1-creature-2");
+  assert.equal(assignment?.targetCreatureId, "wave-1-creature-1");
 });
 
 test("last mode prefers lowest pathIndex", () => {
@@ -1381,11 +1383,12 @@ test("emits hit events and reduces creature hp deterministically", () => {
   assert.equal(hitEvents[0]?.towerId, "tower-p1");
   assert.equal(hitEvents[0]?.creatureId, "wave-1-creature-1");
   assert.equal(hitEvents[0]?.damage, 1);
-  assert.equal(hitEvents[0]?.remainingHp, 1);
+  const hpAfterHit = getCreatureBaseHp("runner") - 1;
+  assert.equal(hitEvents[0]?.remainingHp, hpAfterHit);
 
   const creature = snapshot.creatures.find((entry) => entry.id === "wave-1-creature-1");
   assert.ok(creature);
-  assert.equal(creature.hp, 1);
+  assert.equal(creature.hp, hpAfterHit);
 });
 
 test("emits creature-defeated event, removes creature, and awards points", () => {
@@ -1405,6 +1408,8 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
   advanceToFirstTargetableTick(simulation);
+  // Creatures have more hp now, so two towers need a couple of ticks to land the kill.
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 10);
 
   const snapshot = simulation.getSnapshot();
   const defeatedEvents = snapshot.events.filter((event) => event.type === "creature-defeated");
@@ -1459,6 +1464,7 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     simulation.applyCommand({ type: "set-target-mode", playerId: "p2", towerId: "tower-p2", mode: "first" });
 
     advanceToFirstTargetableTick(simulation);
+    tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 10);
 
     const snapshot = simulation.getSnapshot();
     const hitEvents = snapshot.events.filter((event) => event.type === "tower-hit");
@@ -1473,17 +1479,17 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
   const secondRun = runScenario();
   assert.deepEqual(firstRun, secondRun);
 
-  assert.equal(firstRun.events.hitEvents.length, 2);
-  assert.equal(firstRun.events.hitEvents[0]?.towerId, "tower-p1");
-  assert.equal(firstRun.events.hitEvents[1]?.towerId, "tower-p2");
+  // The runner has 3 hp: both towers hit on the first tick (tower-p1 first), then tower-p1 lands the killing hit
+  // because towers resolve in towerId order.
+  assert.deepEqual(firstRun.events.hitEvents.map((event) => event.towerId), ["tower-p1", "tower-p2", "tower-p1"]);
   assert.equal(firstRun.events.defeatedEvents.length, 1);
-  assert.equal(firstRun.events.defeatedEvents[0]?.towerId, "tower-p2");
-  assert.equal(firstRun.events.defeatedEvents[0]?.playerId, "p2");
+  assert.equal(firstRun.events.defeatedEvents[0]?.towerId, "tower-p1");
+  assert.equal(firstRun.events.defeatedEvents[0]?.playerId, "p1");
   assert.equal(firstRun.events.defeatedEvents[0]?.creatureId, "wave-1-creature-1");
   assert.equal(firstRun.events.defeatedEvents[0]?.rewardPoints, 10);
   assert.deepEqual(firstRun.players, [
-    { id: "p2", points: 10 },
-    { id: "p1", points: 0 }
+    { id: "p2", points: 0 },
+    { id: "p1", points: 10 }
   ]);
 });
 
