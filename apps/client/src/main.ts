@@ -4,7 +4,7 @@ import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
 import { paintHero } from "./art/hero";
 import { applyPaletteCssVars } from "./art/palette";
-import { createSoundEngine, cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
+import { cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
 import type { SoundId } from "./audio/index";
 import { createBattlefieldMount } from "./battlefield-scene";
 import { BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, DAMAGE_TYPE_OPTIONS, DEBUG, EVENT_LOG_CAPACITY, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, MAX_TICKS_PER_REQUEST, PLAYBACK_CHECK_INTERVAL_MS, PLAYBACK_SPEEDS, RETAINED_EVENT_TYPES, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
@@ -12,17 +12,16 @@ import { clampCoord, coordValue } from "./coord";
 import { createDemo } from "./demo";
 import { app, el, must } from "./dom";
 import { REJECT_REASON_TEXT, addFeedback, setMenuMessage, setStatus } from "./feedback";
-import { mountMapPreview } from "./map-preview";
 import { perfTimeApply } from "./perf";
 import { resolvePlacementCell } from "./placement";
 import { playerNumber, playerTowerId, selectedPlayerId, towerColorClass } from "./player-util";
-import { createSettingsStore } from "./settings/settings";
-import { mountSettingsDialog } from "./settings/settings-dialog";
+import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
 import type { MapCache, PlayerChipRefs } from "./state";
 import { getToolbarState } from "./toolbar-state";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import { formatWavePreview } from "./wave-preview";
+
 import "./style.css";
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
 applyPaletteCssVars();
@@ -56,17 +55,6 @@ interface GuideState {
   actionLabel: string;
   action: GuideAction;
 }
-
-const settingsStore = createSettingsStore();
-const soundEngine = createSoundEngine({ settings: settingsStore });
-soundEngine.bindUnlock(document);
-const mapPreview = mountMapPreview({
-  root: must<HTMLElement>("mapPreviewRoot"),
-  playerNumber: (playerId) => playerNumber(playerId),
-  // Placement for the first player starts once the preview is dismissed; the guide already points at them.
-  onContinue: () => el.guideActionBtn.focus()
-});
-const settingsDialog = mountSettingsDialog({ root: must<HTMLElement>("settingsRoot"), settings: settingsStore, engine: soundEngine });
 
 const battlefieldMount = createBattlefieldMount(el.board, {
   onCellClick: (x, y) => handleCellSelected(x, y)
