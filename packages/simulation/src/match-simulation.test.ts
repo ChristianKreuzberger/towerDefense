@@ -538,7 +538,7 @@ test("rejects wall placement when player has insufficient points", () => {
   assert.equal(placeWall.reason, "insufficient-points");
 });
 
-test("upgrades tower in wave phase and deducts deterministic cost", () => {
+test("upgrades tower in prep phase before ready and deducts deterministic cost", () => {
   const towerCoordinate = getBuildableCoordinate(10);
   const simulation = createMatch({
     players: [{ id: "p1", name: "Alpha" }],
@@ -553,12 +553,6 @@ test("upgrades tower in wave phase and deducts deterministic cost", () => {
   });
   assert.equal(placeTower.accepted, true);
 
-  const ready = simulation.applyCommand({
-    type: "ready-for-wave",
-    playerId: "p1"
-  });
-  assert.equal(ready.accepted, true);
-
   const startingUpgradeCost = getTowerUpgradeCost(1);
   simulation.awardPoints("p1", startingUpgradeCost);
 
@@ -568,10 +562,69 @@ test("upgrades tower in wave phase and deducts deterministic cost", () => {
     towerId: "tower-p1"
   });
   assert.equal(upgrade.accepted, true);
+  assert.equal(simulation.getSnapshot().phase, "placement");
 
   const snapshot = simulation.getSnapshot();
   assert.equal(snapshot.towers[0]?.level, 2);
   assert.equal(snapshot.players[0]?.points, 0);
+});
+
+test("rejects tower upgrade after the player readied while the phase is still placement", () => {
+  const [firstTower, secondTower] = getBuildableCoordinates(10, 2);
+  assert.ok(firstTower);
+  assert.ok(secondTower);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed: 10
+  });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstTower.x, y: firstTower.y });
+  simulation.applyCommand({ type: "place-tower", playerId: "p2", x: secondTower.x, y: secondTower.y });
+  simulation.awardPoints("p1", getTowerUpgradeCost(1));
+  simulation.awardPoints("p2", getTowerUpgradeCost(1));
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().phase, "placement");
+
+  const late = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  assert.equal(late.accepted, false);
+  assert.equal(late.reason, "player-already-ready-for-wave");
+
+  // A player who has not readied yet is unaffected by the other player's ready.
+  const other = simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2" });
+  assert.equal(other.accepted, true);
+});
+
+test("rejects tower upgrade during the wave phase", () => {
+  const towerCoordinate = getBuildableCoordinate(10);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 10
+  });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: towerCoordinate.x, y: towerCoordinate.y });
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().phase, "wave");
+  simulation.awardPoints("p1", getTowerUpgradeCost(1));
+
+  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  assert.equal(upgrade.accepted, false);
+  assert.equal(upgrade.reason, "upgrade-phase-not-active");
+});
+
+test("walls stay wave-only while upgrades are prep-only", () => {
+  const towerCoordinate = getBuildableCoordinate(10);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }],
+    seed: 10
+  });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: towerCoordinate.x, y: towerCoordinate.y });
+  simulation.awardPoints("p1", getWallCost(0));
+  const wallCell = getFirstValidWallCoordinate(simulation, "p1");
+
+  const wall = simulation.applyCommand({ type: "place-wall", playerId: "p1", x: wallCell.x, y: wallCell.y });
+  assert.equal(wall.accepted, false);
+  assert.equal(wall.reason, "wall-phase-not-active");
 });
 
 test("rejects tower upgrade when player has insufficient points", () => {
@@ -588,12 +641,6 @@ test("rejects tower upgrade when player has insufficient points", () => {
     y: towerCoordinate.y
   });
   assert.equal(placeTower.accepted, true);
-
-  const ready = simulation.applyCommand({
-    type: "ready-for-wave",
-    playerId: "p1"
-  });
-  assert.equal(ready.accepted, true);
 
   const upgrade = simulation.applyCommand({
     type: "upgrade-tower",
@@ -627,15 +674,6 @@ test("rejects tower upgrade for invalid target ownership", () => {
     x: secondTower.x,
     y: secondTower.y
   });
-  simulation.applyCommand({
-    type: "ready-for-wave",
-    playerId: "p1"
-  });
-  simulation.applyCommand({
-    type: "ready-for-wave",
-    playerId: "p2"
-  });
-
   simulation.awardPoints("p2", getTowerUpgradeCost(1));
   const invalidOwnership = simulation.applyCommand({
     type: "upgrade-tower",
@@ -2132,6 +2170,15 @@ test("exports deterministic balance-analysis snapshot with expected wave and eco
   simulation.awardPoints("p1", getWallCost(0) + getTowerUpgradeCost(1));
   simulation.awardPoints("p2", getWallCost(1));
 
+  assert.equal(
+    simulation.applyCommand({
+      type: "upgrade-tower",
+      playerId: "p1",
+      towerId: "tower-p1"
+    }).accepted,
+    true
+  );
+
   assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" }).accepted, true);
   assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" }).accepted, true);
 
@@ -2144,14 +2191,6 @@ test("exports deterministic balance-analysis snapshot with expected wave and eco
       playerId: "p1",
       x: wallCellA.x,
       y: wallCellA.y
-    }).accepted,
-    true
-  );
-  assert.equal(
-    simulation.applyCommand({
-      type: "upgrade-tower",
-      playerId: "p1",
-      towerId: "tower-p1"
     }).accepted,
     true
   );
@@ -2264,6 +2303,7 @@ test("balance-analysis export snapshots are deterministic across equivalent runs
     simulation.awardPoints("p1", getWallCost(0));
     simulation.awardPoints("p2", getWallCost(1) + getTowerUpgradeCost(1));
 
+    simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2" });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
@@ -2274,7 +2314,6 @@ test("balance-analysis export snapshots are deterministic across equivalent runs
 
     simulation.applyCommand({ type: "place-wall", playerId: "p1", x: wallCellA.x, y: wallCellA.y });
     simulation.applyCommand({ type: "place-wall", playerId: "p2", x: wallCellB.x, y: wallCellB.y });
-    simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2" });
 
     tickUntil(
       simulation,
@@ -2529,8 +2568,6 @@ function firstTickTarget(
 ): string | null {
   const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y });
-  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
-  simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode });
   for (let level = 1; level <= upgrades; level += 1) {
     simulation.awardPoints("p1", getTowerUpgradeCost(level));
     assert.equal(
@@ -2538,6 +2575,8 @@ function firstTickTarget(
       true
     );
   }
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode });
   simulation.applyCommand({ type: "advance-wave" });
   return simulation.getSnapshot().targetAssignments[0]?.targetCreatureId ?? null;
 }
