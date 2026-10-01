@@ -10,6 +10,7 @@
 
 - Tower placement rejection when path would be fully blocked
 - Tower cannot target or damage other towers
+- Damage types: every type against every archetype gives max(1, round(damage * multiplier)); the minimum of 1 holds; `tower-hit.damage` equals the damage applied and the telemetry total; the same seed replays identically; set-damage-type is accepted only in prep before ready, and the transport rejects unknown types
 - Each player must place exactly one tower before wave start
 - Tower cannot be sold; it cannot be moved except for the single free move unlocked after 5 rounds (rejected before that, rejected a second time, rejected after ready or during a wave)
 - Wall placement blocks movement but never invalidates all tower paths

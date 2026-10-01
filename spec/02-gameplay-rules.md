@@ -61,8 +61,18 @@
 
 - Targeting modes: first, last, strongest, nearest
 - Target mode can be changed by its owner during prep (placement phase, also after readying) and during the wave; it is rejected only when the match has ended, the player is eliminated, or the tower is not the player's own. Rejections use their own reasons (`invalid-target-mode-target`, `invalid-target-mode`), never a wall reason
-- Damage types: physical, explosive, magic
-- Resistances and vulnerabilities encoded in data
+- Damage types: `physical`, `explosive`, `magic` (`DamageType` in `packages/shared`)
+- Every tower has one damage type, `physical` by default. The owner changes it with `set-damage-type` during prep only and only before readying (the same window as upgrades). It is free. Rejections use their own reasons: `damage-type-phase-not-active` (not prep), `player-already-ready-for-wave`, `invalid-damage-type-target` (not the player's own tower), `invalid-damage-type` (unknown type). The next-wave preview (public wave composition) lets players pick the type each prep, so resistance shifts matter
+- Every creature archetype has a multiplier per damage type, defined in data (`CREATURE_DAMAGE_MULTIPLIERS` in `packages/shared/src/creature-types.ts`). Multipliers are 0.5 (resists), 1 (neutral) or 1.5 (weak). Each archetype has exactly one weakness and one resistance:
+
+| Archetype | physical | explosive | magic |
+|-----------|----------|-----------|-------|
+| runner    | 1.5      | 1         | 0.5   |
+| swarm     | 0.5      | 1.5       | 1     |
+| armored   | 0.5      | 1         | 1.5   |
+| tank      | 1.5      | 0.5       | 1     |
+
+- Damage per hit = `max(1, round(towerDamage * multiplier))`, where `towerDamage` is the damage-track value (1 to 5). The minimum is 1, so a resisted hit always does something and a level-1 tower can kill every archetype. The accuracy roll happens before damage and is unaffected by the type. `tower-hit.damage` and the `towerDamageDealt` telemetry both carry the damage actually applied
 - Friendly fire is disabled between towers
 
 ## Scoring and economy
