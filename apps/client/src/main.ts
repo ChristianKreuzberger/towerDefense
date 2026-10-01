@@ -471,6 +471,8 @@ const REJECT_REASON_TEXT: Record<string, string> = {
   "wall-overlap": "a wall is already there",
   "path-blocked": "that would block the path",
   "wall-phase-not-active": "walls can only be placed during combat",
+  "upgrade-phase-not-active": "upgrades can only be bought during prep, before you ready",
+  "player-already-ready-for-wave": "you are already ready, upgrades are locked",
   "placement-phase-not-active": "towers can only be placed during placement",
   "tower-already-placed": "you already placed your tower",
   "tower-not-placed": "place your tower first",
@@ -625,7 +627,7 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
       key: `wave-${snapshot.wave}`,
       tone: "hint",
       title: "Wave in progress",
-      body: "The battle runs on its own. Use Place Wall, upgrades, and target modes to hold the lane, or pause to think.",
+      body: "The battle runs on its own. Use Place Wall and target modes to hold the lane, or pause to think. Upgrades are bought in prep, before you ready.",
       actionLabel: playing ? "Pause" : "Resume",
       action: "toggle-playback"
     };
@@ -1034,6 +1036,8 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   el.wallCost.classList.toggle("short", points < wallCost);
   el.upgradeCost.textContent = upgradeCost === null ? "-" : `${upgradeCost}`;
   el.upgradeCost.classList.toggle("short", upgradeCost !== null && points < upgradeCost);
+  // Upgrades are prep-only and locked once this player readies (matches the simulation rule).
+  el.upgradeBtn.classList.toggle("dim", !tower || snapshot.phase !== "placement" || Boolean(player?.readyForWave));
   el.placeTowerBtn.classList.toggle("dim", Boolean(tower) || snapshot.phase !== "placement");
   if (tower) {
     el.mode.value = tower.targetMode;
@@ -1207,11 +1211,11 @@ function phaseSubText(snapshot: MatchSnapshot): string {
       return `Waiting on ${names}${suffix}. Place your tower to keep the setup moving.`;
     }
 
-    return "All towers are set. Lock in readiness to start the first wave.";
+    return "All towers are set. Buy upgrades now, then lock in readiness to start the first wave.";
   }
 
   if (snapshot.phase === "wave") {
-    return "Combat is live. Use walls, upgrades, and target modes to hold the lane.";
+    return "Combat is live. Use walls and target modes to hold the lane.";
   }
 
   if (snapshot.phase === "ended") {
