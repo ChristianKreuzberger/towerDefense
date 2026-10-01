@@ -12,3 +12,5 @@ export class LocalTransportAdapter implements TransportAdapter {
     return createSimulationBootstrap();
   }
 }
+
+export * from "./game-api.js";

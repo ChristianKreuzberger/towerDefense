@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@tower-defense/shared": "0.1.0",
+    "@tower-defense/transport": "0.1.0",
     "phaser": "^4.2.1"
   },
   "devDependencies": {
