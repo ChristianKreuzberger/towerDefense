@@ -29,11 +29,13 @@
 
 ## Tower lifecycle
 
-- Upgrade (multiple levels, up to `MAX_TOWER_LEVEL` = 5); upgrades are bought only during the prep (placement) phase and only while that player has not readied. They are rejected once the player is ready and during the wave. An upgrade at max level is rejected with `tower-max-level` and costs nothing
+- Upgrades come in three independent tracks, each starting at level 1 and going up to `MAX_TOWER_LEVEL` = 5: **range**, **damage** (damage per shot) and **accuracy** (chance that a shot hits). A player chooses which track to buy, so a trailing player can specialise (for example a long-range tower placed elsewhere) instead of only buying generic levels. Upgrades are bought only during the prep (placement) phase and only while that player has not readied. They are rejected once the player is ready and during the wave. An upgrade on a track that is already at max level is rejected with `tower-max-level` and costs nothing; an unknown track is rejected with `invalid-upgrade-track`
 - Cannot shoot other towers under any condition
 - Can shoot invading creatures based on tower range and targeting rules
 - Range is limited and measured in grid cells (Euclidean distance, inclusive); a creature exactly at range distance can be targeted
-- Base (level 1) range is 6 cells and grows by 1.5 cells per upgrade level, so upgrading also extends what a tower can reach
+- Base range is 6 cells (range level 1) and grows by 1.5 cells per range level
+- A tower fires at most once per tick. Whether the shot hits is decided deterministically from the match seed, wave, tick and tower id (no hidden randomness), against the tower's accuracy: 70% at accuracy level 1, +7.5 percentage points per level, 100% at level 5. A miss deals no damage and emits a `tower-miss` event
+- Damage per shot is 1 at damage level 1 and +1 per damage level
 - A tower with no creature in range has no target and does not fire
 - Takes damage from creature attacks
 - Auto-repaired between rounds (must be clearly shown in UI)
