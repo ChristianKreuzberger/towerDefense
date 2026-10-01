@@ -50,6 +50,7 @@
 - Creatures path toward towers and attempt to attack them
 - Creatures cannot move through walls
 - Archetypes: runner, tank, armored, swarm
+- Spawn protection: a creature is untargetable and takes no damage for its first 1 second (`CREATURE_SPAWN_PROTECTION_SECONDS`, 5 simulation ticks at the client's 5 ticks per second) after it appears at the monster cave. It still moves and can attack normally; towers just skip it until the protection ends
 - Later archetypes can include shield or split-on-death
 
 ## Damage and targeting

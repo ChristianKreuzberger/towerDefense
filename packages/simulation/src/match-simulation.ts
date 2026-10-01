@@ -13,6 +13,7 @@ import {
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
   getTowerRange,
+  SPAWN_PROTECTION_TICKS,
   type CommandResult,
   type BalanceAnalysisSnapshot,
   type CumulativeTelemetrySnapshot,
@@ -811,7 +812,8 @@ export class MatchSimulation {
       }
 
       const creature = creaturesById.get(assignment.targetCreatureId);
-      if (!creature || creature.hp <= 0) {
+      // Targeting already skips protected creatures; this guards damage in case an assignment is stale.
+      if (!creature || creature.hp <= 0 || this.isSpawnProtected(creature)) {
         continue;
       }
 
@@ -1009,11 +1011,16 @@ export class MatchSimulation {
     }));
   }
 
+  // Protected for the spawn tick and the following ticks, so the creature gets a full second of travel before it can be shot.
+  private isSpawnProtected(creature: Creature): boolean {
+    return this.state.waveTick - creature.spawnTick < SPAWN_PROTECTION_TICKS;
+  }
+
   private selectCreatureTargetForTower(tower: Tower): Creature | undefined {
     // Squared comparison keeps the range check free of sqrt and float drift.
     const range = getTowerRange(tower.level);
     const creatures = this.state.creatures
-      .filter((creature) => this.getSquaredDistance(tower, creature) <= range * range)
+      .filter((creature) => !this.isSpawnProtected(creature) && this.getSquaredDistance(tower, creature) <= range * range)
       .sort((a, b) => a.id.localeCompare(b.id));
     let best = creatures[0];
     if (!best) {

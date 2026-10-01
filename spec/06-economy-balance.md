@@ -29,6 +29,7 @@ Point economy with per-player score tracking.
 - Wall cost scaling: baseWallCost * 1.2^placedWalls
 - Upgrade cost scaling: baseCost * 1.6^level
 - Tower range (grid cells): baseTowerRange + (level - 1) * towerRangePerLevel, with baseTowerRange = 6 and towerRangePerLevel = 1.5 (level 1 = 6, level 2 = 7.5, level 3 = 9). Creatures have no attack range yet and can hit a tower from anywhere, so the short base range is a deliberate trade-off: towers must be placed close to the lane and upgrades matter
+- Spawn protection: `CREATURE_SPAWN_PROTECTION_SECONDS = 1`, expressed in simulation ticks as `SPAWN_PROTECTION_TICKS = 5` because the client runs 5 ticks per second at 1x. Protected creatures cannot be targeted or damaged, so every creature gets at least 5 ticks of travel before it can be shot (balance note: this slightly lowers early kill rates; separate from `SPAWN_PROTECTION_RADIUS`, which is about tower placement)
 - The base range is short relative to the 50x50 map (it was 12 before), so a lone level 1 tower only covers a small stretch of the lane and range upgrades are a real choice
 
 ## Anti-snowball controls

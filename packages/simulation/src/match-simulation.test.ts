@@ -9,6 +9,7 @@ import {
   MAX_PLAYERS,
   WIN_SCORE,
   BASE_TOWER_RANGE,
+  SPAWN_PROTECTION_TICKS,
   TOWER_RANGE_PER_LEVEL,
   type MatchEvent,
   type MatchSnapshot,
@@ -28,14 +29,38 @@ import {
 import { generateMap } from "./procedural-map.js";
 import { getBuildableCellsNearSpawn } from "./spawn-order.js";
 
+// Where the first creature is on the first tick it can be targeted. With range 6 and spawn protection, towers
+// sorted by distance to the cave itself would see creatures walk out of range before they become shootable.
+function getFirstTargetablePosition(seed: number): { x: number; y: number } {
+  const candidates = getBuildableCellsNearSpawn(seed);
+  const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
+  // The lane does not depend on the tower, so any placeable cell works for the probe; the farthest one stays out of the way.
+  for (const cell of [...candidates].reverse()) {
+    if (probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
+      break;
+    }
+  }
+  probe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  advanceToFirstTargetableTick(probe);
+  const creature = probe.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
+  assert.ok(creature, "expected the first creature to be alive on its first targetable tick");
+  return { x: creature.x, y: creature.y };
+}
+
 // Greedily places one tower per player so combinations that block the lane are skipped.
 function getPlaceableCellsNearSpawn(seed: number, count: number): Array<{ x: number; y: number }> {
+  const lanePoint = getFirstTargetablePosition(seed);
+  const cellsNearLane = [...getBuildableCellsNearSpawn(seed)].sort(
+    (a, b) =>
+      Math.hypot(a.x - lanePoint.x, a.y - lanePoint.y) - Math.hypot(b.x - lanePoint.x, b.y - lanePoint.y)
+      || a.y - b.y || a.x - b.x
+  );
   const probe = createMatch({
     players: Array.from({ length: count }, (_, index) => ({ id: `p${index + 1}`, name: `P${index + 1}` })),
     seed
   });
   const picked: Array<{ x: number; y: number }> = [];
-  for (const cell of getBuildableCellsNearSpawn(seed)) {
+  for (const cell of cellsNearLane) {
     if (picked.length === count) {
       break;
     }
@@ -1165,12 +1190,12 @@ test("ends wave only after spawn schedule completes and all creatures exit", () 
 test("records deterministic target assignments on each wave tick", () => {
   const simulation = createSinglePlayerWaveSimulation(25);
 
-  simulation.applyCommand({ type: "advance-wave" });
+  advanceToFirstTargetableTick(simulation);
 
   const snapshot = simulation.getSnapshot();
   const targetEvents = snapshot.events.filter((event) => event.type === "targets-selected");
-  assert.equal(targetEvents.length, 1);
-  assert.equal(targetEvents[0]?.tick, 1);
+  assert.equal(targetEvents.length, SPAWN_PROTECTION_TICKS + 1);
+  assert.equal(targetEvents[targetEvents.length - 1]?.tick, SPAWN_PROTECTION_TICKS + 1);
   assert.equal(snapshot.targetAssignments.length, 1);
   assert.equal(snapshot.targetAssignments[0]?.towerId, "tower-p1");
   assert.equal(snapshot.targetAssignments[0]?.mode, "first");
@@ -1189,7 +1214,9 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "first" });
 
-  for (let tick = 0; tick < 3; tick += 1) {
+  // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
+  const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
+  for (let tick = 0; tick < assignmentTick; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
   }
 
@@ -1198,7 +1225,7 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
     .reverse()
     .find(
       (event): event is Extract<MatchEvent, { type: "targets-selected" }> =>
-        event.type === "targets-selected" && event.tick === 3
+        event.type === "targets-selected" && event.tick === assignmentTick
     );
   assert.ok(assignmentEvent);
   const assignment = assignmentEvent.assignments.find((entry) => entry.towerId === "tower-p1");
@@ -1217,7 +1244,9 @@ test("last mode prefers lowest pathIndex", () => {
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "last" });
 
-  for (let tick = 0; tick < 3; tick += 1) {
+  // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
+  const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
+  for (let tick = 0; tick < assignmentTick; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
   }
 
@@ -1226,7 +1255,7 @@ test("last mode prefers lowest pathIndex", () => {
     .reverse()
     .find(
       (event): event is Extract<MatchEvent, { type: "targets-selected" }> =>
-        event.type === "targets-selected" && event.tick === 3
+        event.type === "targets-selected" && event.tick === assignmentTick
     );
   assert.ok(assignmentEvent);
   const assignment = assignmentEvent.assignments.find((entry) => entry.towerId === "tower-p1");
@@ -1245,7 +1274,9 @@ test("strongest mode resolves hp ties deterministically", () => {
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "strongest" });
 
-  for (let tick = 0; tick < 3; tick += 1) {
+  // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
+  const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
+  for (let tick = 0; tick < assignmentTick; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
   }
 
@@ -1254,7 +1285,7 @@ test("strongest mode resolves hp ties deterministically", () => {
     .reverse()
     .find(
       (event): event is Extract<MatchEvent, { type: "targets-selected" }> =>
-        event.type === "targets-selected" && event.tick === 3
+        event.type === "targets-selected" && event.tick === assignmentTick
     );
   assert.ok(assignmentEvent);
   const assignment = assignmentEvent.assignments.find((entry) => entry.towerId === "tower-p1");
@@ -1302,8 +1333,7 @@ test("target assignment snapshots and events are reproducible across equal runs"
 test("emits hit events and reduces creature hp deterministically", () => {
   const simulation = createSinglePlayerWaveSimulation(31);
 
-  const advance = simulation.applyCommand({ type: "advance-wave" });
-  assert.equal(advance.accepted, true);
+  advanceToFirstTargetableTick(simulation);
 
   const snapshot = simulation.getSnapshot();
   const hitEvents = snapshot.events.filter((event) => event.type === "tower-hit");
@@ -1334,8 +1364,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
-  const advance = simulation.applyCommand({ type: "advance-wave" });
-  assert.equal(advance.accepted, true);
+  advanceToFirstTargetableTick(simulation);
 
   const snapshot = simulation.getSnapshot();
   const defeatedEvents = snapshot.events.filter((event) => event.type === "creature-defeated");
@@ -1389,8 +1418,7 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "first" });
     simulation.applyCommand({ type: "set-target-mode", playerId: "p2", towerId: "tower-p2", mode: "first" });
 
-    const firstAdvance = simulation.applyCommand({ type: "advance-wave" });
-    assert.equal(firstAdvance.accepted, true);
+    advanceToFirstTargetableTick(simulation);
 
     const snapshot = simulation.getSnapshot();
     const hitEvents = snapshot.events.filter((event) => event.type === "tower-hit");
@@ -1774,9 +1802,16 @@ test("selects deterministic wall targets and emits wall-hit events", () => {
   assert.equal(wallHitEvents[0]?.damage, 1);
   assert.equal(wallHitEvents[0]?.remainingHp, DEFAULT_WALL_HEALTH - 1);
 
-  const tickOneWaveEvents = snapshot.events
+  // Tower hits only start once the first creature leaves spawn protection, so the per-tick ordering is
+  // checked on that tick instead of tick 1.
+  for (let tick = 1; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
+    simulation.applyCommand({ type: "advance-wave" });
+  }
+  const orderingTick = SPAWN_PROTECTION_TICKS + 1;
+  const orderingSnapshot = simulation.getSnapshot();
+  const tickOneWaveEvents = orderingSnapshot.events
     .map((event, index) => ({ event, index }))
-    .filter(({ event }) => event.wave === 1 && event.tick === 1);
+    .filter(({ event }) => event.wave === 1 && event.tick === orderingTick);
   const towerHitIndex = tickOneWaveEvents.find(({ event }) => event.type === "tower-hit")?.index;
   const wallHitIndex = tickOneWaveEvents.find(({ event }) => event.type === "wall-hit")?.index;
   const creatureAttackIndex = tickOneWaveEvents.find(({ event }) => event.type === "creature-attack")?.index;
@@ -2538,12 +2573,30 @@ test("tower range scales consistently for fractional levels", () => {
 
 type TargetMode = "first" | "last" | "strongest" | "nearest";
 
+// Creatures cannot be targeted for their first SPAWN_PROTECTION_TICKS ticks, so the first creature is
+// shootable on the tick after the protected ones. Wave ticks start at 1 and creature 1 spawns on tick 1.
+function advanceToFirstTargetableTick(simulation: ReturnType<typeof createMatch>): void {
+  for (let tick = 0; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
+    simulation.applyCommand({ type: "advance-wave" });
+  }
+}
+
 // Finds a tower cell whose distance to the first spawned creature lies in (minExclusive, maxInclusive].
 function findTowerCellAtDistance(
   seed: number,
   minExclusive: number,
   maxInclusive: number
 ): { x: number; y: number } {
+  const cell = tryFindTowerCellAtDistance(seed, minExclusive, maxInclusive);
+  assert.ok(cell, "no suitable tower cell found");
+  return cell;
+}
+
+function tryFindTowerCellAtDistance(
+  seed: number,
+  minExclusive: number,
+  maxInclusive: number
+): { x: number; y: number } | null {
   const probeMap = generateMap(seed);
   for (const cell of probeMap.cells.filter((entry) => entry.buildable)) {
     const probe = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
@@ -2551,8 +2604,8 @@ function findTowerCellAtDistance(
       continue;
     }
     probe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
-    probe.applyCommand({ type: "advance-wave" });
-    const creature = probe.getSnapshot().creatures[0];
+    advanceToFirstTargetableTick(probe);
+    const creature = probe.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
     if (!creature) {
       continue;
     }
@@ -2561,7 +2614,7 @@ function findTowerCellAtDistance(
       return { x: cell.x, y: cell.y };
     }
   }
-  assert.fail("no suitable tower cell found");
+  return null;
 }
 
 function firstTickTarget(
@@ -2581,7 +2634,7 @@ function firstTickTarget(
   }
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode });
-  simulation.applyCommand({ type: "advance-wave" });
+  advanceToFirstTargetableTick(simulation);
   return simulation.getSnapshot().targetAssignments[0]?.targetCreatureId ?? null;
 }
 
@@ -2594,12 +2647,16 @@ test("towers ignore creatures outside range in every target mode", () => {
 });
 
 test("range boundary is inclusive: creature at exactly range distance is targetable", () => {
-  // The halved range of 6 leaves no axis-aligned cell at exactly that distance on seed 40, so use another seed.
-  const seed = 41;
   const range = getTowerRange(1);
-  // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance.
-  const exact = findTowerCellAtDistance(seed, range - 1e-9, range);
-  assert.equal(firstTickTarget(seed, exact, "first", 0), "wave-1-creature-1");
+  // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance. With the short
+  // range and moving creatures such a cell does not exist on every seed, so take the first seed that has one.
+  let found: { seed: number; cell: { x: number; y: number } } | null = null;
+  for (let seed = 40; seed < 80 && !found; seed += 1) {
+    const cell = tryFindTowerCellAtDistance(seed, range - 1e-9, range);
+    found = cell ? { seed, cell } : null;
+  }
+  assert.ok(found, "expected an exact-range cell on some seed");
+  assert.equal(firstTickTarget(found.seed, found.cell, "first", 0), "wave-1-creature-1");
 });
 
 test("creature just beyond range is not targetable", () => {
@@ -2622,6 +2679,57 @@ test("upgrading a tower extends its range to a previously out-of-range creature"
   const cell = findTowerCellAtDistance(seed, getTowerRange(1), getTowerRange(2));
   assert.equal(firstTickTarget(seed, cell, "first", 0), null);
   assert.equal(firstTickTarget(seed, cell, "first", 1), "wave-1-creature-1");
+});
+
+test("a freshly spawned creature is untargetable and undamaged until spawn protection ends", () => {
+  const seed = 41;
+  // The lane is independent of the tower, so record where creature 1 is on every tick 1..SPAWN_PROTECTION_TICKS + 1
+  // and pick a cell that covers all of those positions: the creature is in range the whole time.
+  const laneProbe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
+  const probeCells = [...getBuildableCellsNearSpawn(seed)].reverse();
+  const probeCell = probeCells.find(
+    (entry) => laneProbe.applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
+  );
+  assert.ok(probeCell);
+  laneProbe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  const lane: Array<{ x: number; y: number }> = [];
+  for (let tick = 1; tick <= SPAWN_PROTECTION_TICKS + 1; tick += 1) {
+    laneProbe.applyCommand({ type: "advance-wave" });
+    const probeCreature = laneProbe.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
+    assert.ok(probeCreature);
+    lane.push({ x: probeCreature.x, y: probeCreature.y });
+  }
+  const cell = getBuildableCellsNearSpawn(seed).find(
+    (entry) =>
+      lane.every((point) => Math.hypot(entry.x - point.x, entry.y - point.y) <= getTowerRange(1))
+      && createMatch({ players: [{ id: "p1", name: "Alpha" }], seed })
+        .applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
+  );
+  assert.ok(cell, "expected a cell that covers the first creature during and right after spawn protection");
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  assert.equal(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted, true);
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+
+  let baseHp: number | undefined;
+  for (let tick = 1; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
+    simulation.applyCommand({ type: "advance-wave" });
+    const snapshot = simulation.getSnapshot();
+    const creature = snapshot.creatures.find((entry) => entry.id === "wave-1-creature-1");
+    assert.ok(creature, `creature exists on tick ${tick}`);
+    // Without this the test could pass just because the creature is out of range.
+    assert.ok(Math.hypot(cell.x - creature.x, cell.y - creature.y) <= getTowerRange(1), `in range on tick ${tick}`);
+    baseHp ??= creature.hp;
+    assert.equal(creature.hp, baseHp, `hp unchanged on tick ${tick}`);
+    assert.equal(snapshot.targetAssignments[0]?.targetCreatureId ?? null, null, `no target on tick ${tick}`);
+    assert.equal(snapshot.events.some((event) => event.type === "tower-hit"), false, `no hit on tick ${tick}`);
+  }
+
+  simulation.applyCommand({ type: "advance-wave" });
+  assert.equal(
+    simulation.getSnapshot().targetAssignments[0]?.targetCreatureId,
+    "wave-1-creature-1",
+    "targeted on the first tick after protection"
+  );
 });
 
 type WaveEndInternals = {
