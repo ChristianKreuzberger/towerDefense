@@ -1,4 +1,4 @@
-import { MAX_PLAYER_NAME_LENGTH, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { MAX_PLAYER_NAME_LENGTH, UPGRADE_TRACKS, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import type { MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
@@ -19,9 +19,9 @@ import { perfTimeApply } from "./perf";
 import { resolvePlacementCell } from "./placement";
 import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, startPlayback, stopPlayback, syncPlaybackControls } from "./playback";
 import { playerNumber, playerTowerId, selectedPlayerId, towerColorClass } from "./player-util";
+import { renderPlayerCards, setChipSelectHandler, updatePlayerOptions } from "./scoreboard";
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
-import type { PlayerChipRefs } from "./state";
 import { getToolbarState } from "./toolbar-state";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import { formatWavePreview } from "./wave-preview";
@@ -62,6 +62,8 @@ const demo = createDemo({
 configurePlayback({ advance: advanceTicks, blocked: () => demo.running() });
 
 setCellClickHandler(handleCellSelected);
+
+setChipSelectHandler(setActivePlayer);
 
 function showMenuScreen(): void {
   // The match keeps running on the host; offer a way back unless it is already over.
@@ -241,36 +243,6 @@ async function advanceTicks(ticks: number): Promise<void> {
   }
 }
 
-function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
-  if (!snapshot || snapshot.players.length === 0) {
-    return "";
-  }
-  return snapshot.players[0]?.id ?? "";
-}
-
-function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
-  const players = snapshot?.players ?? [];
-  const signature = players.map((player) => `${player.id}:${player.name}`).join("|");
-  if (signature === store.playerSignature) {
-    return;
-  }
-  store.playerSignature = signature;
-
-  const previous = el.playerId.value;
-  el.playerId.innerHTML = "";
-  for (const player of players) {
-    const option = document.createElement("option");
-    option.value = player.id;
-    option.textContent = `${player.id} (${player.name})`;
-    el.playerId.append(option);
-  }
-  if (players.some((player) => player.id === previous)) {
-    el.playerId.value = previous;
-  } else {
-    el.playerId.value = pickDefaultPlayer(snapshot);
-  }
-}
-
 function showWaveBanner(title: string, sub: string): void {
   const strong = el.waveBanner.querySelector("strong");
   const span = el.waveBanner.querySelector("span");
@@ -389,151 +361,6 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   if (tower) {
     el.mode.value = tower.targetMode;
     el.damageType.value = tower.damageType;
-  }
-}
-
-function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: string | null): PlayerChipRefs {
-  const root = document.createElement("div");
-  root.className = "player-chip";
-  // Mouse users can click anywhere on the chip; keyboard and assistive tech use the real button around the name.
-  // The chip itself is not a button so the nested health progressbar keeps its accessibility semantics.
-  root.addEventListener("click", () => setActivePlayer(player.id));
-  const swatch = document.createElement("div");
-  swatch.className = "chip-swatch";
-  swatch.textContent = String(playerNumber(player.id));
-  swatch.setAttribute("aria-hidden", "true");
-  const body = document.createElement("div");
-  body.className = "chip-body";
-  const top = document.createElement("div");
-  top.className = "chip-top";
-  const name = document.createElement("button");
-  name.type = "button";
-  name.className = "player-chip-name";
-  const state = document.createElement("span");
-  state.className = "chip-state";
-  top.append(name, state);
-  const scoreRow = document.createElement("div");
-  scoreRow.className = "chip-score";
-  const points = document.createElement("span");
-  points.className = "chip-points";
-  const goal = document.createElement("div");
-  goal.className = "goal-bar";
-  goal.title = `Goal: ${WIN_SCORE} points`;
-  const goalFill = document.createElement("i");
-  goal.append(goalFill);
-  scoreRow.append(points, goal);
-  const meta = document.createElement("div");
-  meta.className = "player-chip-meta";
-  body.append(top, scoreRow, meta);
-  root.append(swatch, body);
-  let bar: HTMLElement | null = null;
-  let barFill: HTMLElement | null = null;
-  if (towerId) {
-    bar = document.createElement("div");
-    bar.className = "tower-hp-bar";
-    bar.setAttribute("role", "progressbar");
-    bar.setAttribute("aria-label", `${player.name} tower health`);
-    bar.setAttribute("aria-valuemin", "0");
-    barFill = document.createElement("i");
-    bar.append(barFill);
-    body.append(bar);
-  }
-  return { root, name, state, points, goalFill, meta, bar, barFill };
-}
-
-// Chips are created once per (player, tower) and updated in place so HP bar transitions and pulses survive snapshots.
-function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent[] = []): void {
-  if (!snapshot) {
-    store.playerChips = new Map();
-    el.playerCards.textContent = "No active match";
-    return;
-  }
-
-  const towersByPlayer = new Map(snapshot.towers.map((tower) => [tower.playerId, tower]));
-  const repairedTowerIds = new Set(
-    newEvents.filter((event) => event.type === "tower-repaired").map((event) => event.towerId)
-  );
-  const structure = snapshot.players.map((player) => `${player.id}:${towersByPlayer.has(player.id) ? 1 : 0}`).join("|");
-  if (structure !== store.chipStructureSignature) {
-    store.chipStructureSignature = structure;
-    store.playerChips = new Map();
-    el.playerCards.textContent = "";
-    for (const player of snapshot.players) {
-      const tower = towersByPlayer.get(player.id);
-      const refs = buildPlayerChip(player, tower?.id ?? null);
-      store.playerChips.set(player.id, refs);
-      el.playerCards.append(refs.root);
-    }
-  }
-
-  for (const player of snapshot.players) {
-    const refs = store.playerChips.get(player.id);
-    if (!refs) {
-      continue;
-    }
-    const tower = towersByPlayer.get(player.id);
-    const towerStatus = tower ? `Tower ${tower.health}/${tower.maxHealth}` : "Tower not placed";
-    let status = "waiting";
-    let label = "WAITING";
-    if (player.eliminated) {
-      status = "eliminated";
-      label = "ELIMINATED";
-    } else if (snapshot.phase === "wave") {
-      status = "fighting";
-      label = "FIGHTING";
-    } else if (!player.hasPlacedTower) {
-      label = "PLACING";
-    } else if (player.readyForWave) {
-      status = "ready";
-      label = "READY";
-    }
-
-    const isActive = player.id === el.playerId.value;
-    const className = `player-chip ${status} ${towerColorClass(player.id)}${isActive ? " active" : ""}`;
-    if (isActive) {
-      refs.name.setAttribute("aria-current", "true");
-    } else {
-      refs.name.removeAttribute("aria-current");
-    }
-    refs.root.title = `Switch to ${player.name} (${playerNumber(player.id)})`;
-    if (refs.root.className !== className) {
-      refs.root.className = className;
-    }
-    if (tower) {
-      refs.root.dataset.towerId = tower.id;
-    } else {
-      delete refs.root.dataset.towerId;
-    }
-    if (refs.name.textContent !== player.name) {
-      refs.name.textContent = player.name;
-    }
-    if (refs.state.textContent !== label) {
-      refs.state.textContent = label;
-    }
-    const pointsText = `${player.points} pts`;
-    if (refs.points.textContent !== pointsText) {
-      refs.points.textContent = pointsText;
-    }
-    refs.goalFill.style.width = `${Math.min(100, (player.points / WIN_SCORE) * 100)}%`;
-    if (refs.meta.textContent !== towerStatus) {
-      refs.meta.textContent = towerStatus;
-    }
-
-    if (tower && refs.bar && refs.barFill) {
-      const ratio = tower.maxHealth > 0 ? tower.health / tower.maxHealth : 0;
-      refs.bar.setAttribute("aria-valuemax", String(tower.maxHealth));
-      refs.bar.setAttribute("aria-valuenow", String(tower.health));
-      refs.barFill.style.width = `${ratio * 100}%`;
-      refs.bar.dataset.level = ratio > 0.6 ? "high" : ratio > 0.3 ? "mid" : "low";
-      if (repairedTowerIds.has(tower.id)) {
-        // Restart the animation if a previous pulse class is still present.
-        refs.bar.classList.remove("repair-pulse");
-        void refs.bar.offsetWidth;
-        refs.bar.classList.add("repair-pulse");
-      } else {
-        refs.bar.classList.remove("repair-pulse");
-      }
-    }
   }
 }
 
