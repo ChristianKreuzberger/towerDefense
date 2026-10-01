@@ -85,6 +85,7 @@ Effects (driven by snapshot events, presentation only)
 - `tower-destroyed`: smoke
 - `wall-hit`: spark
 - `wave-end`: wave-clear banner
+- `tower-hit` and `creature-defeated` carry the cell the creature was in. Strong towers can kill a creature within the same batched response that spawned it, so it never appears in a snapshot; the client falls back to that cell so shots and kills are still shown
 - Events of one batched response are spread across the glide time of that response so they do not all fire at once; the number of effects per snapshot is capped
 - With `prefers-reduced-motion` there is no shake, no particle burst and no banner animation; flashes become short static highlights
 

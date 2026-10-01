@@ -827,6 +827,8 @@ export class MatchSimulation {
         towerId: tower.id,
         playerId: tower.playerId,
         creatureId: creature.id,
+        x: creature.x,
+        y: creature.y,
         damage,
         remainingHp: Math.max(0, creature.hp)
       });
@@ -845,6 +847,8 @@ export class MatchSimulation {
           towerId: tower.id,
           playerId: tower.playerId,
           creatureId: creature.id,
+          x: creature.x,
+          y: creature.y,
           rewardPoints
         });
       } else {
