@@ -9,6 +9,7 @@ import {
   GAME_RULES,
   PATH_CELL_MAX_WEAR,
   BETWEEN_WAVE_PATH_WEAR_REPAIR,
+  PATH_WEAR_PER_TRAVERSAL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
@@ -730,6 +731,9 @@ export class MatchSimulation {
       }
 
       const finalPathNode = this.currentWavePath[nextPathIndex] ?? currentPathNode;
+      for (const step of steps) {
+        this.addPathWear(step.toX, step.toY);
+      }
 
       this.state.events.push({
         type: "movement-resolved",
@@ -1281,6 +1285,13 @@ export class MatchSimulation {
     return (dx * dx) + (dy * dy);
   }
 
+  private addPathWear(x: number, y: number): void {
+    const cell = this.state.map.cells.find((entry) => entry.x === x && entry.y === y);
+    if (cell) {
+      cell.pathWear = Math.min(PATH_CELL_MAX_WEAR, Math.max(0, cell.pathWear) + PATH_WEAR_PER_TRAVERSAL);
+    }
+  }
+
   private getCellPathWear(x: number, y: number): number {
     const cell = this.state.map.cells.find((entry) => entry.x === x && entry.y === y);
     if (!cell) {
@@ -1491,31 +1502,12 @@ export class MatchSimulation {
     const repairs: Array<{ x: number; y: number; wearBefore: number; wearAfter: number }> = [];
 
     for (const cell of this.state.map.cells) {
-      const isWallCell = this.state.walls.some((wall) => wall.x === cell.x && wall.y === cell.y);
-      const hadCreatureTraffic = this.state.events.some(
-        (event) =>
-          (event.type === "creature-spawned" || event.type === "creature-exited") &&
-          event.wave === this.state.wave &&
-          event.x === cell.x &&
-          event.y === cell.y
-      );
-
-      const wearBeforeWave = Math.max(0, cell.pathWear);
-      const wearAfterWaveLoad = Math.min(
-        PATH_CELL_MAX_WEAR,
-        wearBeforeWave + (isWallCell ? 2 : 0) + (hadCreatureTraffic ? 1 : 0)
-      );
-      const repairAmount = Math.min(BETWEEN_WAVE_PATH_WEAR_REPAIR, wearAfterWaveLoad);
-      const wearAfter = wearAfterWaveLoad - repairAmount;
+      const wearBefore = Math.max(0, cell.pathWear);
+      const wearAfter = Math.max(0, wearBefore - BETWEEN_WAVE_PATH_WEAR_REPAIR);
       cell.pathWear = wearAfter;
 
-      if (repairAmount > 0) {
-        repairs.push({
-          x: cell.x,
-          y: cell.y,
-          wearBefore: wearAfterWaveLoad,
-          wearAfter
-        });
+      if (wearAfter < wearBefore) {
+        repairs.push({ x: cell.x, y: cell.y, wearBefore, wearAfter });
       }
     }
 
