@@ -9,6 +9,8 @@ import {
   getTowerOverallLevel,
   getTowerRange,
   getTowerStats,
+  getTowerStyleTier,
+  TOWER_STYLE_TIERS,
   getTowerUpgradeCost
 } from "./game-rules.js";
 import { UPGRADE_TRACKS } from "./tower-types.js";
@@ -55,4 +57,15 @@ test("buying every track completely costs more than the win score, so players mu
   }
   assert.equal(total, 591 + 887 + 364);
   assert.ok(total > 1000);
+});
+
+test("the tower style changes on every 3rd upgrade", () => {
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 9, 10, 12, 13].map(getTowerStyleTier), [0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 4]);
+});
+
+test("the style tier never exceeds the last tier and tolerates bad levels", () => {
+  assert.equal(getTowerStyleTier(99), TOWER_STYLE_TIERS - 1);
+  assert.equal(getTowerStyleTier(0), 0);
+  // The highest reachable overall level (every track maxed) is exactly the last tier.
+  assert.equal(getTowerStyleTier(1 + 3 * (MAX_TOWER_LEVEL - 1)), TOWER_STYLE_TIERS - 1);
 });

@@ -158,3 +158,12 @@ export function getTowerUpgradeCost(track: UpgradeTrack, currentTrackLevel: numb
   const { base, growth } = UPGRADE_TRACK_COSTS[track];
   return Math.floor(base * growth ** currentTrackLevel);
 }
+
+// Every 3rd upgrade (by overall level) gives the tower a new look: levels 1-3 tier 0, 4-6 tier 1 and so on.
+export const TOWER_STYLE_TIER_SIZE = 3;
+export const TOWER_STYLE_TIERS = 5;
+
+export function getTowerStyleTier(overallLevel: number): number {
+  const tier = Math.floor((Math.max(1, overallLevel) - 1) / TOWER_STYLE_TIER_SIZE);
+  return Math.min(TOWER_STYLE_TIERS - 1, tier);
+}

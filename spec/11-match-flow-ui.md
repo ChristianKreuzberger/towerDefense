@@ -73,6 +73,8 @@ Terrain
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
+- Tower style tiers: every 3rd upgrade (counted across all tracks, so by the tower's overall `level`) switches the tower to a new look. Tier = floor((level - 1) / 3), tiers 0 to 4 (level 13 is the highest). Each tier has its own turret art and its shots look different (longer, thicker bolts with a brighter muzzle flash from tier 2, a white core from tier 3). The level pips under the tower show progress to the next tier (0 to 2 pips)
+- Level-up: when an upgrade is bought the tower plays a short shine (gold ring, sparkles, a small pulse and a floating "Level up"); when the purchase starts a new tier it is bigger and says "New style!". Nothing plays on first render or reconnect, and with reduced motion only the floating text shows
 - The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, the level of each upgrade track (range, damage, accuracy), health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. Accuracy is always 100% today because towers do not miss. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
 Ruins
