@@ -1,13 +1,15 @@
 import Phaser from "phaser";
 
 import {
+  BASE_TOWER_UPGRADES,
   CREATURE_ARCHETYPE_STATS,
+  MAX_TOWER_LEVEL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
   getTowerStats,
   isInSpawnProtection
 } from "@tower-defense/shared";
-import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
+import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades, Wall } from "@tower-defense/shared";
 
 import { Effects } from "./art/fx";
 import { CREAM, INK, UI_COLORS, colorForPlayer, playerIndex } from "./art/palette";
@@ -72,6 +74,7 @@ interface TowerVisual {
   flash: Phaser.GameObjects.Image;
   player: number;
   level: number;
+  upgrades: TowerUpgrades;
   hp: number;
   maxHp: number;
   angle: number;
@@ -404,7 +407,7 @@ class BattlefieldScene extends Phaser.Scene {
       if (hovered) {
         hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
         hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
-        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.level).range);
+        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.upgrades).range);
       }
     }
     this.updateTowerTooltip();
@@ -433,7 +436,7 @@ class BattlefieldScene extends Phaser.Scene {
         ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
         ghostTurret.setTexture(KEY.turret(index, 1)).setPosition(cx, cy).setVisible(true);
         // Placement is one-shot, so show the coverage before the player commits.
-        this.drawRangeCircle(hover, cx, cy, getTowerStats(1).range);
+        this.drawRangeCircle(hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
       }
     }
   }
@@ -448,14 +451,15 @@ class BattlefieldScene extends Phaser.Scene {
       tooltip.hidden = true;
       return;
     }
-    const stats = getTowerStats(tower.level);
+    const stats = getTowerStats(tower.upgrades);
+    const trackLevel = (level: number): string => `${level}/${MAX_TOWER_LEVEL}`;
     const rows: Array<[string, string]> = [
       ["Level", String(stats.level)],
       ["Health", `${tower.hp}/${tower.maxHp}`],
-      ["Range", `${stats.range} cells`],
-      ["Damage", `${stats.damagePerShot} per shot`],
+      ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
+      ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
       ["DPS", String(stats.damagePerSecond)],
-      ["Accuracy", `${Math.round(stats.accuracy * 100)}%`]
+      ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
     ];
     tooltip.replaceChildren(
       ...rows.map(([label, value]) => {
@@ -794,7 +798,7 @@ class BattlefieldScene extends Phaser.Scene {
     container.add([shadow, base, flash, turret, badge, pips, hpBg, hpFill]);
     return {
       container, base, turret, pips, hpBg, hpFill, flash,
-      player, level: tower.level, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
+      player, level: tower.level, upgrades: { ...tower.upgrades }, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
       baseX: cx, baseY: cy, flashUntil: 0, shakeUntil: 0, recoilUntil: 0
     };
   }
@@ -803,6 +807,7 @@ class BattlefieldScene extends Phaser.Scene {
     const { cx, cy } = cellCenter(tower.x, tower.y, cellSize);
     visual.baseX = cx;
     visual.baseY = cy;
+    visual.upgrades = { ...tower.upgrades };
     if (visual.level !== tower.level) {
       visual.level = tower.level;
       visual.turret.setTexture(KEY.turret(visual.player, tower.level));
@@ -971,6 +976,26 @@ class BattlefieldScene extends Phaser.Scene {
             const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
             const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
             fx.projectile(tower.baseX, tower.baseY, x, y, color, delay);
+            tower.recoilUntil = now + delay + RECOIL_MS;
+            budget -= 1;
+          }
+          break;
+        }
+        case "tower-miss": {
+          const tower = this.towerVisuals.get(event.towerId);
+          const creature = this.creatureVisuals.get(event.creatureId);
+          if (tower) {
+            const color = colorForPlayer(event.playerId);
+            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
+            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
+            // The shot flies past the creature, offset sideways so a miss is visibly different from a hit.
+            const dx = x - tower.baseX;
+            const dy = y - tower.baseY;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            const missX = x + (-dy / length) * cellSize * 0.9;
+            const missY = y + (dx / length) * cellSize * 0.9;
+            fx.projectile(tower.baseX, tower.baseY, missX, missY, color, delay);
+            fx.floatText(x, y - cellSize * 0.5, "miss", 0xcfc8b8, delay + 120);
             tower.recoilUntil = now + delay + RECOIL_MS;
             budget -= 1;
           }

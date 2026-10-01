@@ -1,6 +1,6 @@
-import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import { getToolbarState } from "./toolbar-state.js";
-import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
+import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode, UpgradeTrack } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
 import { cueForCommandResult, cuesForSnapshotChange, createSoundEngine } from "./audio/index";
@@ -280,8 +280,14 @@ app.innerHTML = `
         <button id="placeWallBtn" class="tool" aria-pressed="false" title="Toggle wall mode, then click tiles (W)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M9 5v7M15 12v7" stroke="currentColor" stroke-width="2"/></svg><span class="tool-label">Place Wall</span><span class="tool-cost" id="wallCost">25</span><kbd>W</kbd>
         </button>
-        <button id="upgradeBtn" data-sfx="none" class="tool" title="Upgrade your tower (U)">
-          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 9h-5v9H9v-9H4z" fill="currentColor"/></svg><span class="tool-label">Upgrade Tower</span><span class="tool-cost" id="upgradeCost">50</span><kbd>U</kbd>
+<button id="upgradeRangeBtn" data-track="range" data-sfx="none" class="tool upgrade-btn" title="Upgrade tower range (U)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16M7 7l-3 5 3 5M17 7l3 5-3 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="tool-label">Range</span><span class="tool-cost" id="upgradeRangeCost">-</span><kbd>U</kbd>
+        </button>
+        <button id="upgradeDamageBtn" data-track="damage" data-sfx="none" class="tool upgrade-btn" title="Upgrade tower damage (I)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="tool-label">Damage</span><span class="tool-cost" id="upgradeDamageCost">-</span><kbd>I</kbd>
+        </button>
+        <button id="upgradeAccuracyBtn" data-track="accuracy" data-sfx="none" class="tool upgrade-btn" title="Upgrade tower accuracy (O)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zm0 5a4 4 0 110 8 4 4 0 010-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="tool-label">Accuracy</span><span class="tool-cost" id="upgradeAccuracyCost">-</span><kbd>O</kbd>
         </button>
         <button id="readyBtn" data-sfx="none" class="tool good" title="Lock in your setup (R)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tool-label">Ready For Wave</span><span class="tool-cost">&nbsp;</span><kbd>R</kbd>
@@ -320,7 +326,7 @@ app.innerHTML = `
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd> upgrade <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
   </footer>
 
   <div id="settingsRoot"></div>
@@ -382,9 +388,17 @@ const el = {
   guideCloseBtn: must<HTMLButtonElement>("guideCloseBtn"),
   status: must<HTMLElement>("status"),
   placeTowerBtn: must<HTMLButtonElement>("placeTowerBtn"),
-  upgradeBtn: must<HTMLButtonElement>("upgradeBtn"),
+  upgradeBtns: {
+    range: must<HTMLButtonElement>("upgradeRangeBtn"),
+    damage: must<HTMLButtonElement>("upgradeDamageBtn"),
+    accuracy: must<HTMLButtonElement>("upgradeAccuracyBtn")
+  } as Record<UpgradeTrack, HTMLButtonElement>,
   wallCost: must<HTMLElement>("wallCost"),
-  upgradeCost: must<HTMLElement>("upgradeCost"),
+  upgradeCosts: {
+    range: must<HTMLElement>("upgradeRangeCost"),
+    damage: must<HTMLElement>("upgradeDamageCost"),
+    accuracy: must<HTMLElement>("upgradeAccuracyCost")
+  } as Record<UpgradeTrack, HTMLElement>,
   waveBanner: must<HTMLElement>("waveBanner"),
   turnBanner: must<HTMLElement>("turnBanner"),
   demoBtn: must<HTMLButtonElement>("demoBtn"),
@@ -666,7 +680,7 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
       key: `wave-${snapshot.wave}`,
       tone: "hint",
       title: "Wave in progress",
-      body: "The battle runs on its own. Use Place Wall and target modes to hold the lane, or pause to think. Upgrades are bought in prep, before you ready.",
+      body: "The battle runs on its own. Use Place Wall and target modes to hold the lane, or pause to think. Upgrades (range, damage, accuracy) are bought in prep, before you ready.",
       actionLabel: playing ? "Pause" : "Resume",
       action: "toggle-playback"
     };
@@ -1109,19 +1123,24 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   const tower = snapshot.towers.find((entry) => entry.playerId === playerId);
   const points = player?.points ?? 0;
   const wallCost = getWallCost(snapshot.walls.length);
-  const upgradeCost = tower ? getTowerUpgradeCost(tower.level) : null;
   el.wallCost.textContent = `${wallCost}`;
   el.wallCost.classList.toggle("short", points < wallCost);
   const state = getToolbarState({
     phase: snapshot.phase,
-    towerLevel: tower?.level ?? null,
+    upgrades: tower?.upgrades ?? null,
     eliminated: Boolean(player?.eliminated),
     readyForWave: Boolean(player?.readyForWave)
   });
-  el.upgradeCost.textContent = state.upgradeMaxed ? "MAX" : upgradeCost === null ? "-" : `${upgradeCost}`;
-  el.upgradeCost.classList.toggle("short", !state.upgradeMaxed && upgradeCost !== null && points < upgradeCost);
-  el.upgradeBtn.classList.toggle("dim", !state.upgradeEnabled);
-  el.upgradeBtn.setAttribute("aria-disabled", String(!state.upgradeEnabled));
+  for (const track of UPGRADE_TRACKS) {
+    const button = el.upgradeBtns[track];
+    const cost = el.upgradeCosts[track];
+    const level = tower?.upgrades[track] ?? null;
+    const price = level === null ? null : getTowerUpgradeCost(track, level);
+    cost.textContent = state.upgrades[track].maxed ? "MAX" : price === null ? "-" : `${price}`;
+    cost.classList.toggle("short", !state.upgrades[track].maxed && price !== null && points < price);
+    button.classList.toggle("dim", !state.upgrades[track].enabled);
+    button.setAttribute("aria-disabled", String(!state.upgrades[track].enabled));
+  }
   // The wall button stays clickable so a press explains why it is off (see the click handler) instead of failing silently.
   el.placeWallBtn.classList.toggle("dim", !state.wallEnabled);
   el.placeWallBtn.setAttribute("aria-disabled", String(!state.wallEnabled));
@@ -1638,7 +1657,7 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
       if (command.type === "place-wall") {
         addFeedback("accepted", "Wall placed");
       } else if (command.type === "upgrade-tower") {
-        addFeedback("accepted", "Tower upgraded");
+        addFeedback("accepted", `Tower ${command.track} upgraded`);
       }
     }
 
@@ -1788,14 +1807,12 @@ for (const button of el.playbackControls.querySelectorAll<HTMLButtonElement>(".s
   });
 }
 
-must<HTMLButtonElement>("upgradeBtn").addEventListener("click", () => {
-  const playerId = selectedPlayerId();
-  void sendCommand({
-    type: "upgrade-tower",
-    playerId,
-    towerId: playerTowerId(playerId)
+for (const track of UPGRADE_TRACKS) {
+  el.upgradeBtns[track].addEventListener("click", () => {
+    const playerId = selectedPlayerId();
+    void sendCommand({ type: "upgrade-tower", playerId, towerId: playerTowerId(playerId), track });
   });
-});
+}
 
 el.mode.addEventListener("change", () => {
   const requestedMode = String(el.mode.value);
@@ -1914,9 +1931,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (key === "u") {
+  const hotkeyTrack = ({ u: "range", i: "damage", o: "accuracy" } as const)[key as "u" | "i" | "o"];
+  if (hotkeyTrack) {
     event.preventDefault();
-    must<HTMLButtonElement>("upgradeBtn").click();
+    el.upgradeBtns[hotkeyTrack].click();
     return;
   }
 

@@ -5,6 +5,8 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   PROJECT_NAME,
+  UPGRADE_TRACKS,
+  isValidUpgradeTrack,
   type MatchSetup,
   type MatchSnapshot,
   type TowerTargetMode,
@@ -150,7 +152,11 @@ function parseCommand(body: unknown): SimulationCommand {
   }
 
   if (type === "upgrade-tower") {
-    return { type, playerId: text("playerId"), towerId: text("towerId") };
+    const track = commandSource.track;
+    if (!isValidUpgradeTrack(track)) {
+      throw new GameApiError("invalid-command", `upgrade-tower: track must be one of ${UPGRADE_TRACKS.join(", ")}`);
+    }
+    return { type, playerId: text("playerId"), towerId: text("towerId"), track };
   }
 
   if (type === "set-target-mode") {

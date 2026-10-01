@@ -6,7 +6,8 @@ import {
   getWallCost,
   isValidWallPlacement,
   type SimulationCommand,
-  type TowerTargetMode
+  type TowerTargetMode,
+  type UpgradeTrack
 } from "@tower-defense/shared";
 
 import { formatBalanceReport, deriveBalanceReport } from "./balance-report.js";
@@ -26,7 +27,7 @@ interface BaselineScenario {
 
 type WaveStartAction =
   | { type: "place-wall"; playerId: string }
-  | { type: "upgrade-tower"; playerId: string }
+  | { type: "upgrade-tower"; playerId: string; track: UpgradeTrack }
   | { type: "set-target-mode"; playerId: string; mode: TowerTargetMode };
 
 interface CliArgs {
@@ -69,7 +70,8 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
     waveStartActions: {
       2: [
         { type: "place-wall", playerId: "p1" },
-        { type: "upgrade-tower", playerId: "p2" }
+        { type: "upgrade-tower", playerId: "p2", track: "range" },
+        { type: "upgrade-tower", playerId: "p1", track: "accuracy" }
       ]
     }
   },
@@ -93,7 +95,7 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
       ],
       3: [
         { type: "place-wall", playerId: "p3" },
-        { type: "upgrade-tower", playerId: "p1" }
+        { type: "upgrade-tower", playerId: "p1", track: "damage" }
       ]
     }
   }
@@ -320,14 +322,14 @@ function applyWaveStartAction(
       throw new Error(`missing tower/player for upgrade in scenario ${scenarioId} wave ${wave}`);
     }
 
-    const upgradeCost = getTowerUpgradeCost(tower.level);
+    const upgradeCost = getTowerUpgradeCost(action.track, tower.upgrades[action.track]);
     if (player.points < upgradeCost) {
       simulation.awardPoints(action.playerId, upgradeCost - player.points);
     }
 
     applyCommandOrThrow(
       simulation,
-      { type: "upgrade-tower", playerId: action.playerId, towerId: `tower-${action.playerId}` },
+      { type: "upgrade-tower", playerId: action.playerId, towerId: `tower-${action.playerId}`, track: action.track },
       `${scenarioId}:wave-${wave}:upgrade-tower`
     );
     return;

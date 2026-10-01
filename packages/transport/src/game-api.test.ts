@@ -61,6 +61,15 @@ test("a missing or unsupported command is rejected with invalid-command", () => 
   assertRejected(command(api, { type: "upgrade-tower", playerId: 7, towerId: "tower-p1" }), "invalid-command");
 });
 
+test("upgrade-tower needs a known track", () => {
+  const api = startedApi();
+  for (const track of [undefined, "speed", 3, null]) {
+    assertRejected(command(api, { type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track }), "invalid-command");
+  }
+  const response = command(api, { type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" });
+  assert.equal(response.status, 200);
+});
+
 test("duplicate player ids are rejected", () => {
   const api = createGameApi();
   assertRejected(
