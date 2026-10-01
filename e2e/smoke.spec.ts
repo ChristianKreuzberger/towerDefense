@@ -471,3 +471,16 @@ test("the game runs without Web Audio", async ({ page }) => {
   await expect(page.locator("#gameScreen")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("readying up hands the turn to the next player who is not ready", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await page.locator("#playerId").selectOption("p2");
+  await clickCellNearSpawn(page, 1);
+
+  await page.locator("#playerId").selectOption("p1");
+  await page.locator("#readyBtn").click();
+
+  await expect(page.locator("#playerId")).toHaveValue("p2");
+  await expect(page.locator("#guideCard")).toContainText("Bravo, it's your turn");
+});
