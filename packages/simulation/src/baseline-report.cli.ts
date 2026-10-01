@@ -169,9 +169,12 @@ function placeTowersDeterministically(simulation: ReturnType<typeof createMatch>
 
   for (const playerId of players) {
     const snapshot = simulation.getSnapshot();
+    // Towers have limited range, so start from the cells closest to the spawn gate (the buildable cells on x = 0).
+    const gate = snapshot.map.cells.filter((cell) => cell.buildable && cell.x === 0);
+    const gateY = gate.reduce((sum, cell) => sum + cell.y, 0) / Math.max(1, gate.length);
     const available = snapshot.map.cells
       .filter((cell) => cell.buildable)
-      .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+      .sort((a, b) => (Math.hypot(a.x - 8, a.y - gateY) - Math.hypot(b.x - 8, b.y - gateY)) || (a.y - b.y) || (a.x - b.x));
 
     let placed = false;
     for (const cell of available) {
@@ -307,7 +310,7 @@ function advanceCurrentWaveUntilComplete(
   while (simulation.getSnapshot().telemetry.completedWaves.length < expectedCompletedWaves) {
     const snapshot = simulation.getSnapshot();
     if (snapshot.phase !== "wave") {
-      throw new Error(`scenario ${scenarioId} left wave phase unexpectedly while advancing wave ${expectedCompletedWaves}`);
+      throw new Error(`scenario ${scenarioId} left wave phase unexpectedly while advancing wave ${expectedCompletedWaves} (phase ${snapshot.phase}, ${snapshot.endReason ?? "no end reason"})`);
     }
 
     applyCommandOrThrow(simulation, { type: "advance-wave" }, `${scenarioId}:advance-wave`);
