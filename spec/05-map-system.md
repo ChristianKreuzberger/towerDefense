@@ -35,8 +35,9 @@
 ## Creature lane
 
 - Creatures walk over buildable cells only (the walkable layer).
-- Procedural generation guarantees one connected lane of buildable cells from the left edge (x = 0) to the right edge (x = width - 1), carved deterministically from the seed. The remaining cells are random buildable noise.
-- Every generated map therefore has a spawn-to-goal route of at least `width` cells, so creatures visibly cross the map and walls and path wear matter.
+- Procedural generation carves a maze of corridors (buildable cells) with a seeded randomized depth-first search on a coarse grid (one corridor every 4 cells, so walls between corridors are 3 cells thick). A few extra walls are knocked through for loops.
+- The cave (left edge) and the goal (right edge) are the pair of rooms furthest apart in the maze, so the creature route winds back and forth across the map (at least 3 x width cells for the default map).
+- The remaining cells are random buildable noise, but only cells that do not touch a corridor. Noise therefore forms isolated tower pads inside the walls and never opens a shortcut through the maze.
 - Towers and walls may be placed on lane cells, but the placement path checks (towers and walls) reject any placement that would cut the last route.
 - Rendering follows the same model: buildable cells are the walkable road and non-buildable cells are raised grass pads (see spec/11, Terrain).
 
