@@ -9,10 +9,10 @@ export interface CreatureArchetypeStats {
 }
 
 export const CREATURE_ARCHETYPE_STATS: Record<CreatureArchetype, CreatureArchetypeStats> = {
-  runner: { hp: 2, rewardPoints: 10, attackDamage: 1, attackRange: 1 },
-  swarm: { hp: 1, rewardPoints: 8, attackDamage: 1, attackRange: 1 },
-  armored: { hp: 3, rewardPoints: 14, attackDamage: 2, attackRange: 1.5 },
-  tank: { hp: 5, rewardPoints: 20, attackDamage: 3, attackRange: 1.5 }
+  runner: { hp: 3, rewardPoints: 10, attackDamage: 1, attackRange: 1 },
+  swarm: { hp: 2, rewardPoints: 8, attackDamage: 1, attackRange: 1 },
+  armored: { hp: 5, rewardPoints: 14, attackDamage: 2, attackRange: 1.5 },
+  tank: { hp: 8, rewardPoints: 20, attackDamage: 3, attackRange: 1.5 }
 };
 
 export function getCreatureBaseHp(archetype: CreatureArchetype): number {
