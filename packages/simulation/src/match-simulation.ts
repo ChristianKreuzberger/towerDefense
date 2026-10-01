@@ -1,5 +1,6 @@
 import {
   getCreatureAttackDamage,
+  isWithinCreatureAttackRange,
   getCreatureBaseHp,
   getCreatureRewardPoints,
   DEFAULT_TOWER_TARGET_MODE,
@@ -1148,12 +1149,16 @@ export class MatchSimulation {
   }
 
   private selectTowerTargetForCreature(creature: Creature, towersById: Map<string, Tower>): Tower | undefined {
+    // A sticky target only counts while it is still in reach: creatures keep walking the lane, so the target
+    // they were assigned at spawn is usually out of range.
     const currentTarget = creature.targetTowerId ? towersById.get(creature.targetTowerId) : undefined;
-    if (currentTarget) {
+    if (currentTarget && this.isTowerInCreatureRange(creature, currentTarget)) {
       return currentTarget;
     }
 
-    const candidates = [...towersById.values()].sort((a, b) => a.id.localeCompare(b.id));
+    const candidates = [...towersById.values()]
+      .filter((tower) => this.isTowerInCreatureRange(creature, tower))
+      .sort((a, b) => a.id.localeCompare(b.id));
     if (candidates.length === 0) {
       return undefined;
     }
@@ -1172,7 +1177,9 @@ export class MatchSimulation {
   }
 
   private selectWallTargetForCreature(creature: Creature, wallsById: Map<string, Wall>): Wall | undefined {
-    const candidates = [...wallsById.values()].sort((a, b) => a.id.localeCompare(b.id));
+    const candidates = [...wallsById.values()]
+      .filter((wall) => this.isWallInCreatureRange(creature, wall))
+      .sort((a, b) => a.id.localeCompare(b.id));
     if (candidates.length === 0) {
       return undefined;
     }
@@ -1217,6 +1224,14 @@ export class MatchSimulation {
     }
 
     return candidate.id.localeCompare(current.id) < 0;
+  }
+
+  private isTowerInCreatureRange(creature: Creature, tower: Tower): boolean {
+    return isWithinCreatureAttackRange(creature.archetype, creature, tower);
+  }
+
+  private isWallInCreatureRange(creature: Creature, wall: Wall): boolean {
+    return isWithinCreatureAttackRange(creature.archetype, creature, wall);
   }
 
   private getSquaredTowerDistanceForCreature(creature: Creature, tower: Tower): number {
