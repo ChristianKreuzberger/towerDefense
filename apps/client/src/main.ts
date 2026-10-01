@@ -1,4 +1,4 @@
-import { MAX_PLAYER_NAME_LENGTH, UPGRADE_TRACKS, isInSpawnProtection } from "@tower-defense/shared";
+import { UPGRADE_TRACKS, isInSpawnProtection } from "@tower-defense/shared";
 import type { MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
@@ -16,10 +16,11 @@ import { REJECT_REASON_TEXT, addFeedback, setMenuMessage, setStatus } from "./fe
 import { hideGuideOverlay, syncGuideOverlay } from "./guide";
 import type { GuideAction } from "./guide";
 import { hydrateSnapshot, resetMatchCaches } from "./hydrate";
+import { menuPlayersToSetupPlayers, renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
 import { perfTimeApply } from "./perf";
 import { announceWaveEnd, renderPhase, showTurnBanner } from "./phase";
 import { resolvePlacementCell } from "./placement";
-import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, stopPlayback, syncPlaybackControls } from "./playback";
+import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, syncPlaybackControls } from "./playback";
 import { playerNumber, playerTowerId, selectedPlayerId } from "./player-util";
 import { renderPlayerCards, setChipSelectHandler, updatePlayerOptions } from "./scoreboard";
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
@@ -65,61 +66,6 @@ configurePlayback({ advance: advanceTicks, blocked: () => demo.running() });
 setCellClickHandler(handleCellSelected);
 
 setChipSelectHandler(setActivePlayer);
-
-function showMenuScreen(): void {
-  // The match keeps running on the host; offer a way back unless it is already over.
-  el.menuResumeBtn.classList.toggle("hidden", !store.current || store.current.phase === "ended");
-  el.menuScreen.classList.remove("hidden");
-  el.gameScreen.classList.add("hidden");
-  stopPlayback();
-  hideGuideOverlay();
-  // Responses already in flight (playback ticks) must not pop the game screen back open over the menu.
-  store.appliedSeq = ++store.requestSeq;
-}
-
-function showGameScreen(): void {
-  el.menuScreen.classList.add("hidden");
-  el.gameScreen.classList.remove("hidden");
-}
-
-function renderMenuPlayerInputs(): void {
-  const count = Number(el.menuPlayerCount.value);
-  store.menuPlayers = Array.from({ length: count }, (_, index) => ({
-    id: `p${index + 1}`,
-    inputId: `menuPlayerName${index + 1}`,
-    defaultName: `Player ${index + 1}`
-  }));
-
-  el.menuPlayerNames.replaceChildren(...store.menuPlayers.map((player, index) => {
-    const row = document.createElement("div");
-    row.className = "menu-player";
-    const swatch = document.createElement("span");
-    swatch.className = `swatch ${player.id}`;
-    swatch.setAttribute("aria-hidden", "true");
-    swatch.textContent = String(index + 1);
-    const label = document.createElement("label");
-    label.className = "sr-only";
-    label.htmlFor = player.inputId;
-    label.textContent = `${player.id.toUpperCase()} Name`;
-    const input = document.createElement("input");
-    input.id = player.inputId;
-    input.maxLength = MAX_PLAYER_NAME_LENGTH;
-    input.value = player.defaultName;
-    row.append(swatch, label, input);
-    return row;
-  }));
-}
-
-function menuPlayersToSetupPlayers(): MatchSetup["players"] {
-  return store.menuPlayers.map((player, index) => {
-    const element = must<HTMLInputElement>(player.inputId);
-    const name = element.value.trim().slice(0, MAX_PLAYER_NAME_LENGTH);
-    return {
-      id: `p${index + 1}`,
-      name: name.length > 0 ? name : player.defaultName
-    };
-  });
-}
 
 function runGuideAction(action: GuideAction): void {
   if (action === "focus-place") {
