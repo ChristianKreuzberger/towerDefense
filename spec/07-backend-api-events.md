@@ -90,6 +90,14 @@ Common rejection reasons:
 - PATH_BLOCKED
 - SPAWN_PROTECTED (tower or wall inside the monster cave's protected area; wire code `spawn-protected`)
 - INSUFFICIENT_POINTS
+- TOWER_MAX_LEVEL (upgrade at max level; wire code `tower-max-level`)
+
+Transport-level validation (host API, before the simulation sees a command or setup). These are structured errors `{ ok: false, error: <code>, message }` with HTTP 400 and never end the session:
+- `invalid-json`: the request body is not valid JSON
+- `invalid-command`: missing or unsupported command, non-string ids, or an unknown `set-target-mode` mode (never coerced to `first`)
+- `invalid-coordinates`: `place-tower` / `place-wall` `x`/`y` are not finite integers inside the map bounds
+- `invalid-setup`: player count outside 1..8, duplicate player IDs (rejected, not de-duplicated), a name longer than `MAX_PLAYER_NAME_LENGTH` (24 characters), or a seed that is present but not a finite integer. A missing seed uses the documented default 777
+- CORS: the Node server answers cross-origin requests with `Access-Control-Allow-Origin: *` and handles `OPTIONS` preflight (it is a local, unauthenticated dev host)
 
 ## Contract versioning
 

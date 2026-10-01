@@ -29,7 +29,7 @@
 
 ## Tower lifecycle
 
-- Upgrade (multiple levels); upgrades are bought only during the prep (placement) phase and only while that player has not readied. They are rejected once the player is ready and during the wave
+- Upgrade (multiple levels, up to `MAX_TOWER_LEVEL` = 5); upgrades are bought only during the prep (placement) phase and only while that player has not readied. They are rejected once the player is ready and during the wave. An upgrade at max level is rejected with `tower-max-level` and costs nothing
 - Cannot shoot other towers under any condition
 - Can shoot invading creatures based on tower range and targeting rules
 - Range is limited and measured in grid cells (Euclidean distance, inclusive); a creature exactly at range distance can be targeted
@@ -57,6 +57,7 @@
 ## Damage and targeting
 
 - Targeting modes: first, last, strongest, nearest
+- Target mode can be changed by its owner during prep (placement phase, also after readying) and during the wave; it is rejected only when the match has ended, the player is eliminated, or the tower is not the player's own. Rejections use their own reasons (`invalid-target-mode-target`, `invalid-target-mode`), never a wall reason
 - Damage types: physical, explosive, magic
 - Resistances and vulnerabilities encoded in data
 - Friendly fire is disabled between towers
