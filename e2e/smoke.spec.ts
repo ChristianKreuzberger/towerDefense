@@ -592,3 +592,59 @@ test("wall and target-mode controls follow the phase and a disabled wall button 
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
   await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
 });
+
+async function showEndedOverlay(page: Page): Promise<void> {
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const ended = {
+    ...live.snapshot,
+    phase: "ended",
+    winnerId: "p1",
+    endReason: "score-win",
+    players: (live.snapshot.players as Array<Record<string, unknown>>).map((player) => ({ ...player, points: player.id === "p1" ? 1000 : 0 }))
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: ended }) });
+  });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#matchEndOverlay")).toBeVisible();
+}
+
+test("match-end modal is a real dialog: focus moves in, Tab stays inside, Escape closes it for good", async ({ page }) => {
+  await startMatch(page, "/");
+  const modal = page.locator(".match-end-modal");
+  await showEndedOverlay(page);
+
+  await expect(modal).toHaveAttribute("role", "dialog");
+  await expect(modal).toHaveAttribute("aria-modal", "true");
+  await expect(modal).toHaveAttribute("aria-labelledby", "matchEndTitle");
+  await expect(page.locator("#matchEndTitle")).toHaveText("Match Ended");
+  await expect(page.locator("#rematchBtn")).toBeFocused();
+  await expect(page.locator("#gameScreen")).toHaveAttribute("inert", "");
+
+  for (let press = 0; press < 8; press += 1) {
+    await page.keyboard.press("Tab");
+    const inside = await page.evaluate(() => Boolean(document.activeElement?.closest(".match-end-modal")));
+    expect(inside, `focus escaped the modal on Tab press ${press + 1}`).toBe(true);
+  }
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
+  // Focus goes back to the button that was focused when the modal opened.
+  await expect(page.getByRole("button", { name: "Refresh Snapshot" })).toBeFocused();
+
+  // Refreshing the same ended match must not pop the dismissed modal open again.
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await page.waitForTimeout(500);
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+});
+
+test("the guide close button has an accessible name and the shortcut bar matches real hotkeys", async ({ page }) => {
+  await startMatch(page, "/");
+  await expect(page.locator("#guideCloseBtn")).toHaveAttribute("aria-label", "Dismiss guidance");
+  await expect(page.locator("#guideCloseBtn")).toHaveAttribute("title", "Dismiss guidance");
+  const bar = page.locator("#shortcutBar");
+  for (const text of ["ready", "tower", "wall mode", "upgrade", "switch player", "pause", "mute", "move cursor"]) {
+    await expect(bar).toContainText(text);
+  }
+});

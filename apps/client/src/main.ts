@@ -240,7 +240,7 @@ app.innerHTML = `
             <div id="guideBody" class="guide-body"></div>
           </div>
           <button id="guideActionBtn" class="guide-action"></button>
-          <button id="guideCloseBtn" class="guide-close" aria-label="Dismiss guidance">&times;</button>
+          <button id="guideCloseBtn" class="guide-close" aria-label="Dismiss guidance" title="Dismiss guidance">&times;</button>
         </div>
       </div>
 
@@ -326,7 +326,7 @@ app.innerHTML = `
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
   </footer>
 
   <div id="settingsRoot"></div>
@@ -334,8 +334,8 @@ app.innerHTML = `
   <div id="feedbackQueue" class="toasts" role="status" aria-live="polite"></div>
 
   <div class="match-end-overlay" id="matchEndOverlay">
-    <div class="match-end-modal">
-      <h2>Match Ended</h2>
+    <div class="match-end-modal" role="dialog" aria-modal="true" aria-labelledby="matchEndTitle">
+      <h2 id="matchEndTitle">Match Ended</h2>
       <div id="matchEndSummary" class="small"></div>
       <div id="matchEndScores" class="match-end-grid"></div>
       <div class="stack">
@@ -1375,8 +1375,41 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
   }
 }
 
+// The match-end modal is dismissable; once dismissed it stays closed for this ended match.
+let endOverlayDismissed = false;
+let endOverlayInerted: Element[] = [];
+let endOverlayOpener: HTMLElement | null = null;
+
+function isEndOverlayOpen(): boolean {
+  return el.overlay.style.display === "flex";
+}
+
+// aria-modal alone does not stop Tab or screen readers reaching the page behind, so the siblings are made inert.
+function setEndOverlayBackgroundInert(on: boolean): void {
+  if (on) {
+    endOverlayInerted = [...(el.overlay.parentElement?.children ?? [])].filter((node) => node !== el.overlay && !node.hasAttribute("inert"));
+    endOverlayInerted.forEach((node) => node.setAttribute("inert", ""));
+  } else {
+    endOverlayInerted.forEach((node) => node.removeAttribute("inert"));
+    endOverlayInerted = [];
+  }
+}
+
+function hideEndOverlay(): void {
+  if (!isEndOverlayOpen()) {
+    return;
+  }
+  el.overlay.style.display = "none";
+  setEndOverlayBackgroundInert(false);
+  const target = endOverlayOpener && endOverlayOpener.isConnected ? endOverlayOpener : el.settingsBtn;
+  endOverlayOpener = null;
+  target.focus();
+}
+
 function renderEndOverlay(snapshot: MatchSnapshot | null): void {
   if (!snapshot || snapshot.phase !== "ended") {
+    endOverlayDismissed = false;
+    hideEndOverlay();
     el.overlay.style.display = "none";
     return;
   }
@@ -1398,10 +1431,18 @@ function renderEndOverlay(snapshot: MatchSnapshot | null): void {
     return [name, points];
   }));
 
+  if (endOverlayDismissed || isEndOverlayOpen()) {
+    return;
+  }
+  endOverlayOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   el.overlay.style.display = "flex";
+  setEndOverlayBackgroundInert(true);
+  must<HTMLButtonElement>("rematchBtn").focus();
 }
 
 function closeOverlay(): void {
+  endOverlayDismissed = true;
+  hideEndOverlay();
   el.overlay.style.display = "none";
 }
 
@@ -1876,6 +1917,26 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       event.preventDefault();
       settingsDialog.close();
+    }
+    return;
+  }
+
+  if (isEndOverlayOpen()) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeOverlay();
+    } else if (event.key === "Tab") {
+      // Wrap inside the modal; with the page inert Tab would otherwise leave for the browser chrome.
+      const buttons = [...el.overlay.querySelectorAll<HTMLButtonElement>("button")];
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (first && last && event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (first && last && !event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
     return;
   }
