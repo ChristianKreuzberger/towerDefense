@@ -18,6 +18,8 @@
 - Creature kill increments points and ends match at 1000 points
 - End-of-round automatic tower repair is applied and announced
 - Upgrade and wall cost calculations remain deterministic
+- Creature routing ignores tower list order, survives the loss of the first tower, and assigns live towers round robin
+- `validateGameMap` rejects each kind of malformed map; generated maps are valid and leave at least 8 reachable tower sites on every seed (checked across several hundred seeds by counting sites, not by placing every combination)
 
 ## Client audio and settings
 
