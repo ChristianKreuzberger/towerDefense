@@ -1,8 +1,8 @@
-import { MAX_PLAYER_NAME_LENGTH, TICKS_PER_SECOND, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { MAX_PLAYER_NAME_LENGTH, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import { getToolbarState } from "./toolbar-state.js";
 import { resolvePlacementCell } from "./placement.js";
 import { formatWavePreview } from "./wave-preview.js";
-import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, DamageType, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
+import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
 import { cueForCommandResult, cuesForSnapshotChange, createSoundEngine } from "./audio/index";
@@ -17,6 +17,9 @@ import { mountMapPreview } from "./map-preview";
 import { getJson, postJson } from "./api.js";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api.js";
 import { app, el, must } from "./dom";
+import { store } from "./state";
+import type { MapCache, PlayerChipRefs } from "./state";
+import { TARGET_MODES, DAMAGE_TYPE_OPTIONS, PLAYER_COLORS, TOAST_CAPACITY, TOAST_LIFETIME_MS, BANNER_LIFETIME_MS, TURN_BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, PLAYBACK_SPEEDS, PLAYBACK_CHECK_INTERVAL_MS, MAX_TICKS_PER_REQUEST, MAX_PLAYBACK_ERRORS, MANUAL_TRANSITION_MS, RETAINED_EVENT_TYPES, EVENT_LOG_CAPACITY, MAX_FX_EVENT_BACKLOG, DEBUG } from "./constants";
 import { clampCoord, coordValue } from "./coord.js";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import "./style.css";
@@ -39,22 +42,10 @@ declare global {
   }
 }
 
-const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
-const DAMAGE_TYPE_OPTIONS: DamageType[] = ["physical", "explosive", "magic"];
-const PLAYER_COLORS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"] as const;
-
 type FeedbackType = "accepted" | "rejected" | "info" | "error";
 
 interface FetchSnapshotOptions {
   silentStatus?: boolean;
-}
-
-interface MapCache {
-  key: string;
-  cells: MapCell[];
-  byKey: Map<string, MapCell>;
-  buildable: MapCell[];
-  worn: MapCell[];
 }
 
 type GuideAction = "focus-place" | "place-tower" | "ready-player" | "toggle-playback";
@@ -67,75 +58,6 @@ interface GuideState {
   actionLabel: string;
   action: GuideAction;
 }
-
-interface MenuPlayerInput {
-  id: string;
-  inputId: string;
-  defaultName: string;
-}
-
-const TOAST_CAPACITY = 5;
-const TOAST_LIFETIME_MS = 4500;
-const BANNER_LIFETIME_MS = 2600;
-// Longer than the wave banner: the player has to notice whose turn it is and hand over the screen.
-const TURN_BANNER_LIFETIME_MS = 3500;
-// 5 ticks/s at 1x: creatures cover up to 5 cells/s, slow enough to follow and fast enough that a wave is over in seconds.
-const BASE_TICKS_PER_SECOND = TICKS_PER_SECOND;
-const PLAYBACK_SPEEDS = [1, 2, 4] as const;
-const PLAYBACK_CHECK_INTERVAL_MS = 50;
-const MAX_TICKS_PER_REQUEST = 4;
-const MAX_PLAYBACK_ERRORS = 3;
-const MANUAL_TRANSITION_MS = 120;
-// Only these events drive presentation; the rest (movement, targeting, telemetry) would bloat the retained log.
-const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]> = new Set([
-  "tower-repaired",
-  "wall-repaired",
-  "path-repaired",
-  "wave-clear-bonus",
-  "catch-up-bonus"
-]);
-const EVENT_LOG_CAPACITY = 200;
-const MAX_FX_EVENT_BACKLOG = 300;
-
-const searchParams = new URLSearchParams(window.location.search);
-const DEBUG = searchParams.get("debug") === "1";
-
-let current: MatchSnapshot | null = null;
-let bannerTimer: ReturnType<typeof setTimeout> | null = null;
-let turnBannerTimer: ReturnType<typeof setTimeout> | null = null;
-let menuPlayers: MenuPlayerInput[] = [];
-let guideDismissedKey: string | null = null;
-let lastGuideKey = "";
-let mapCache: MapCache | null = null;
-let eventLog: MatchEvent[] = [];
-let eventCursor = 0;
-let requestSeq = 0;
-let appliedSeq = 0;
-let playing = true;
-let playbackSpeed: (typeof PLAYBACK_SPEEDS)[number] = 1;
-let playbackTimer: ReturnType<typeof setInterval> | null = null;
-let playbackLastClock = 0;
-let tickDebt = 0;
-let playbackInFlight = false;
-let playbackErrors = 0;
-let wallMode = false;
-// While on, the next tile click moves the player's tower (the one free move, spec/02).
-let moveMode = false;
-// Whether the player picked a tile (click or arrows) since this match began; see resolvePlacementCell.
-let cursorChosen = false;
-let playerSignature = "";
-let chipStructureSignature = "";
-interface PlayerChipRefs {
-  root: HTMLElement;
-  name: HTMLElement;
-  state: HTMLElement;
-  points: HTMLElement;
-  goalFill: HTMLElement;
-  meta: HTMLElement;
-  bar: HTMLElement | null;
-  barFill: HTMLElement | null;
-}
-let playerChips = new Map<string, PlayerChipRefs>();
 
 const settingsStore = createSettingsStore();
 const soundEngine = createSoundEngine({ settings: settingsStore });
@@ -154,7 +76,7 @@ const battlefieldMount = createBattlefieldMount(el.board, {
 
 // Debug-only synthetic combat: feeds creatures and events to the board without touching the host simulation.
 const demo = createDemo({
-  current: () => current,
+  current: () => store.current,
   feed: (snapshot, events) => applySnapshot(snapshot, events),
   tickMs: () => msPerTick(),
   onFinished: () => {
@@ -164,13 +86,13 @@ const demo = createDemo({
 
 function showMenuScreen(): void {
   // The match keeps running on the host; offer a way back unless it is already over.
-  el.menuResumeBtn.classList.toggle("hidden", !current || current.phase === "ended");
+  el.menuResumeBtn.classList.toggle("hidden", !store.current || store.current.phase === "ended");
   el.menuScreen.classList.remove("hidden");
   el.gameScreen.classList.add("hidden");
   stopPlayback();
   hideGuideOverlay();
   // Responses already in flight (playback ticks) must not pop the game screen back open over the menu.
-  appliedSeq = ++requestSeq;
+  store.appliedSeq = ++store.requestSeq;
 }
 
 function showGameScreen(): void {
@@ -257,13 +179,13 @@ function addFeedback(
 
 function renderMenuPlayerInputs(): void {
   const count = Number(el.menuPlayerCount.value);
-  menuPlayers = Array.from({ length: count }, (_, index) => ({
+  store.menuPlayers = Array.from({ length: count }, (_, index) => ({
     id: `p${index + 1}`,
     inputId: `menuPlayerName${index + 1}`,
     defaultName: `Player ${index + 1}`
   }));
 
-  el.menuPlayerNames.replaceChildren(...menuPlayers.map((player, index) => {
+  el.menuPlayerNames.replaceChildren(...store.menuPlayers.map((player, index) => {
     const row = document.createElement("div");
     row.className = "menu-player";
     const swatch = document.createElement("span");
@@ -284,7 +206,7 @@ function renderMenuPlayerInputs(): void {
 }
 
 function menuPlayersToSetupPlayers(): MatchSetup["players"] {
-  return menuPlayers.map((player, index) => {
+  return store.menuPlayers.map((player, index) => {
     const element = must<HTMLInputElement>(player.inputId);
     const name = element.value.trim().slice(0, MAX_PLAYER_NAME_LENGTH);
     return {
@@ -297,7 +219,7 @@ function menuPlayersToSetupPlayers(): MatchSetup["players"] {
 // The guide is an inline coach mark above the board with reserved height, so it never overlaps or shifts the battlefield.
 function hideGuideOverlay(): void {
   el.guideOverlay.classList.add("guide-idle");
-  lastGuideKey = "";
+  store.lastGuideKey = "";
 }
 
 function showGuideOverlay(state: GuideState): void {
@@ -381,7 +303,7 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
       tone: "hint",
       title: "Wave in progress",
       body: "The battle runs on its own. Use Place Wall and target modes to hold the lane, or pause to think. Upgrades (range, damage, accuracy) are bought in prep, before you ready.",
-      actionLabel: playing ? "Pause" : "Resume",
+      actionLabel: store.playing ? "Pause" : "Resume",
       action: "toggle-playback"
     };
   }
@@ -396,17 +318,17 @@ function syncGuideOverlay(snapshot: MatchSnapshot | null): void {
     return;
   }
 
-  if (guideDismissedKey === state.key) {
+  if (store.guideDismissedKey === state.key) {
     hideGuideOverlay();
-    guideDismissedKey = state.key;
+    store.guideDismissedKey = state.key;
     return;
   }
 
-  if (state.key === lastGuideKey && !el.guideOverlay.classList.contains("guide-idle")) {
+  if (state.key === store.lastGuideKey && !el.guideOverlay.classList.contains("guide-idle")) {
     return;
   }
 
-  lastGuideKey = state.key;
+  store.lastGuideKey = state.key;
   showGuideOverlay(state);
 }
 
@@ -427,7 +349,7 @@ function runGuideAction(action: GuideAction): void {
     return;
   }
 
-  setPlaying(!playing);
+  setPlaying(!store.playing);
 }
 
 function mapKeyOf(map: { seed: number; width: number; height: number }): string {
@@ -435,8 +357,8 @@ function mapKeyOf(map: { seed: number; width: number; height: number }): string 
 }
 
 function resetMatchCaches(): void {
-  eventLog = [];
-  eventCursor = 0;
+  store.eventLog = [];
+  store.eventCursor = 0;
 }
 
 function buildMapCache(key: string, cells: MapCell[]): MapCache {
@@ -459,21 +381,24 @@ function buildMapCache(key: string, cells: MapCell[]): MapCache {
 // arrives for a map whose cells we do not have, so the caller can fall back to a full fetch.
 function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEvents: MatchEvent[] } | null {
   const key = mapKeyOf(wire.map);
+  let cache: MapCache;
   if (wire.map.cells) {
-    mapCache = buildMapCache(key, wire.map.cells);
-  } else if (!mapCache || mapCache.key !== key) {
+    cache = buildMapCache(key, wire.map.cells);
+    store.mapCache = cache;
+  } else if (!store.mapCache || store.mapCache.key !== key) {
     return null;
   } else {
+    cache = store.mapCache;
     // The cached cell objects are mutated in place so the scene and lookups always see current wear.
-    for (const cell of mapCache.worn) {
+    for (const cell of cache.worn) {
       cell.pathWear = 0;
     }
-    mapCache.worn = [];
+    cache.worn = [];
     for (const entry of wire.map.wornCells ?? []) {
-      const cell = mapCache.byKey.get(`${entry.x},${entry.y}`);
+      const cell = cache.byKey.get(`${entry.x},${entry.y}`);
       if (cell) {
         cell.pathWear = entry.pathWear;
-        mapCache.worn.push(cell);
+        cache.worn.push(cell);
       }
     }
   }
@@ -482,17 +407,17 @@ function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEven
   const tail = wire.events;
   const total = wire.eventsTotal ?? offset + tail.length;
   let newEvents: MatchEvent[];
-  if (total < eventCursor) {
+  if (total < store.eventCursor) {
     // The host restarted its match behind our back; drop history rather than replaying it.
-    eventLog = [];
+    store.eventLog = [];
     newEvents = [];
   } else {
-    newEvents = tail.slice(Math.max(0, eventCursor - offset));
+    newEvents = tail.slice(Math.max(0, store.eventCursor - offset));
   }
-  eventCursor = total;
+  store.eventCursor = total;
   const retained = newEvents.filter((event) => RETAINED_EVENT_TYPES.has(event.type));
   if (retained.length > 0) {
-    eventLog = [...eventLog, ...retained].slice(-EVENT_LOG_CAPACITY);
+    store.eventLog = [...store.eventLog, ...retained].slice(-EVENT_LOG_CAPACITY);
   }
 
   const snapshot: MatchSnapshot = {
@@ -502,25 +427,25 @@ function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEven
       width: wire.map.width,
       height: wire.map.height,
       seed: wire.map.seed,
-      cells: mapCache.cells,
+      cells: cache.cells,
       ...(wire.map.spawn ? { spawn: wire.map.spawn } : {}),
       ...(wire.map.goal ? { goal: wire.map.goal } : {})
     },
-    events: eventLog
+    events: store.eventLog
   };
   return { snapshot, newEvents };
 }
 
 // Applies a host response unless a newer one was already applied. Returns false when a full refetch is needed.
 function applyWireSnapshot(wire: WireSnapshot, seq: number): boolean {
-  if (seq < appliedSeq) {
+  if (seq < store.appliedSeq) {
     return true;
   }
   const hydrated = hydrateSnapshot(wire);
   if (!hydrated) {
     return false;
   }
-  appliedSeq = seq;
+  store.appliedSeq = seq;
   applySnapshot(hydrated.snapshot, hydrated.newEvents);
   return true;
 }
@@ -530,8 +455,8 @@ function applySnapshot(snapshot: MatchSnapshot, newEvents: MatchEvent[]): void {
 }
 
 function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): void {
-  const previous = current;
-  current = snapshot;
+  const previous = store.current;
+  store.current = snapshot;
   // Real ticks between snapshots set how long creatures glide; anything else (new wave, rewind) snaps quickly.
   const ticksElapsed = previous && previous.wave === snapshot.wave && previous.phase === "wave" && snapshot.phase === "wave"
     ? snapshot.waveTick - previous.waveTick
@@ -546,17 +471,17 @@ function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEvent[]): v
     glideMs
   );
   showGameScreen();
-  updatePlayerOptions(current);
-  syncCursorToBuildableCell(current);
-  updateBattlefield(current, glideMs, fxEvents);
+  updatePlayerOptions(store.current);
+  syncCursorToBuildableCell(store.current);
+  updateBattlefield(store.current, glideMs, fxEvents);
   announceWaveEnd(fxEvents);
   resetTurnAfterWave(previous, snapshot);
-  renderToolbar(current);
-  renderPlayerCards(current, newEvents);
-  renderPhase(current);
-  renderEndOverlay(current);
-  renderSnapshot(current);
-  syncGuideOverlay(current);
+  renderToolbar(store.current);
+  renderPlayerCards(store.current, newEvents);
+  renderPhase(store.current);
+  renderEndOverlay(store.current);
+  renderSnapshot(store.current);
+  syncGuideOverlay(store.current);
 }
 
 function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["events"]): void {
@@ -596,64 +521,64 @@ function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["ev
 }
 
 function msPerTick(): number {
-  return 1000 / (BASE_TICKS_PER_SECOND * playbackSpeed);
+  return 1000 / (BASE_TICKS_PER_SECOND * store.playbackSpeed);
 }
 
 function playbackShouldRun(): boolean {
-  return playing && !demo.running() && !document.hidden && current?.phase === "wave" && !el.gameScreen.classList.contains("hidden");
+  return store.playing && !demo.running() && !document.hidden && store.current?.phase === "wave" && !el.gameScreen.classList.contains("hidden");
 }
 
 function startPlayback(): void {
-  if (playbackTimer !== null) {
+  if (store.playbackTimer !== null) {
     return;
   }
-  playbackLastClock = performance.now();
-  tickDebt = 0;
-  playbackErrors = 0;
-  playbackTimer = setInterval(playbackStep, PLAYBACK_CHECK_INTERVAL_MS);
+  store.playbackLastClock = performance.now();
+  store.tickDebt = 0;
+  store.playbackErrors = 0;
+  store.playbackTimer = setInterval(playbackStep, PLAYBACK_CHECK_INTERVAL_MS);
 }
 
 function stopPlayback(): void {
-  if (playbackTimer !== null) {
-    clearInterval(playbackTimer);
-    playbackTimer = null;
+  if (store.playbackTimer !== null) {
+    clearInterval(store.playbackTimer);
+    store.playbackTimer = null;
   }
-  tickDebt = 0;
+  store.tickDebt = 0;
 }
 
 // Fixed-rate tick accumulator: at most one request in flight, and stalls or hidden tabs never cause a catch-up burst.
 function playbackStep(): void {
   const now = performance.now();
-  const elapsedMs = Math.min(now - playbackLastClock, 250);
-  playbackLastClock = now;
+  const elapsedMs = Math.min(now - store.playbackLastClock, 250);
+  store.playbackLastClock = now;
   if (!playbackShouldRun()) {
-    tickDebt = 0;
+    store.tickDebt = 0;
     return;
   }
 
-  tickDebt = Math.min(tickDebt + (elapsedMs / 1000) * BASE_TICKS_PER_SECOND * playbackSpeed, MAX_TICKS_PER_REQUEST);
-  const ticks = Math.floor(tickDebt);
-  if (playbackInFlight || ticks < 1) {
+  store.tickDebt = Math.min(store.tickDebt + (elapsedMs / 1000) * BASE_TICKS_PER_SECOND * store.playbackSpeed, MAX_TICKS_PER_REQUEST);
+  const ticks = Math.floor(store.tickDebt);
+  if (store.playbackInFlight || ticks < 1) {
     return;
   }
-  tickDebt -= ticks;
-  playbackInFlight = true;
+  store.tickDebt -= ticks;
+  store.playbackInFlight = true;
   void advanceTicks(ticks).finally(() => {
-    playbackInFlight = false;
+    store.playbackInFlight = false;
   });
 }
 
 async function advanceTicks(ticks: number): Promise<void> {
-  const seq = ++requestSeq;
+  const seq = ++store.requestSeq;
   try {
-    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks, lite: true, eventsSince: eventCursor });
-    playbackErrors = 0;
+    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks, lite: true, eventsSince: store.eventCursor });
+    store.playbackErrors = 0;
     if (data.snapshot && !applyWireSnapshot(data.snapshot, seq)) {
       await fetchSnapshot({ silentStatus: true });
     }
   } catch (error) {
-    playbackErrors += 1;
-    if (playbackErrors >= MAX_PLAYBACK_ERRORS) {
+    store.playbackErrors += 1;
+    if (store.playbackErrors >= MAX_PLAYBACK_ERRORS) {
       setPlaying(false);
       const message = error instanceof Error ? error.message : "request failed";
       setStatus(`Playback paused after repeated failures: ${message}`);
@@ -663,34 +588,34 @@ async function advanceTicks(ticks: number): Promise<void> {
 }
 
 function setPlaying(next: boolean): void {
-  playing = next;
+  store.playing = next;
   syncPlaybackControls();
-  if (playing) {
-    tickDebt = 0;
+  if (store.playing) {
+    store.tickDebt = 0;
     // Otherwise a single failure after a failure-triggered pause would pause again immediately.
-    playbackErrors = 0;
-    playbackLastClock = performance.now();
+    store.playbackErrors = 0;
+    store.playbackLastClock = performance.now();
   }
   // The wave guidance button label mirrors the current state.
-  syncGuideOverlay(current);
+  syncGuideOverlay(store.current);
 }
 
 function setPlaybackSpeed(next: (typeof PLAYBACK_SPEEDS)[number]): void {
-  playbackSpeed = next;
+  store.playbackSpeed = next;
   syncPlaybackControls();
 }
 
 function syncPlaybackControls(): void {
-  el.playPauseBtn.textContent = playing ? "Pause" : "Play";
-  el.playPauseBtn.setAttribute("aria-pressed", String(playing));
+  el.playPauseBtn.textContent = store.playing ? "Pause" : "Play";
+  el.playPauseBtn.setAttribute("aria-pressed", String(store.playing));
   for (const button of el.playbackControls.querySelectorAll<HTMLButtonElement>(".speed-btn")) {
-    button.setAttribute("aria-pressed", String(Number(button.dataset.speed) === playbackSpeed));
+    button.setAttribute("aria-pressed", String(Number(button.dataset.speed) === store.playbackSpeed));
   }
 }
 
 document.addEventListener("visibilitychange", () => {
-  tickDebt = 0;
-  playbackLastClock = performance.now();
+  store.tickDebt = 0;
+  store.playbackLastClock = performance.now();
 });
 
 function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
@@ -703,10 +628,10 @@ function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
 function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
   const players = snapshot?.players ?? [];
   const signature = players.map((player) => `${player.id}:${player.name}`).join("|");
-  if (signature === playerSignature) {
+  if (signature === store.playerSignature) {
     return;
   }
-  playerSignature = signature;
+  store.playerSignature = signature;
 
   const previous = el.playerId.value;
   el.playerId.innerHTML = "";
@@ -739,7 +664,7 @@ function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0, eve
   }
 
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
-  const wallHint = wallMode ? " • Wall mode: click a buildable tile (Esc to leave)" : "";
+  const wallHint = store.wallMode ? " • Wall mode: click a buildable tile (Esc to leave)" : "";
   const toSpawn = snapshot.phase === "wave" ? ` • ${snapshot.creaturesToSpawn} still to spawn` : "";
   el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active${toSpawn}${wallHint}`;
 }
@@ -753,8 +678,8 @@ function syncPlacementContext(snapshot: MatchSnapshot | null): void {
     phase: snapshot.phase,
     playerId,
     hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId),
-    wallMode,
-    moveMode
+    wallMode: store.wallMode,
+    moveMode: store.moveMode
   });
 }
 
@@ -775,10 +700,10 @@ function showWaveBanner(title: string, sub: string): void {
   el.waveBanner.classList.remove("show");
   void el.waveBanner.offsetWidth;
   el.waveBanner.classList.add("show");
-  if (bannerTimer !== null) {
-    clearTimeout(bannerTimer);
+  if (store.bannerTimer !== null) {
+    clearTimeout(store.bannerTimer);
   }
-  bannerTimer = setTimeout(() => el.waveBanner.classList.remove("show"), BANNER_LIFETIME_MS);
+  store.bannerTimer = setTimeout(() => el.waveBanner.classList.remove("show"), BANNER_LIFETIME_MS);
 }
 
 function showTurnBanner(player: { id: string; name: string }): void {
@@ -790,10 +715,10 @@ function showTurnBanner(player: { id: string; name: string }): void {
   el.turnBanner.classList.remove("show");
   void el.turnBanner.offsetWidth;
   el.turnBanner.classList.add("show");
-  if (turnBannerTimer !== null) {
-    clearTimeout(turnBannerTimer);
+  if (store.turnBannerTimer !== null) {
+    clearTimeout(store.turnBannerTimer);
   }
-  turnBannerTimer = setTimeout(() => el.turnBanner.classList.remove("show"), TURN_BANNER_LIFETIME_MS);
+  store.turnBannerTimer = setTimeout(() => el.turnBanner.classList.remove("show"), TURN_BANNER_LIFETIME_MS);
 }
 
 // Every wave hands the table back to the first seat. Detected from the phase change between two snapshots, so a
@@ -868,7 +793,7 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   // The wall button stays clickable so a press explains why it is off (see the click handler) instead of failing silently.
   el.placeWallBtn.classList.toggle("dim", !state.wallEnabled);
   el.placeWallBtn.setAttribute("aria-disabled", String(!state.wallEnabled));
-  if (!state.wallEnabled && wallMode) {
+  if (!state.wallEnabled && store.wallMode) {
     setWallMode(false);
   }
   setAvailability(el.placeTowerBtn, state.placeTowerEnabled, snapshot.phase === "ended");
@@ -877,7 +802,7 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   el.moveTowerBtn.classList.toggle("dim", !state.moveEnabled);
   el.moveTowerBtn.setAttribute("aria-disabled", String(!state.moveEnabled));
   el.moveTowerCost.textContent = state.moveLabel;
-  if (!state.moveEnabled && moveMode) {
+  if (!state.moveEnabled && store.moveMode) {
     setMoveMode(false);
   }
   el.mode.disabled = !state.targetModeEnabled;
@@ -944,7 +869,7 @@ function playerNumber(playerId: string): number {
 // Chips are created once per (player, tower) and updated in place so HP bar transitions and pulses survive snapshots.
 function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent[] = []): void {
   if (!snapshot) {
-    playerChips = new Map();
+    store.playerChips = new Map();
     el.playerCards.textContent = "No active match";
     return;
   }
@@ -954,20 +879,20 @@ function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent
     newEvents.filter((event) => event.type === "tower-repaired").map((event) => event.towerId)
   );
   const structure = snapshot.players.map((player) => `${player.id}:${towersByPlayer.has(player.id) ? 1 : 0}`).join("|");
-  if (structure !== chipStructureSignature) {
-    chipStructureSignature = structure;
-    playerChips = new Map();
+  if (structure !== store.chipStructureSignature) {
+    store.chipStructureSignature = structure;
+    store.playerChips = new Map();
     el.playerCards.textContent = "";
     for (const player of snapshot.players) {
       const tower = towersByPlayer.get(player.id);
       const refs = buildPlayerChip(player, tower?.id ?? null);
-      playerChips.set(player.id, refs);
+      store.playerChips.set(player.id, refs);
       el.playerCards.append(refs.root);
     }
   }
 
   for (const player of snapshot.players) {
-    const refs = playerChips.get(player.id);
+    const refs = store.playerChips.get(player.id);
     if (!refs) {
       continue;
     }
@@ -1112,11 +1037,6 @@ function renderPhase(snapshot: MatchSnapshot | null): void {
   }
 }
 
-// The match-end modal is dismissable; once dismissed it stays closed for this ended match.
-let endOverlayDismissed = false;
-let endOverlayInerted: Element[] = [];
-let endOverlayOpener: HTMLElement | null = null;
-
 function isEndOverlayOpen(): boolean {
   return el.overlay.style.display === "flex";
 }
@@ -1124,11 +1044,11 @@ function isEndOverlayOpen(): boolean {
 // aria-modal alone does not stop Tab or screen readers reaching the page behind, so the siblings are made inert.
 function setEndOverlayBackgroundInert(on: boolean): void {
   if (on) {
-    endOverlayInerted = [...(el.overlay.parentElement?.children ?? [])].filter((node) => node !== el.overlay && !node.hasAttribute("inert"));
-    endOverlayInerted.forEach((node) => node.setAttribute("inert", ""));
+    store.endOverlayInerted = [...(el.overlay.parentElement?.children ?? [])].filter((node) => node !== el.overlay && !node.hasAttribute("inert"));
+    store.endOverlayInerted.forEach((node) => node.setAttribute("inert", ""));
   } else {
-    endOverlayInerted.forEach((node) => node.removeAttribute("inert"));
-    endOverlayInerted = [];
+    store.endOverlayInerted.forEach((node) => node.removeAttribute("inert"));
+    store.endOverlayInerted = [];
   }
 }
 
@@ -1138,14 +1058,14 @@ function hideEndOverlay(): void {
   }
   el.overlay.style.display = "none";
   setEndOverlayBackgroundInert(false);
-  const target = endOverlayOpener && endOverlayOpener.isConnected ? endOverlayOpener : el.settingsBtn;
-  endOverlayOpener = null;
+  const target = store.endOverlayOpener && store.endOverlayOpener.isConnected ? store.endOverlayOpener : el.settingsBtn;
+  store.endOverlayOpener = null;
   target.focus();
 }
 
 function renderEndOverlay(snapshot: MatchSnapshot | null): void {
   if (!snapshot || snapshot.phase !== "ended") {
-    endOverlayDismissed = false;
+    store.endOverlayDismissed = false;
     hideEndOverlay();
     el.overlay.style.display = "none";
     return;
@@ -1168,28 +1088,28 @@ function renderEndOverlay(snapshot: MatchSnapshot | null): void {
     return [name, points];
   }));
 
-  if (endOverlayDismissed || isEndOverlayOpen()) {
+  if (store.endOverlayDismissed || isEndOverlayOpen()) {
     return;
   }
-  endOverlayOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  store.endOverlayOpener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   el.overlay.style.display = "flex";
   setEndOverlayBackgroundInert(true);
   must<HTMLButtonElement>("rematchBtn").focus();
 }
 
 function closeOverlay(): void {
-  endOverlayDismissed = true;
+  store.endOverlayDismissed = true;
   hideEndOverlay();
   el.overlay.style.display = "none";
 }
 
 async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnapshot | null> {
-  const seq = ++requestSeq;
+  const seq = ++store.requestSeq;
   // Only a client that had no match yet is actually reconnecting; later calls are routine refreshes.
-  const reconnecting = current === null;
+  const reconnecting = store.current === null;
   try {
     // Without cached map cells the host must send a full snapshot; afterwards lite is enough.
-    const path = mapCache ? `/api/snapshot?lite=1&eventsSince=${eventCursor}` : "/api/snapshot";
+    const path = store.mapCache ? `/api/snapshot?lite=1&eventsSince=${store.eventCursor}` : "/api/snapshot";
     let data = await getJson<{ ok: true; snapshot: WireSnapshot }>(path);
     if (!applyWireSnapshot(data.snapshot, seq)) {
       data = await getJson<{ ok: true; snapshot: WireSnapshot }>("/api/snapshot");
@@ -1198,7 +1118,7 @@ async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnaps
     if (reconnecting) {
       setMenuMessage("Reconnected to running match.");
     }
-    return current;
+    return store.current;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch snapshot";
     if (!options?.silentStatus) {
@@ -1210,20 +1130,20 @@ async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnaps
 
 function startFreshMatch(wire: WireSnapshot): void {
   resetMatchCaches();
-  cursorChosen = false;
-  guideDismissedKey = null;
-  playing = true;
+  store.cursorChosen = false;
+  store.guideDismissedKey = null;
+  store.playing = true;
   syncPlaybackControls();
   setWallMode(false);
-  applyWireSnapshot(wire, ++requestSeq);
+  applyWireSnapshot(wire, ++store.requestSeq);
   // A new match (menu Start or Rematch) opens with the preview; a reconnect never reaches this function.
-  if (current && current.phase === "placement") {
-    mapPreview.open(current);
+  if (store.current && store.current.phase === "placement") {
+    mapPreview.open(store.current);
   }
 }
 
 async function startMatchFromMenu(): Promise<void> {
-  if (current && current.phase !== "ended" && !window.confirm("Replace the running match?")) {
+  if (store.current && store.current.phase !== "ended" && !window.confirm("Replace the running match?")) {
     return;
   }
   closeOverlay();
@@ -1260,13 +1180,13 @@ async function startMatchFromMenu(): Promise<void> {
 }
 
 async function rematchWithSamePlayers(): Promise<void> {
-  if (!current) {
+  if (!store.current) {
     return;
   }
 
-  const players = current.players.map((player) => ({ id: player.id, name: player.name }));
+  const players = store.current.players.map((player) => ({ id: player.id, name: player.name }));
   const payload: MatchSetup = {
-    seed: current.map.seed + 1,
+    seed: store.current.map.seed + 1,
     players
   };
 
@@ -1292,7 +1212,7 @@ async function rematchWithSamePlayers(): Promise<void> {
 function selectedPlayerId(): string {
   const value = String(el.playerId.value || "").trim();
   if (!value) {
-    const fallback = current?.players[0]?.id ?? "";
+    const fallback = store.current?.players[0]?.id ?? "";
     if (fallback) {
       el.playerId.value = fallback;
       return fallback;
@@ -1313,20 +1233,20 @@ function occupiedCellKeys(snapshot: MatchSnapshot): Set<string> {
 }
 
 function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y: number } | null {
-  if (!snapshot || !mapCache) {
+  if (!snapshot || !store.mapCache) {
     return null;
   }
 
   const occupied = occupiedCellKeys(snapshot);
   const currentX = coordValue(el.x);
   const currentY = coordValue(el.y);
-  const currentCell = mapCache.byKey.get(`${currentX},${currentY}`);
+  const currentCell = store.mapCache.byKey.get(`${currentX},${currentY}`);
   const isFree = (x: number, y: number): boolean => !occupied.has(`${x},${y}`) && !isInSpawnProtection(snapshot.map, x, y);
   if (currentCell?.buildable && isFree(currentX, currentY)) {
     return { x: currentX, y: currentY };
   }
 
-  const cell = mapCache.buildable.find((entry) => isFree(entry.x, entry.y));
+  const cell = store.mapCache.buildable.find((entry) => isFree(entry.x, entry.y));
   return cell ? { x: cell.x, y: cell.y } : null;
 }
 
@@ -1341,14 +1261,14 @@ function syncCursorToBuildableCell(snapshot: MatchSnapshot | null): void {
 }
 
 function adjustCoord(dx: number, dy: number): void {
-  cursorChosen = true;
-  const width = current?.map?.width ?? 64;
-  const height = current?.map?.height ?? 64;
+  store.cursorChosen = true;
+  const width = store.current?.map?.width ?? 64;
+  const height = store.current?.map?.height ?? 64;
   const nextX = clampCoord(coordValue(el.x) + dx, width);
   const nextY = clampCoord(coordValue(el.y) + dy, height);
   el.x.value = String(nextX);
   el.y.value = String(nextY);
-  if (current) {
+  if (store.current) {
     battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
   }
 }
@@ -1363,71 +1283,71 @@ function isFormField(target: EventTarget | null): boolean {
 }
 
 function handleCellSelected(x: number, y: number): void {
-  if (!current) {
+  if (!store.current) {
     return;
   }
-  cursorChosen = true;
+  store.cursorChosen = true;
 
   el.x.value = String(x);
   el.y.value = String(y);
   battlefieldMount.setCursor(x, y);
 
-  const cell = mapCache?.byKey.get(`${x},${y}`);
+  const cell = store.mapCache?.byKey.get(`${x},${y}`);
   if (!cell || !cell.buildable) {
     return;
   }
 
-  if (occupiedCellKeys(current).has(`${x},${y}`)) {
+  if (occupiedCellKeys(store.current).has(`${x},${y}`)) {
     return;
   }
 
   const playerId = selectedPlayerId();
-  if (moveMode) {
+  if (store.moveMode) {
     void sendCommand({ type: "move-tower", playerId, towerId: playerTowerId(playerId), x, y });
     return;
   }
 
-  if (wallMode) {
+  if (store.wallMode) {
     void sendCommand({ type: "place-wall", playerId, x, y });
     return;
   }
 
-  const alreadyHasTower = current.towers.some((tower) => tower.playerId === playerId);
-  if (current.phase === "placement" && !alreadyHasTower) {
+  const alreadyHasTower = store.current.towers.some((tower) => tower.playerId === playerId);
+  if (store.current.phase === "placement" && !alreadyHasTower) {
     void sendCommand({ type: "place-tower", playerId, x, y });
   }
 }
 
 function setMoveMode(next: boolean): void {
-  if (next && wallMode) {
+  if (next && store.wallMode) {
     setWallMode(false);
   }
-  moveMode = next;
+  store.moveMode = next;
   el.moveTowerBtn.setAttribute("aria-pressed", String(next));
   el.moveTowerBtn.classList.toggle("active", next);
-  if (current) {
-    syncPlacementContext(current);
-    updateBattlefield(current);
+  if (store.current) {
+    syncPlacementContext(store.current);
+    updateBattlefield(store.current);
   }
 }
 
 function setWallMode(next: boolean): void {
-  if (next && moveMode) {
+  if (next && store.moveMode) {
     setMoveMode(false);
   }
-  wallMode = next;
+  store.wallMode = next;
   el.placeWallBtn.setAttribute("aria-pressed", String(next));
   el.placeWallBtn.classList.toggle("active", next);
   el.battlefieldMeta.classList.toggle("wall-mode", next);
-  if (current) {
-    updateBattlefield(current);
+  if (store.current) {
+    updateBattlefield(store.current);
   }
 }
 
 async function sendCommand(command: SimulationCommand): Promise<void> {
-  const seq = ++requestSeq;
+  const seq = ++store.requestSeq;
   try {
-    const data = await postJson<ApiCommandPayload>("/api/command", { command, lite: true, eventsSince: eventCursor });
+    const data = await postJson<ApiCommandPayload>("/api/command", { command, lite: true, eventsSince: store.eventCursor });
     const result = data.result;
     const cue = cueForCommandResult(command.type, result?.accepted === true);
     if (cue) {
@@ -1490,7 +1410,7 @@ el.menuRefreshBtn.addEventListener("click", () => {
 
 must<HTMLButtonElement>("refreshBtn").addEventListener("click", () => {
   addFeedback("info", "Manual snapshot refresh");
-  guideDismissedKey = null;
+  store.guideDismissedKey = null;
   void fetchSnapshot();
 });
 
@@ -1504,7 +1424,7 @@ must<HTMLButtonElement>("backToMenuBtn").addEventListener("click", () => {
 });
 
 el.guideCloseBtn.addEventListener("click", () => {
-  guideDismissedKey = lastGuideKey;
+  store.guideDismissedKey = store.lastGuideKey;
   hideGuideOverlay();
 });
 
@@ -1514,39 +1434,39 @@ el.guideActionBtn.addEventListener("click", () => {
     return;
   }
 
-  guideDismissedKey = null;
+  store.guideDismissedKey = null;
   hideGuideOverlay();
   runGuideAction(action);
 });
 
 function applyActivePlayerChange(): void {
-  guideDismissedKey = null;
+  store.guideDismissedKey = null;
   hideGuideOverlay();
-  syncCursorToBuildableCell(current);
-  updateBattlefield(current);
-  syncGuideOverlay(current);
-  renderToolbar(current);
-  renderPlayerCards(current);
+  syncCursorToBuildableCell(store.current);
+  updateBattlefield(store.current);
+  syncGuideOverlay(store.current);
+  renderToolbar(store.current);
+  renderPlayerCards(store.current);
 }
 
 // Hot-seat play: once a player is ready, hand the screen to the next player who still has to act.
 function passTurnAfterReady(readyPlayerId: string): void {
-  if (!current || current.phase !== "placement" || selectedPlayerId() !== readyPlayerId) {
+  if (!store.current || store.current.phase !== "placement" || selectedPlayerId() !== readyPlayerId) {
     return;
   }
-  const nextId = nextPendingPlayerId(current.players, readyPlayerId);
+  const nextId = nextPendingPlayerId(store.current.players, readyPlayerId);
   if (!nextId || nextId === readyPlayerId) {
     return;
   }
   setActivePlayer(nextId);
-  const next = current.players.find((player) => player.id === nextId);
+  const next = store.current.players.find((player) => player.id === nextId);
   if (next) {
     showTurnBanner(next);
   }
 }
 
 function setActivePlayer(playerId: string): void {
-  if (!current || playerId === el.playerId.value || !current.players.some((player) => player.id === playerId)) {
+  if (!store.current || playerId === el.playerId.value || !store.current.players.some((player) => player.id === playerId)) {
     return;
   }
   el.playerId.value = playerId;
@@ -1562,13 +1482,13 @@ el.rematchBtn.addEventListener("click", () => {
 
 function placeTowerForSelectedPlayer(): void {
   const playerId = selectedPlayerId();
-  const snapshot = current;
+  const snapshot = store.current;
   const coords = snapshot
     ? resolvePlacementCell({
         cursor: { x: coordValue(el.x), y: coordValue(el.y) },
-        cursorChosen,
+        cursorChosen: store.cursorChosen,
         isFreeBuildable: (cell) =>
-          Boolean(mapCache?.byKey.get(`${cell.x},${cell.y}`)?.buildable)
+          Boolean(store.mapCache?.byKey.get(`${cell.x},${cell.y}`)?.buildable)
           && !occupiedCellKeys(snapshot).has(`${cell.x},${cell.y}`)
           && !isInSpawnProtection(snapshot.map, cell.x, cell.y),
         firstFree: () => firstFreeBuildableCoord(snapshot)
@@ -1598,7 +1518,7 @@ el.placeWallBtn.addEventListener("click", () => {
     addFeedback("info", REJECT_REASON_TEXT["wall-phase-not-active"] ?? "walls are not available right now");
     return;
   }
-  setWallMode(!wallMode);
+  setWallMode(!store.wallMode);
 });
 
 el.moveTowerBtn.addEventListener("click", () => {
@@ -1607,11 +1527,11 @@ el.moveTowerBtn.addEventListener("click", () => {
     addFeedback("info", used ? "You already used your free tower move" : "Moving your tower unlocks after round 5 and only in prep, before you ready");
     return;
   }
-  setMoveMode(!moveMode);
+  setMoveMode(!store.moveMode);
 });
 
 el.playPauseBtn.addEventListener("click", () => {
-  setPlaying(!playing);
+  setPlaying(!store.playing);
 });
 
 for (const button of el.playbackControls.querySelectorAll<HTMLButtonElement>(".speed-btn")) {
@@ -1667,8 +1587,8 @@ must<HTMLButtonElement>("advanceBtn").addEventListener("click", () => {
 must<HTMLButtonElement>("autoBtn").addEventListener("click", async () => {
   try {
     const attemptedTicks = 200;
-    const seq = ++requestSeq;
-    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks: attemptedTicks, lite: true, eventsSince: eventCursor });
+    const seq = ++store.requestSeq;
+    const data = await postJson<ApiAdvanceManyPayload>("/api/advance-many", { ticks: attemptedTicks, lite: true, eventsSince: store.eventCursor });
     setStatus(`advance-many: attempted=${attemptedTicks} accepted=${data.acceptedTicks ?? 0} stopped=${data.stoppedReason ?? "none"}`);
     addFeedback("info", `Advance-many accepted ${data.acceptedTicks ?? 0} ticks`, "advance-wave", data.stoppedReason);
 
@@ -1743,9 +1663,9 @@ document.addEventListener("keydown", (event) => {
   }
 
   // `current` is not cleared when returning to the menu, so check the screen and end overlay explicitly.
-  const inMatch = current && !el.gameScreen.classList.contains("hidden") && el.overlay.style.display !== "flex";
-  if (inMatch && current && !event.ctrlKey && !event.metaKey && !event.altKey && /^[1-8]$/.test(event.key)) {
-    const target = current.players.find((player) => playerNumber(player.id) === Number(event.key));
+  const inMatch = store.current && !el.gameScreen.classList.contains("hidden") && el.overlay.style.display !== "flex";
+  if (inMatch && store.current && !event.ctrlKey && !event.metaKey && !event.altKey && /^[1-8]$/.test(event.key)) {
+    const target = store.current.players.find((player) => playerNumber(player.id) === Number(event.key));
     if (target) {
       event.preventDefault();
       setActivePlayer(target.id);
@@ -1797,18 +1717,18 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key === "Escape" && moveMode) {
+  if (event.key === "Escape" && store.moveMode) {
     setMoveMode(false);
     return;
   }
 
-  if (event.key === "Escape" && wallMode) {
+  if (event.key === "Escape" && store.wallMode) {
     setWallMode(false);
     return;
   }
 
   if (event.key === "Escape" && !el.guideOverlay.classList.contains("guide-idle")) {
-    guideDismissedKey = lastGuideKey;
+    store.guideDismissedKey = store.lastGuideKey;
     hideGuideOverlay();
     return;
   }
@@ -1871,20 +1791,20 @@ void fetchSnapshot({ silentStatus: true }).finally(endBoot);
 
 // Read-only test hook so Playwright can locate buildable cells without DOM grid elements.
 function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {
-  if (!current || !mapCache) {
+  if (!store.current || !store.mapCache) {
     return [];
   }
 
-  const occupied = occupiedCellKeys(current);
-  const map = current.map;
-  const open = new Set(mapCache.buildable.map((cell) => `${cell.x},${cell.y}`));
+  const occupied = occupiedCellKeys(store.current);
+  const map = store.current.map;
+  const open = new Set(store.mapCache.buildable.map((cell) => `${cell.x},${cell.y}`));
   // Maze corridors are the creatures' only route, so placements there are usually rejected.
   // Isolated pads (no walkable neighbour) are always legal spots for tests to click.
   const isPad = (cell: { x: number; y: number }): boolean =>
     [`${cell.x + 1},${cell.y}`, `${cell.x - 1},${cell.y}`, `${cell.x},${cell.y + 1}`, `${cell.x},${cell.y - 1}`].every(
       (key) => !open.has(key)
     );
-  return mapCache.buildable
+  return store.mapCache.buildable
     .filter((cell) => !occupied.has(`${cell.x},${cell.y}`) && !isInSpawnProtection(map, cell.x, cell.y) && isPad(cell))
     .map((cell) => ({ x: cell.x, y: cell.y }));
 }
@@ -1904,7 +1824,7 @@ window.__testBoard = {
     return battlefieldMount.creaturePositions();
   },
   playback(): { playing: boolean; speed: number } {
-    return { playing, speed: playbackSpeed };
+    return { playing: store.playing, speed: store.playbackSpeed };
   },
   ...(DEBUG ? { demo } : {})
 };
