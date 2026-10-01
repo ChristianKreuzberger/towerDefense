@@ -19,8 +19,8 @@
 ## In-round HUD requirements
 
 - Compact scoreboard, one chip per player: colour swatch with the player number, name, points with a bar toward the 1000-point goal, tower HP bar
-- Scoreboard chips double as player switchers: click, Enter or Space on a chip selects that player
-- The active chip is highlighted with a border and glow, carries `aria-current="true"` and a non-colour marker (a ▶ before the name)
+- Scoreboard chips double as player switchers: clicking a chip, or activating the real button around its name with Enter or Space, selects that player. The chip itself is not a button, so the nested HP progressbar stays exposed to assistive tech
+- The active chip is highlighted with a border and glow, the name button carries `aria-current="true"` and a non-colour marker (a ▶ before the name)
 - Keys 1-8 select player N (ignored if that player does not exist); the keys only work while a match is on screen (not on the menu or the match-end overlay) and never while typing in a form field. Tab is deliberately left alone so keyboard-only navigation keeps working
 - The "Active Player" select stays and is kept in sync with the chips in both directions
 - Show active wave and remaining creatures

@@ -427,6 +427,8 @@ function showMenuScreen(): void {
   el.gameScreen.classList.add("hidden");
   stopPlayback();
   hideGuideOverlay();
+  // Responses already in flight (playback ticks) must not pop the game screen back open over the menu.
+  appliedSeq = ++requestSeq;
 }
 
 function showGameScreen(): void {
@@ -1023,17 +1025,9 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
 function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: string | null): PlayerChipRefs {
   const root = document.createElement("div");
   root.className = "player-chip";
-  root.tabIndex = 0;
-  root.setAttribute("role", "button");
-  root.title = `Switch to ${player.name} (${playerNumber(player.id)})`;
+  // Mouse users can click anywhere on the chip; keyboard and assistive tech use the real button around the name.
+  // The chip itself is not a button so the nested health progressbar keeps its accessibility semantics.
   root.addEventListener("click", () => setActivePlayer(player.id));
-  root.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      event.stopPropagation();
-      setActivePlayer(player.id);
-    }
-  });
   const swatch = document.createElement("div");
   swatch.className = "chip-swatch";
   swatch.textContent = String(playerNumber(player.id));
@@ -1042,7 +1036,8 @@ function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: stri
   body.className = "chip-body";
   const top = document.createElement("div");
   top.className = "chip-top";
-  const name = document.createElement("span");
+  const name = document.createElement("button");
+  name.type = "button";
   name.className = "player-chip-name";
   const state = document.createElement("span");
   state.className = "chip-state";
@@ -1130,9 +1125,9 @@ function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent
     const isActive = player.id === el.playerId.value;
     const className = `player-chip ${status} ${towerColorClass(player.id)}${isActive ? " active" : ""}`;
     if (isActive) {
-      refs.root.setAttribute("aria-current", "true");
+      refs.name.setAttribute("aria-current", "true");
     } else {
-      refs.root.removeAttribute("aria-current");
+      refs.name.removeAttribute("aria-current");
     }
     refs.root.title = `Switch to ${player.name} (${playerNumber(player.id)})`;
     if (refs.root.className !== className) {

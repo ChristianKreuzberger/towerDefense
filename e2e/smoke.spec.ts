@@ -35,15 +35,11 @@ async function startMatch(page: Page, path: string): Promise<void> {
   await page.goto(path);
   const hasMatch = (await (await reconnect).json()).ok === true;
   // The host keeps the previous test's match alive, and the client reconnects to it on load.
-  // A playback tick still in flight can re-show the game screen right after "Back To Menu", so retry until the menu sticks.
+  // Wait for that reconnect to show the game screen before leaving it; the client drops responses
+  // still in flight after "Back To Menu", so the menu stays put once it is shown.
   if (hasMatch) {
-    await expect(async () => {
-      const backToMenu = page.getByRole("button", { name: "Back To Menu" });
-      if (await backToMenu.isVisible()) {
-        await backToMenu.click();
-      }
-      await expect(page.locator("#menuScreen")).toBeVisible({ timeout: 1000 });
-    }).toPass({ timeout: 10_000 });
+    await expect(page.locator("#gameScreen")).toBeVisible();
+    await page.getByRole("button", { name: "Back To Menu" }).click();
   }
   await expect(page.locator("#menuScreen")).toBeVisible();
   await page.locator("#menuSeed").fill("777");
@@ -294,20 +290,21 @@ test("scoreboard chips and hotkeys switch the active player", async ({ page }) =
   await startMatch(page, "/");
   const select = page.locator("#playerId");
   const chips = page.locator("#playerCards .player-chip");
+  const switchers = page.locator("#playerCards .player-chip-name");
   await expect(select).toHaveValue("p1");
-  await expect(chips.nth(0)).toHaveAttribute("aria-current", "true");
-  await expect(chips.nth(1)).not.toHaveAttribute("aria-current", "true");
+  await expect(switchers.nth(0)).toHaveAttribute("aria-current", "true");
+  await expect(switchers.nth(1)).not.toHaveAttribute("aria-current", "true");
 
   await chips.nth(1).click();
   await expect(select).toHaveValue("p2");
-  await expect(chips.nth(1)).toHaveAttribute("aria-current", "true");
+  await expect(switchers.nth(1)).toHaveAttribute("aria-current", "true");
   await expect(chips.nth(1)).toHaveClass(/active/);
   await expect(chips.nth(0)).not.toHaveClass(/active/);
 
-  await chips.nth(0).focus();
+  await switchers.nth(0).focus();
   await page.keyboard.press("Enter");
   await expect(select).toHaveValue("p1");
-  await chips.nth(1).focus();
+  await switchers.nth(1).focus();
   await page.keyboard.press("Space");
   await expect(select).toHaveValue("p2");
 
@@ -321,8 +318,8 @@ test("scoreboard chips and hotkeys switch the active player", async ({ page }) =
   await expect(select).toHaveValue("p2");
 
   await select.selectOption("p1");
-  await expect(chips.nth(0)).toHaveAttribute("aria-current", "true");
-  await expect(chips.nth(1)).not.toHaveAttribute("aria-current", "true");
+  await expect(switchers.nth(0)).toHaveAttribute("aria-current", "true");
+  await expect(switchers.nth(1)).not.toHaveAttribute("aria-current", "true");
 });
 
 test("typing in a form field does not switch players", async ({ page }) => {
@@ -332,7 +329,7 @@ test("typing in a form field does not switch players", async ({ page }) => {
   await page.locator("#playerId").focus();
   await page.keyboard.press("1");
   await expect(page.locator("#playerId")).toHaveValue("p2");
-  await expect(page.locator("#playerCards .player-chip").nth(1)).toHaveAttribute("aria-current", "true");
+  await expect(page.locator("#playerCards .player-chip-name").nth(1)).toHaveAttribute("aria-current", "true");
 });
 
 test("a tower can be placed as a player switched to via hotkey", async ({ page }) => {

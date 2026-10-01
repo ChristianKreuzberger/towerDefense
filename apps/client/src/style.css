@@ -430,7 +430,7 @@ kbd {
   border-color: var(--chip, var(--line));
 }
 
-.player-chip:focus-visible {
+.player-chip-name:focus-visible {
   outline: 2px solid var(--chip, var(--ink));
   outline-offset: 2px;
 }
@@ -469,6 +469,14 @@ kbd {
 }
 
 .player-chip-name {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   font-weight: 800;
   font-size: 13px;
   overflow: hidden;
