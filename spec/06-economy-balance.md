@@ -44,7 +44,7 @@ Point economy with per-player score tracking.
 
 ## Constraints
 
-- Towers cannot be sold or relocated after placement
+- Towers cannot be sold. They cannot be relocated either, except for the one free move per player that unlocks after 5 completed rounds (see spec/02); the move costs no points
 - Spending points is limited to upgrades and wall construction at MVP
 
 ## Data storage

@@ -55,6 +55,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 
 - placeTower { tileX, tileY, towerType }
 - placeWall { tileX, tileY, wallType }
+- moveTower { towerId, x, y } (once per player, unlocked after 5 completed rounds, prep phase only and before the player is ready; accepted moves emit a `tower-moved` event)
 - upgradeTower { towerId, track } where track is `range`, `damage` or `accuracy` (prep phase only, rejected once the player is ready or during the wave)
 - setTargetMode { towerId, mode }
 - readyForWave { ready: boolean } (`allPlayersReadyForWave` excludes eliminated players)
@@ -92,6 +93,7 @@ Common rejection reasons:
 - INSUFFICIENT_POINTS
 - TOWER_MAX_LEVEL (upgrade track at max level; wire code `tower-max-level`)
 - INVALID_UPGRADE_TRACK (wire code `invalid-upgrade-track`)
+- TOWER_MOVE_LOCKED, TOWER_MOVE_USED, MOVE_PHASE_NOT_ACTIVE (wire codes `tower-move-locked`, `tower-move-used`, `move-phase-not-active`)
 
 Transport-level validation (host API, before the simulation sees a command or setup). These are structured errors `{ ok: false, error: <code>, message }` with HTTP 400 and never end the session:
 - `invalid-json`: the request body is not valid JSON

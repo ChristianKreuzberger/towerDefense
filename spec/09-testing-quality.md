@@ -11,7 +11,7 @@
 - Tower placement rejection when path would be fully blocked
 - Tower cannot target or damage other towers
 - Each player must place exactly one tower before wave start
-- Tower cannot be moved or sold after placement
+- Tower cannot be sold; it cannot be moved except for the single free move unlocked after 5 rounds (rejected before that, rejected a second time, rejected after ready or during a wave)
 - Wall placement blocks movement but never invalidates all tower paths
 - Creature kill increments points and ends match at 1000 points
 - End-of-round automatic tower repair is applied and announced
