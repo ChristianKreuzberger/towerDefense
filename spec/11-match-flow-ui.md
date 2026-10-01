@@ -87,6 +87,45 @@ Effects (driven by snapshot events, presentation only)
 - Events of one batched response are spread across the glide time of that response so they do not all fire at once; the number of effects per snapshot is capped
 - With `prefers-reduced-motion` there is no shake, no particle burst and no banner animation; flashes become short static highlights
 
+## Audio and settings
+
+Sound effects are procedural Web Audio only: no audio files are downloaded or bundled, matching the procedural-art policy. Audio is presentation only. It is driven from client events and snapshot diffs; the simulation and server know nothing about it.
+
+Settings dialog
+- A "Settings" button sits in the main-menu actions (`#menuSettingsBtn`) and in the match session row (`#settingsBtn`)
+- The dialog is a modal (`role="dialog"`, `aria-modal="true"`, labelled by its title) with an effects volume slider (0-100, default 70, with a visible value label), a mute toggle (`aria-pressed`) and a Close button
+- Esc, Close or a click on the backdrop dismisses it; focus returns to the button that opened it
+- While the dialog is open the rest of the page is `inert` (no Tab or pointer access behind it) and game hotkeys are ignored (Esc closes the dialog only)
+- Moving the slider plays a short preview blip (not when muted); the blip is throttled
+- `M` toggles mute from anywhere except form fields (key repeat is ignored). It is listed in the shortcut bar
+- Settings persist in `localStorage` (see 08-data-persistence.md) and apply immediately
+
+Engine rules
+- The `AudioContext` is created lazily, never at import time, and unlocked (resumed) on the first `pointerdown`, `keydown` or `touchend`; the listeners are removed once the context is running and re-armed if the context later leaves the running state (for example Safari interruptions)
+- If Web Audio is unavailable or throws, audio is a permanent no-op and nothing else is affected
+- Output goes through a master gain, a compressor and fixed headroom. The master gain is the volume squared (perceptual curve); muted means gain 0 and no nodes are created
+- Nothing plays while the document is hidden, while the context is not running, or on a fresh load, reconnect or event backlog (same suppression as visual effects: no previous snapshot, or more than 300 new events)
+- Sounds are throttled per id (minimum interval, maximum simultaneous voices) and by a global voice cap. Priority sounds (wave start, wave clear, win, lose, tower destroyed) are never throttled or capped
+- Tower pitch is derived deterministically from the player number; no randomness
+- Cues from one batched response are spread across the glide time of that response, like visual effects
+
+Event to sound table
+| Source | Sound id | Notes |
+| --- | --- | --- |
+| `tower-hit` | `tower-shot` | at most one per tower id, at most 4 per snapshot |
+| `creature-defeated` | `creature-kill` | at most 3 per snapshot |
+| `creature-attack` | `tower-damaged` | |
+| `tower-destroyed` | `tower-destroyed` | priority |
+| `wall-hit` | `wall-hit` | |
+| `wall-destroyed` | `wall-destroyed` | |
+| `wave-start` event or phase change into `wave` | `wave-start` | once per snapshot |
+| `wave-end` | `wave-clear`, plus `wave-clear-bonus` sparkle | |
+| `tower-repaired` | `repair` | at most one per snapshot |
+| phase change into `ended` from another phase | `win` (score-win) or `lose` (all-towers-destroyed) | priority |
+| command accepted: place-tower, place-wall, upgrade-tower, ready-for-wave | `place-tower`, `place-wall`, `upgrade`, `ready` | |
+| command rejected | `rejected` | debug commands and set-target-mode are silent |
+| enabled button click | `ui-click` | `data-sfx` on a button overrides or disables (`none`) it |
+
 ## Wall placement
 
 - Walls are placed from the battlefield: toggle "Place Wall" (or press W), then click a buildable free tile; the mode stays active until toggled off

@@ -17,6 +17,11 @@
 - End-of-round automatic tower repair is applied and announced
 - Upgrade and wall cost calculations remain deterministic
 
+## Client audio and settings
+
+- Client unit tests (`node --test` on the compiled output, fake `AudioContext` and storage) cover settings parsing and persistence, the event-to-sound mapping with its caps and suppression, and engine guards (no `AudioContext`, suspended, muted, hidden, throttling)
+- The browser smoke tests must pass with `AudioContext` blocked, and cover settings persistence across reload and hotkey isolation while the dialog is open
+
 ## Tooling suggestions
 
 - Vitest for unit and integration tests
