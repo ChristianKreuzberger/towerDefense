@@ -160,6 +160,8 @@ let tickDebt = 0;
 let playbackInFlight = false;
 let playbackErrors = 0;
 let wallMode = false;
+// While on, the next tile click moves the player's tower (the one free move, spec/02).
+let moveMode = false;
 // Whether the player picked a tile (click or arrows) since this match began; see resolvePlacementCell.
 let cursorChosen = false;
 let playerSignature = "";
@@ -287,7 +289,10 @@ app.innerHTML = `
         <button id="placeWallBtn" class="tool" aria-pressed="false" title="Toggle wall mode, then click tiles (W)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M9 5v7M15 12v7" stroke="currentColor" stroke-width="2"/></svg><span class="tool-label">Place Wall</span><span class="tool-cost" id="wallCost">25</span><kbd>W</kbd>
         </button>
-<button id="upgradeRangeBtn" data-track="range" data-sfx="none" class="tool upgrade-btn" title="Upgrade tower range (U)">
+<button id="moveTowerBtn" data-sfx="none" class="tool" aria-pressed="false" title="Move your tower once, free, after round 5 (V)">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tool-label">Move Tower</span><span class="tool-cost" id="moveTowerCost">-</span><kbd>V</kbd>
+        </button>
+        <button id="upgradeRangeBtn" data-track="range" data-sfx="none" class="tool upgrade-btn" title="Upgrade tower range (U)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M4 12h16M7 7l-3 5 3 5M17 7l3 5-3 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="tool-label">Range</span><span class="tool-cost" id="upgradeRangeCost">-</span><kbd>U</kbd>
         </button>
         <button id="upgradeDamageBtn" data-track="damage" data-sfx="none" class="tool upgrade-btn" title="Upgrade tower damage (I)">
@@ -333,7 +338,7 @@ app.innerHTML = `
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>V</kbd> move tower <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
   </footer>
 
   <div id="settingsRoot"></div>
@@ -398,6 +403,8 @@ const el = {
   status: must<HTMLElement>("status"),
   placeTowerBtn: must<HTMLButtonElement>("placeTowerBtn"),
   readyBtn: must<HTMLButtonElement>("readyBtn"),
+  moveTowerBtn: must<HTMLButtonElement>("moveTowerBtn"),
+  moveTowerCost: must<HTMLElement>("moveTowerCost"),
   upgradeBtns: {
     range: must<HTMLButtonElement>("upgradeRangeBtn"),
     damage: must<HTMLButtonElement>("upgradeDamageBtn"),
@@ -520,6 +527,10 @@ const REJECT_REASON_TEXT: Record<string, string> = {
   "spawn-protected": "too close to the monster cave",
   "wall-phase-not-active": "walls can only be placed during combat",
   "upgrade-phase-not-active": "upgrades can only be bought during prep, before you ready",
+  "tower-move-locked": "moving your tower unlocks after round 5",
+  "tower-move-used": "you already used your free move",
+  "move-phase-not-active": "you can only move your tower during prep, before you ready",
+  "invalid-move-target": "you can only move your own tower",
   "tower-max-level": "your tower is already at max level",
   "invalid-target-mode-target": "you can only change your own tower",
   "invalid-target-mode": "unknown target mode",
@@ -537,6 +548,7 @@ const COMMAND_LABEL: Partial<Record<SimulationCommand["type"], string>> = {
   "place-wall": "Wall",
   "place-tower": "Tower",
   "upgrade-tower": "Upgrade",
+  "move-tower": "Move",
   "set-target-mode": "Target mode",
   "ready-for-wave": "Ready"
 };
@@ -1057,7 +1069,8 @@ function syncPlacementContext(snapshot: MatchSnapshot | null): void {
     phase: snapshot.phase,
     playerId,
     hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId),
-    wallMode
+    wallMode,
+    moveMode
   });
 }
 
@@ -1154,7 +1167,9 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
     phase: snapshot.phase,
     upgrades: tower?.upgrades ?? null,
     eliminated: Boolean(player?.eliminated),
-    readyForWave: Boolean(player?.readyForWave)
+    readyForWave: Boolean(player?.readyForWave),
+    towerMoveAvailable: Boolean(player?.towerMoveAvailable),
+    wave: snapshot.wave
   });
   for (const track of UPGRADE_TRACKS) {
     const button = el.upgradeBtns[track];
@@ -1174,6 +1189,13 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   }
   setAvailability(el.placeTowerBtn, state.placeTowerEnabled, snapshot.phase === "ended");
   setAvailability(el.readyBtn, state.readyEnabled, snapshot.phase === "ended");
+  // Stays clickable like the wall button, so a press can explain why it is off.
+  el.moveTowerBtn.classList.toggle("dim", !state.moveEnabled);
+  el.moveTowerBtn.setAttribute("aria-disabled", String(!state.moveEnabled));
+  el.moveTowerCost.textContent = state.moveLabel;
+  if (!state.moveEnabled && moveMode) {
+    setMoveMode(false);
+  }
   el.mode.disabled = !state.targetModeEnabled;
   if (tower) {
     el.mode.value = tower.targetMode;
@@ -1681,6 +1703,11 @@ function handleCellSelected(x: number, y: number): void {
   }
 
   const playerId = selectedPlayerId();
+  if (moveMode) {
+    void sendCommand({ type: "move-tower", playerId, towerId: playerTowerId(playerId), x, y });
+    return;
+  }
+
   if (wallMode) {
     void sendCommand({ type: "place-wall", playerId, x, y });
     return;
@@ -1692,7 +1719,23 @@ function handleCellSelected(x: number, y: number): void {
   }
 }
 
+function setMoveMode(next: boolean): void {
+  if (next && wallMode) {
+    setWallMode(false);
+  }
+  moveMode = next;
+  el.moveTowerBtn.setAttribute("aria-pressed", String(next));
+  el.moveTowerBtn.classList.toggle("active", next);
+  if (current) {
+    syncPlacementContext(current);
+    updateBattlefield(current);
+  }
+}
+
 function setWallMode(next: boolean): void {
+  if (next && moveMode) {
+    setMoveMode(false);
+  }
   wallMode = next;
   el.placeWallBtn.setAttribute("aria-pressed", String(next));
   el.placeWallBtn.classList.toggle("active", next);
@@ -1718,6 +1761,9 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
       setStatus("accepted");
       if (command.type === "place-wall") {
         addFeedback("accepted", "Wall placed");
+      } else if (command.type === "move-tower") {
+        addFeedback("accepted", "Tower moved");
+        setMoveMode(false);
       } else if (command.type === "upgrade-tower") {
         addFeedback("accepted", `Tower ${command.track} upgraded`);
       }
@@ -1874,6 +1920,15 @@ el.placeWallBtn.addEventListener("click", () => {
     return;
   }
   setWallMode(!wallMode);
+});
+
+el.moveTowerBtn.addEventListener("click", () => {
+  if (el.moveTowerBtn.getAttribute("aria-disabled") === "true") {
+    const used = el.moveTowerCost.textContent === "used";
+    addFeedback("info", used ? "You already used your free tower move" : "Moving your tower unlocks after round 5 and only in prep, before you ready");
+    return;
+  }
+  setMoveMode(!moveMode);
 });
 
 el.playPauseBtn.addEventListener("click", () => {
@@ -2034,9 +2089,22 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (key === "v") {
+    event.preventDefault();
+    if (isActionAvailable(el.moveTowerBtn)) {
+      el.moveTowerBtn.click();
+    }
+    return;
+  }
+
   if (key === "p") {
     event.preventDefault();
     el.playPauseBtn.click();
+    return;
+  }
+
+  if (event.key === "Escape" && moveMode) {
+    setMoveMode(false);
     return;
   }
 

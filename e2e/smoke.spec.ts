@@ -729,3 +729,45 @@ test("after the match ended the ready and place-tower buttons are disabled and t
   await expect(page.locator("#matchEndOverlay")).toBeHidden();
   await expect(page.locator("#readyBtn")).toBeDisabled();
 });
+
+test("the move button explains itself while locked and, once unlocked, sends a move on the next tile click", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+
+  // Locked before round 5 is done: dimmed, labelled, and a press only explains.
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#moveTowerCost")).toHaveText("after R5");
+  await page.locator("#moveTowerBtn").click({ force: true });
+  await expect(page.locator("#feedbackQueue")).toContainText("unlocks after round 5");
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-pressed", "false");
+  expect(commands).toEqual([]);
+
+  // A snapshot from round 6 where the player still holds the token enables it.
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const unlocked = {
+    ...live.snapshot,
+    wave: 6,
+    players: (live.snapshot.players as Array<Record<string, unknown>>).map((player) => ({ ...player, towerMoveAvailable: player.id === "p1" }))
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: unlocked }) });
+  }, { times: 1 });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-disabled", "false");
+  await expect(page.locator("#moveTowerCost")).toHaveText("free");
+
+  await page.keyboard.press("v");
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-pressed", "true");
+  await clickBuildableCell(page, 3);
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toContain('"type":"move-tower"');
+  expect(commands[0]).toContain('"towerId":"tower-p1"');
+});

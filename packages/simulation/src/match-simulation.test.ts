@@ -23,6 +23,7 @@ import {
   getCreatureMovementSpeedUnits,
   PATH_CELL_MAX_WEAR,
   getTowerRange,
+  isInSpawnProtection,
   getWaveCreatureCount,
   getTowerUpgradeCost,
   MAX_TOWER_LEVEL,
@@ -3606,4 +3607,93 @@ test("creaturesToSpawn counts down during a wave and previews the next wave in p
   assert.equal(afterWave.phase, "placement");
   assert.equal(afterWave.wave, 2);
   assert.equal(afterWave.creaturesToSpawn, getWaveCreatureCount(2));
+});
+
+// The move unlocks after 5 completed rounds; tests jump straight to the prep of wave 6 instead of playing 5 waves.
+function jumpToWave(simulation: ReturnType<typeof createMatch>, wave: number): void {
+  (simulation as unknown as { state: { wave: number } }).state.wave = wave;
+}
+
+function freeCellAwayFrom(seed: number, taken: { x: number; y: number }): { x: number; y: number } {
+  const cell = getPlaceableCellsNearSpawn(seed, 3).find((entry) => entry.x !== taken.x || entry.y !== taken.y);
+  assert.ok(cell);
+  return cell;
+}
+
+test("moving a tower is locked until 5 rounds are done, and a rejected move keeps the token", () => {
+  const simulation = createPrepMatchWithTower(31);
+  const tower = simulation.getSnapshot().towers[0];
+  assert.ok(tower);
+  const target = freeCellAwayFrom(31, tower);
+
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, false);
+  for (const wave of [1, 5]) {
+    jumpToWave(simulation, wave);
+    const result = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: target.x, y: target.y });
+    assert.deepEqual(result, { accepted: false, reason: "tower-move-locked" }, `wave ${wave}`);
+  }
+
+  jumpToWave(simulation, 6);
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, true);
+  const bad = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: tower.x, y: tower.y });
+  assert.deepEqual(bad, { accepted: false, reason: "tower-overlap" });
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, true);
+});
+
+test("the free move relocates the tower, keeps its progress, emits an event and is used up", () => {
+  const simulation = createPrepMatchWithTower(31);
+  simulation.awardPoints("p1", 200);
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" });
+  simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "strongest" });
+  const before = simulation.getSnapshot().towers[0];
+  assert.ok(before);
+  const target = freeCellAwayFrom(31, before);
+
+  jumpToWave(simulation, 6);
+  const result = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: target.x, y: target.y });
+  assert.deepEqual(result, { accepted: true });
+
+  const after = simulation.getSnapshot();
+  const moved = after.towers[0];
+  assert.deepEqual({ x: moved?.x, y: moved?.y }, target);
+  assert.deepEqual(moved?.upgrades, before.upgrades);
+  assert.equal(moved?.level, before.level);
+  assert.equal(moved?.targetMode, "strongest");
+  assert.equal(moved?.health, before.health);
+  assert.deepEqual(after.players[0]?.tower, { playerId: "p1", x: target.x, y: target.y });
+  assert.equal(after.players[0]?.towerMoveAvailable, false);
+  assert.ok(after.events.some((event) => event.type === "tower-moved" && event.fromX === before.x && event.x === target.x && event.towerId === "tower-p1"));
+
+  const second = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: before.x, y: before.y });
+  assert.deepEqual(second, { accepted: false, reason: "tower-move-used" });
+});
+
+test("a move follows the placement rules and needs prep, before ready, and the player's own tower", () => {
+  const [firstCell, secondCell] = getBuildableCoordinates(10, 2);
+  assert.ok(firstCell && secondCell);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }, { id: "p2", name: "Beta" }],
+    seed: 10
+  });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstCell.x, y: firstCell.y });
+  simulation.applyCommand({ type: "place-tower", playerId: "p2", x: secondCell.x, y: secondCell.y });
+  jumpToWave(simulation, 6);
+  const move = (x: number, y: number, playerId = "p1", towerId = "tower-p1") =>
+    simulation.applyCommand({ type: "move-tower", playerId, towerId, x, y });
+
+  assert.equal(move(-1, 0).reason, "out-of-bounds");
+  assert.equal(move(getNonBuildableCoordinate(10).x, getNonBuildableCoordinate(10).y).reason, "cell-not-buildable");
+  const map = simulation.getSnapshot().map;
+  const protectedCell = map.cells.find((cell) => cell.buildable && isInSpawnProtection(map, cell.x, cell.y));
+  assert.ok(protectedCell, "expected a buildable cell inside the cave's protected area");
+  assert.equal(move(protectedCell.x, protectedCell.y).reason, "spawn-protected");
+  assert.equal(move(secondCell.x, secondCell.y).reason, "tower-overlap");
+  assert.equal(move(5, 5, "p1", "tower-p2").reason, "invalid-move-target");
+  assert.equal(move(5, 5, "p1", "tower-missing").reason, "invalid-move-target");
+
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(move(firstCell.x, firstCell.y + 1).reason, "player-already-ready-for-wave");
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
+  assert.equal(simulation.getSnapshot().phase, "wave");
+  assert.equal(move(firstCell.x, firstCell.y + 1).reason, "move-phase-not-active");
 });

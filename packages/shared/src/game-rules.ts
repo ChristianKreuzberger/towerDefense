@@ -36,6 +36,8 @@ export const BASE_TOWER_RANGE = 6;
 export const TOWER_RANGE_PER_LEVEL = 1.5;
 // Highest level of each upgrade track (spec/06). A default chosen with the economy spec.
 export const MAX_TOWER_LEVEL = 5;
+// After this many completed rounds every player gets one free tower move (spec/02).
+export const TOWER_MOVE_AFTER_WAVES = 5;
 // Cost of an upgrade is floor(base * growth ** currentTrackLevel); damage is the strongest track, so the dearest.
 export const UPGRADE_TRACK_COSTS = {
   range: { base: 40, growth: 1.6 },
@@ -77,6 +79,7 @@ export const GAME_RULES = {
   baseTowerRange: BASE_TOWER_RANGE,
   towerRangePerLevel: TOWER_RANGE_PER_LEVEL,
   maxTowerLevel: MAX_TOWER_LEVEL,
+  towerMoveAfterWaves: TOWER_MOVE_AFTER_WAVES,
   baseTowerAccuracy: BASE_TOWER_ACCURACY,
   towerAccuracyPerLevel: TOWER_ACCURACY_PER_LEVEL
 } as const;
