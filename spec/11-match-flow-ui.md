@@ -23,6 +23,7 @@
 - The active chip is highlighted with a border and glow, the name button carries `aria-current="true"` and a non-colour marker (a ▶ before the name)
 - Keys 1-8 select player N (ignored if that player does not exist); the keys only work while a match is on screen (not on the menu or the match-end overlay) and never while typing in a form field. Tab is deliberately left alone so keyboard-only navigation keeps working
 - The "Active Player" select stays and is kept in sync with the chips in both directions
+- Hot-seat turn handover: when a player's ready command is accepted during placement, the active player automatically switches to the next player (wrapping around) who is neither ready nor eliminated, and a toast plus the guide card announce "<name>, it's your turn". Nothing switches when no such player remains or the ready came from another phase
 - Show active wave and remaining creatures
 - Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log

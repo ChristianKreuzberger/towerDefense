@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { nextPendingPlayerId, type TurnPlayer } from "./turn.js";
+
+const player = (id: string, readyForWave: boolean, eliminated = false): TurnPlayer => ({ id, readyForWave, eliminated });
+
+test("picks the next player who is not ready", () => {
+  const players = [player("p1", true), player("p2", false), player("p3", false)];
+  assert.equal(nextPendingPlayerId(players, "p1"), "p2");
+});
+
+test("skips ready and eliminated players and wraps around", () => {
+  const players = [player("p1", false), player("p2", true), player("p3", false, true), player("p4", true)];
+  assert.equal(nextPendingPlayerId(players, "p2"), "p1");
+});
+
+test("returns null when everyone is ready", () => {
+  assert.equal(nextPendingPlayerId([player("p1", true), player("p2", true)], "p1"), null);
+});
+
+test("can return the same player when they are the only one pending", () => {
+  assert.equal(nextPendingPlayerId([player("p1", false), player("p2", true)], "p1"), "p1");
+});
+
+test("unknown current player starts from the first player", () => {
+  assert.equal(nextPendingPlayerId([player("p1", false), player("p2", false)], "zz"), "p1");
+});

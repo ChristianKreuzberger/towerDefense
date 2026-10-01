@@ -10,6 +10,7 @@ import { createDemo } from "./demo";
 import { perfRecordBytes, perfTimeApply } from "./perf";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
+import { nextPendingPlayerId } from "./turn";
 import "./style.css";
 
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
@@ -578,7 +579,7 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
       return {
         key: `place-${activePlayer.id}`,
         tone: "place",
-        title: `${activePlayer.name}, claim the opening tower`,
+        title: `${activePlayer.name}, it's your turn: claim the opening tower`,
         body: "Click a buildable tile on the battlefield to place your tower there.",
         actionLabel: "Place Tower Now",
         action: "place-tower"
@@ -586,17 +587,15 @@ function computeGuideState(snapshot: MatchSnapshot | null): GuideState | null {
     }
 
     if (!activePlayer.readyForWave) {
-      const everyonePlaced = snapshot.players.every((player) => player.hasPlacedTower);
-      if (everyonePlaced) {
-        return {
-          key: `ready-${activePlayer.id}-${snapshot.wave}`,
-          tone: "ready",
-          title: `${activePlayer.name}, lock in your setup`,
-          body: "Every tower is in place. Confirm readiness so the first wave can begin on schedule.",
-          actionLabel: "Ready For Wave",
-          action: "ready-player"
-        };
-      }
+      // The sim accepts ready as soon as this player has a tower, so the turn card must not wait for the others.
+      return {
+        key: `ready-${activePlayer.id}-${snapshot.wave}`,
+        tone: "ready",
+        title: `${activePlayer.name}, it's your turn: lock in your setup`,
+        body: "Confirm readiness once your tower is where you want it. The wave starts when every player is ready.",
+        actionLabel: "Ready For Wave",
+        action: "ready-player"
+      };
     }
 
     const allReady = snapshot.players.every((player) => player.readyForWave);
@@ -1537,6 +1536,10 @@ async function sendCommand(command: SimulationCommand): Promise<void> {
     if (!data.snapshot || !applyWireSnapshot(data.snapshot, seq)) {
       await fetchSnapshot();
     }
+
+    if (result?.accepted && command.type === "ready-for-wave") {
+      passTurnAfterReady(command.playerId);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to send command";
     setStatus(`error: ${message}`);
@@ -1604,6 +1607,22 @@ function applyActivePlayerChange(): void {
   updateBattlefield(current);
   syncGuideOverlay(current);
   renderPlayerCards(current);
+}
+
+// Hot-seat play: once a player is ready, hand the screen to the next player who still has to act.
+function passTurnAfterReady(readyPlayerId: string): void {
+  if (!current || current.phase !== "placement" || selectedPlayerId() !== readyPlayerId) {
+    return;
+  }
+  const nextId = nextPendingPlayerId(current.players, readyPlayerId);
+  if (!nextId || nextId === readyPlayerId) {
+    return;
+  }
+  setActivePlayer(nextId);
+  const next = current.players.find((player) => player.id === nextId);
+  if (next) {
+    addFeedback("info", `${next.name}, it's your turn`);
+  }
 }
 
 function setActivePlayer(playerId: string): void {
