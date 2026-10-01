@@ -21,6 +21,8 @@ export const BASE_CREATURE_MOVEMENT_SPEED_UNITS = MOVEMENT_PROGRESS_UNITS_PER_CE
 export const CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR = 10;
 export const MIN_CREATURE_MOVEMENT_SPEED_UNITS = 40;
 export const WAVE_CLEAR_BONUS = 15;
+export const BASE_TOWER_RANGE = 8;
+export const TOWER_RANGE_PER_LEVEL = 1.5;
 
 export const GAME_RULES = {
   minPlayers: MIN_PLAYERS,
@@ -46,7 +48,9 @@ export const GAME_RULES = {
   baseCreatureMovementSpeedUnits: BASE_CREATURE_MOVEMENT_SPEED_UNITS,
   creatureMovementSpeedPenaltyPerWear: CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR,
   minCreatureMovementSpeedUnits: MIN_CREATURE_MOVEMENT_SPEED_UNITS,
-  waveClearBonus: WAVE_CLEAR_BONUS
+  waveClearBonus: WAVE_CLEAR_BONUS,
+  baseTowerRange: BASE_TOWER_RANGE,
+  towerRangePerLevel: TOWER_RANGE_PER_LEVEL
 } as const;
 
 export function getBetweenWaveTowerRepairAmount(maxHealth: number): number {
@@ -73,4 +77,9 @@ export function getCreatureMovementSpeedUnits(pathWear: number): number {
 
 export function getWaveClearBonus(): number {
   return WAVE_CLEAR_BONUS;
+}
+
+// Range is measured in grid cells (Euclidean) and grows with each upgrade level.
+export function getTowerRange(level: number): number {
+  return BASE_TOWER_RANGE + (Math.max(1, level) - 1) * TOWER_RANGE_PER_LEVEL;
 }
