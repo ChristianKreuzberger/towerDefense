@@ -174,6 +174,18 @@ test("spawn protection: a wall may not cut the cave's lane even if another left-
   });
 });
 
+test("spawn protection: a wall may not cut a tower off from the cave even if it touches a map border elsewhere", () => {
+  // Tower at (7,1) is reachable from the cave only through (7,2). Its other neighbour (7,0) sits on the top
+  // border but is walled off from the cave, so only cave-seeded reachability sees the cut. The lower lane keeps
+  // the left-to-right route open, so only the per-tower check can reject.
+  const rows = ["#######.##", "#######.##", "..........", ".#########", ".........."];
+  const map: GameMap = { ...mapFrom(rows), spawn: { x: 0, y: 2 } };
+  assert.deepEqual(isValidWallPlacement({ playerId: "p1", x: 7, y: 2 }, [], [towerAt("t1", 7, 1)], map), {
+    valid: false,
+    reason: "path-blocked"
+  });
+});
+
 test("spawn protection: a map without a cave protects nothing", () => {
   assert.equal(isInSpawnProtection(OPEN, 0, 0), false);
 });

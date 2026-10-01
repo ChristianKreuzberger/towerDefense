@@ -102,8 +102,11 @@ function getBorderReachableCells(
 
   for (let y = 0; y < map.height; y += 1) {
     for (let x = 0; x < map.width; x += 1) {
-      const isBorder = x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1;
-      if (!isBorder) {
+      // Creatures only enter through the cave, so on maps with one it is the only seed; border seeding is the cave-less fallback.
+      const isSeed = map.spawn
+        ? x === map.spawn.x && y === map.spawn.y
+        : x === 0 || y === 0 || x === map.width - 1 || y === map.height - 1;
+      if (!isSeed) {
         continue;
       }
 
