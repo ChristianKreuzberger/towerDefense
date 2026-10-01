@@ -118,5 +118,6 @@ Acceptance checks:
 - Creatures, walls and towers are keyed by entity id and updated in place; display objects are pooled and never created per snapshot
 - The canvas is resized only when map size changes
 - HUD/player chips are updated in place; select options are rewritten only when the player list changes
+- Leaving the match for the menu discards snapshot responses still in flight, so a late playback tick cannot reopen the game screen
 - The client keeps a per-map-key cell cache and requests lite snapshots (see spec/07)
 - Creature motion is interpolated in the Phaser update loop; the loop does nothing while the document is hidden

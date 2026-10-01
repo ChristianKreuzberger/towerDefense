@@ -30,12 +30,12 @@ const RECOIL_MS = 140;
 // Internal resolution per map size; CSS scales the canvas to fit the container.
 export function cellSizeForWidth(width: number): number {
   if (width > 40) {
-    return 16;
+    return 19;
   }
   if (width > 24) {
-    return 22;
+    return 26;
   }
-  return 28;
+  return 34;
 }
 
 function cellCenter(x: number, y: number, cellSize: number): { cx: number; cy: number } {
@@ -142,7 +142,7 @@ class BattlefieldScene extends Phaser.Scene {
   private hasRenderedTowersOnce = false;
   private pendingSnapshot: MatchSnapshot | null = null;
   private pendingEvents: MatchEvent[] = [];
-  private cellSize = 28;
+  private cellSize = 34;
   private cursorX: number | null = null;
   private cursorY: number | null = null;
   private pendingCursor: { x: number; y: number } | null = null;

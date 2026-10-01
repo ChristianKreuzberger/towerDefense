@@ -422,6 +422,29 @@ kbd {
   background: var(--chip, var(--panel-2));
 }
 
+.player-chip {
+  cursor: pointer;
+}
+
+.player-chip:hover {
+  border-color: var(--chip, var(--line));
+}
+
+.player-chip-name:focus-visible {
+  outline: 2px solid var(--chip, var(--ink));
+  outline-offset: 2px;
+}
+
+.player-chip.active {
+  border-color: var(--chip, var(--line));
+  box-shadow: 0 0 0 1px var(--chip, var(--line)), 0 0 14px -2px var(--chip, var(--line));
+}
+
+/* Marker besides the glow so the active player is not identified by colour alone. */
+.player-chip.active .player-chip-name::before {
+  content: "\25B6\00a0";
+}
+
 .player-chip.ready {
   border-color: rgba(95, 191, 143, 0.55);
 }
@@ -446,6 +469,14 @@ kbd {
 }
 
 .player-chip-name {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   font-weight: 800;
   font-size: 13px;
   overflow: hidden;
@@ -565,7 +596,7 @@ kbd {
   width: auto !important;
   height: auto !important;
   max-width: 100%;
-  max-height: calc(100vh - 170px);
+  max-height: calc(120vh - 204px);
   aspect-ratio: 1 / 1;
   border-radius: 8px;
   box-shadow: 0 0 0 3px var(--ink), 0 12px 30px rgba(0, 0, 0, 0.5);
@@ -946,4 +977,11 @@ kbd {
   .wave-banner.show {
     animation: none;
   }
+}
+
+label .hint {
+  font-weight: 400;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
 }

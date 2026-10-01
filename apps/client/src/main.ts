@@ -240,7 +240,7 @@ app.innerHTML = `
       <div class="hud-chip-row" id="playerCards" aria-label="Scoreboard"></div>
 
       <div class="panel-block">
-        <label for="playerId">Active Player</label>
+        <label for="playerId">Active Player <span class="hint">(1-8)</span></label>
         <select id="playerId"></select>
       </div>
 
@@ -427,6 +427,8 @@ function showMenuScreen(): void {
   el.gameScreen.classList.add("hidden");
   stopPlayback();
   hideGuideOverlay();
+  // Responses already in flight (playback ticks) must not pop the game screen back open over the menu.
+  appliedSeq = ++requestSeq;
 }
 
 function showGameScreen(): void {
@@ -1023,6 +1025,9 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
 function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: string | null): PlayerChipRefs {
   const root = document.createElement("div");
   root.className = "player-chip";
+  // Mouse users can click anywhere on the chip; keyboard and assistive tech use the real button around the name.
+  // The chip itself is not a button so the nested health progressbar keeps its accessibility semantics.
+  root.addEventListener("click", () => setActivePlayer(player.id));
   const swatch = document.createElement("div");
   swatch.className = "chip-swatch";
   swatch.textContent = String(playerNumber(player.id));
@@ -1031,7 +1036,8 @@ function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: stri
   body.className = "chip-body";
   const top = document.createElement("div");
   top.className = "chip-top";
-  const name = document.createElement("span");
+  const name = document.createElement("button");
+  name.type = "button";
   name.className = "player-chip-name";
   const state = document.createElement("span");
   state.className = "chip-state";
@@ -1116,7 +1122,14 @@ function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: MatchEvent
       label = "READY";
     }
 
-    const className = `player-chip ${status} ${towerColorClass(player.id)}`;
+    const isActive = player.id === el.playerId.value;
+    const className = `player-chip ${status} ${towerColorClass(player.id)}${isActive ? " active" : ""}`;
+    if (isActive) {
+      refs.name.setAttribute("aria-current", "true");
+    } else {
+      refs.name.removeAttribute("aria-current");
+    }
+    refs.root.title = `Switch to ${player.name} (${playerNumber(player.id)})`;
     if (refs.root.className !== className) {
       refs.root.className = className;
     }
@@ -1561,13 +1574,24 @@ el.guideActionBtn.addEventListener("click", () => {
   runGuideAction(action);
 });
 
-el.playerId.addEventListener("change", () => {
+function applyActivePlayerChange(): void {
   guideDismissedKey = null;
   hideGuideOverlay();
   syncCursorToBuildableCell(current);
   updateBattlefield(current);
   syncGuideOverlay(current);
-});
+  renderPlayerCards(current);
+}
+
+function setActivePlayer(playerId: string): void {
+  if (!current || playerId === el.playerId.value || !current.players.some((player) => player.id === playerId)) {
+    return;
+  }
+  el.playerId.value = playerId;
+  applyActivePlayerChange();
+}
+
+el.playerId.addEventListener("change", applyActivePlayerChange);
 
 must<HTMLButtonElement>("closeOverlayBtn").addEventListener("click", closeOverlay);
 el.rematchBtn.addEventListener("click", () => {
@@ -1660,6 +1684,17 @@ must<HTMLButtonElement>("autoBtn").addEventListener("click", async () => {
 
 document.addEventListener("keydown", (event) => {
   if (isFormField(event.target)) {
+    return;
+  }
+
+  // `current` is not cleared when returning to the menu, so check the screen and end overlay explicitly.
+  const inMatch = current && !el.gameScreen.classList.contains("hidden") && el.overlay.style.display !== "flex";
+  if (inMatch && current && !event.ctrlKey && !event.metaKey && !event.altKey && /^[1-8]$/.test(event.key)) {
+    const target = current.players.find((player) => playerNumber(player.id) === Number(event.key));
+    if (target) {
+      event.preventDefault();
+      setActivePlayer(target.id);
+    }
     return;
   }
 
