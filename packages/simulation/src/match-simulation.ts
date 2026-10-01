@@ -371,7 +371,7 @@ export class MatchSimulation {
 
       player.readyForWave = true;
 
-      if (this.state.players.every((entry) => entry.hasPlacedTower && entry.readyForWave)) {
+      if (this.areSurvivorsReadyForWave()) {
         this.startWave();
       }
 
@@ -537,9 +537,7 @@ export class MatchSimulation {
       phase: this.state.phase,
       wave: this.state.wave,
       waveTick: this.state.waveTick,
-      allPlayersReadyForWave: this.state.players.every(
-        (player) => player.hasPlacedTower && player.readyForWave
-      ),
+      allPlayersReadyForWave: this.areSurvivorsReadyForWave(),
       telemetry: {
         currentWave: cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave),
         completedWaves: this.state.telemetry.completedWaves.map((waveTelemetry) =>
@@ -1246,6 +1244,14 @@ export class MatchSimulation {
     }
   }
 
+  // Eliminated players cannot ready up, so requiring them would soft-lock the survivors.
+  private areSurvivorsReadyForWave(): boolean {
+    const survivors = this.state.players.filter((player) => !player.eliminated);
+    return (
+      survivors.length > 0 && survivors.every((player) => player.hasPlacedTower && player.readyForWave)
+    );
+  }
+
   private isWaveComplete(): boolean {
     const plan = this.getWaveSpawnPlan();
     return this.currentWaveSpawned >= plan.totalCreatures && this.state.creatures.length === 0;
@@ -1257,9 +1263,6 @@ export class MatchSimulation {
     this.repairWallsBetweenWaves();
     this.repairPathWearBetweenWaves();
     this.awardWaveClearBonus(waveCleared);
-    if (this.state.phase === "ended") {
-      return;
-    }
     this.emitTelemetrySnapshotEvent();
     const completedWaveTelemetry = cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave);
     this.state.telemetry.completedWaves.push(completedWaveTelemetry);
@@ -1269,6 +1272,10 @@ export class MatchSimulation {
       wave: this.state.wave,
       tick: this.state.waveTick
     });
+    // A score-win from the clear bonus ends the match; keep it ended instead of reopening placement.
+    if (this.state.phase === "ended") {
+      return;
+    }
     this.state.phase = "placement";
     this.state.wave += 1;
     this.state.waveTick = 0;

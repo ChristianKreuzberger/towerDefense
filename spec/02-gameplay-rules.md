@@ -64,6 +64,7 @@
 ## Win and lose conditions
 
 - Win: first player to reach 1000 points
+- Wave start: only non-eliminated players need to place a tower and ready up; eliminated players never block the next wave
 - Team fail state: all towers destroyed before any player reaches 1000 points
 
 ## Co-op interaction

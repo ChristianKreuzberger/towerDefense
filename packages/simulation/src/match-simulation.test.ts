@@ -2545,3 +2545,113 @@ test("upgrading a tower extends its range to a previously out-of-range creature"
   assert.equal(firstTickTarget(seed, cell, "first", 0), null);
   assert.equal(firstTickTarget(seed, cell, "first", 1), "wave-1-creature-1");
 });
+
+type WaveEndInternals = {
+  endWave: () => void;
+  isWaveComplete: () => boolean;
+  state: { players: Array<{ points: number }> };
+};
+
+// Runs wave 1 until every creature is gone but defers the teardown, so a test can set up scores first.
+function runWaveOneUntilTeardownPending(simulation: ReturnType<typeof createMatch>): WaveEndInternals {
+  const internals = simulation as unknown as WaveEndInternals;
+  const realEndWave = internals.endWave.bind(simulation);
+  internals.endWave = () => undefined;
+  for (let step = 0; step < 300 && !internals.isWaveComplete(); step += 1) {
+    assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+  }
+  assert.equal(internals.isWaveComplete(), true);
+  internals.endWave = realEndWave;
+  return internals;
+}
+
+test("score-win during wave-clear bonus still runs full wave teardown bookkeeping", () => {
+  const simulation = createSinglePlayerWaveSimulation(24);
+  const internals = runWaveOneUntilTeardownPending(simulation);
+  internals.state.players[0]!.points = WIN_SCORE - getWaveClearBonus();
+
+  internals.endWave();
+
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.phase, "ended");
+  assert.equal(snapshot.endReason, "score-win");
+  assert.equal(snapshot.winnerId, "p1");
+  assert.equal(snapshot.events.filter((event) => event.type === "wave-end").length, 1);
+  assert.equal(snapshot.events.filter((event) => event.type === "telemetry-snapshot").length >= 1, true);
+  assert.equal(snapshot.events.filter((event) => event.type === "balance-analysis-export").length, 1);
+  assert.equal(snapshot.telemetry.completedWaves.length, 1);
+  assert.equal(snapshot.telemetry.completedWaves[0]?.waveClearBonusAwarded, getWaveClearBonus());
+});
+
+test("wave-clear bonus is only paid when the wave was cleared", () => {
+  const cleared = createSinglePlayerWaveSimulation(24);
+  const clearedInternals = runWaveOneUntilTeardownPending(cleared);
+  clearedInternals.state.players[0]!.points = 0;
+  clearedInternals.endWave();
+  assert.equal(cleared.getSnapshot().players[0]?.points, getWaveClearBonus());
+
+  const leaked = createSinglePlayerWaveSimulation(24);
+  const leakedInternals = runWaveOneUntilTeardownPending(leaked);
+  leakedInternals.state.players[0]!.points = WIN_SCORE - getWaveClearBonus();
+  // A leaked creature forfeits the bonus, so the same score must not tip into a win.
+  (leaked as unknown as { state: { telemetry: { currentWave: { creaturesExited: number } } } }).state.telemetry.currentWave.creaturesExited = 1;
+  leakedInternals.endWave();
+  const snapshot = leaked.getSnapshot();
+  assert.equal(snapshot.players[0]?.points, WIN_SCORE - getWaveClearBonus());
+  assert.equal(snapshot.phase, "placement");
+  assert.equal(snapshot.events.some((event) => event.type === "wave-clear-bonus"), false);
+});
+
+test("survivors can start the next wave after another player is eliminated", () => {
+  const seed = 85;
+  const cells = getBuildableCoordinates(seed, 2);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed
+  });
+  cells.forEach((cell, index) => {
+    assert.equal(
+      simulation.applyCommand({ type: "place-tower", playerId: `p${index + 1}`, x: cell.x, y: cell.y }).accepted,
+      true
+    );
+  });
+
+  // Eliminate p2 directly; the combat path to elimination is covered elsewhere.
+  const internals = simulation as unknown as {
+    state: { players: Array<{ id: string; eliminated: boolean }>; towers: Array<{ playerId: string }> };
+  };
+  internals.state.players[1]!.eliminated = true;
+  internals.state.towers = internals.state.towers.filter((tower) => tower.playerId !== "p2");
+
+  assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" }).reason, "player-eliminated");
+  assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" }).accepted, true);
+
+  const snapshot = simulation.getSnapshot();
+  assert.equal(snapshot.phase, "wave");
+  assert.equal(snapshot.events.some((event) => event.type === "wave-start"), true);
+});
+
+test("allPlayersReadyForWave ignores eliminated players", () => {
+  const seed = 85;
+  const cells = getBuildableCoordinates(seed, 2);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed
+  });
+  cells.forEach((cell, index) => {
+    simulation.applyCommand({ type: "place-tower", playerId: `p${index + 1}`, x: cell.x, y: cell.y });
+  });
+  const internals = simulation as unknown as {
+    state: { players: Array<{ readyForWave: boolean; eliminated: boolean }> };
+  };
+  internals.state.players[0]!.readyForWave = true;
+  internals.state.players[1]!.eliminated = true;
+
+  assert.equal(simulation.getSnapshot().allPlayersReadyForWave, true);
+});
