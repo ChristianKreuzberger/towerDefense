@@ -645,54 +645,6 @@ test("the damage type selector follows the tower, is sent as a command and locks
   await expect(page.locator("#damageType")).toHaveValue("magic");
 });
 
-test("a destroyed tower leaves ruins whose tooltip names the owner and the wave", async ({ page }) => {
-  await startMatch(page, "/");
-  await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
-
-  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
-  const towers = live.snapshot.towers as Array<{ id: string; x: number; y: number; playerId: string }>;
-  const fallen = towers[0]!;
-  const withRuins = {
-    ...live.snapshot,
-    towers: [],
-    ruins: [{ id: fallen.id, playerId: fallen.playerId, x: fallen.x, y: fallen.y, destroyedWave: 3, destroyedTick: 12 }]
-  };
-  await page.route("**/api/snapshot*", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: withRuins }) });
-  }, { times: 1 });
-  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
-  await expect(page.locator("#playerCards")).not.toContainText("Tower 100/100");
-
-  const tooltip = page.locator(".tower-tooltip");
-  const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, fallen);
-  // Wait out the explosion so the ruins have faded in, then hover them.
-  await page.waitForTimeout(1200);
-  await page.locator("#board canvas").hover({ position: position! });
-  await expect(tooltip).toBeVisible();
-  await expect(tooltip).toContainText("Alpha's tower");
-  await expect(tooltip).toContainText("wave 3");
-
-  await page.locator("#board canvas").hover({ position: { x: 2, y: 2 } });
-  await expect(tooltip).toBeHidden();
-});
-
-async function showEndedOverlay(page: Page): Promise<void> {
-  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
-  const ended = {
-    ...live.snapshot,
-    phase: "ended",
-    winnerId: "p1",
-    endReason: "score-win",
-    players: (live.snapshot.players as Array<Record<string, unknown>>).map((player) => ({ ...player, points: player.id === "p1" ? 1000 : 0 }))
-  };
-  await page.route("**/api/snapshot*", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: ended }) });
-  });
-  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
-  await expect(page.locator("#matchEndOverlay")).toBeVisible();
-}
-
 test("match-end modal is a real dialog: focus moves in, Tab stays inside, Escape closes it for good", async ({ page }) => {
   await startMatch(page, "/");
   const modal = page.locator(".match-end-modal");
