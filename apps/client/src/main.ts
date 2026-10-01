@@ -18,7 +18,7 @@ import type { GuideAction } from "./guide";
 import { hydrateSnapshot, resetMatchCaches } from "./hydrate";
 import { menuPlayersToSetupPlayers, renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
 import { perfTimeApply } from "./perf";
-import { announceWaveEnd, renderPhase, showTurnBanner } from "./phase";
+import { announceWaveEnd, renderPhase } from "./phase";
 import { resolvePlacementCell } from "./placement";
 import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, syncPlaybackControls } from "./playback";
 import { playerNumber, playerTowerId, selectedPlayerId } from "./player-util";
@@ -26,7 +26,7 @@ import { renderPlayerCards, setChipSelectHandler, updatePlayerOptions } from "./
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
 import { isActionAvailable, renderToolbar } from "./toolbar";
-import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
+import { applyActivePlayerChange, passTurnAfterReady, resetTurnAfterWave, setActivePlayer } from "./turns";
 
 import "./style.css";
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
@@ -187,23 +187,6 @@ async function advanceTicks(ticks: number): Promise<void> {
       setStatus(`Playback paused after repeated failures: ${message}`);
       addFeedback("error", "Playback paused after repeated failures", undefined, message);
     }
-  }
-}
-
-// Every wave hands the table back to the first seat. Detected from the phase change between two snapshots, so a
-// fresh load (no previous snapshot) or replayed events can never trigger it, and each transition fires once.
-function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: MatchSnapshot): void {
-  if (!previous || previous.phase !== "wave" || snapshot.phase !== "placement") {
-    return;
-  }
-  const firstId = firstPendingPlayerId(snapshot.players);
-  const first = snapshot.players.find((player) => player.id === firstId);
-  if (!first) {
-    return;
-  }
-  setActivePlayer(first.id);
-  if (snapshot.players.length > 1) {
-    showTurnBanner(first);
   }
 }
 
@@ -452,40 +435,6 @@ el.guideActionBtn.addEventListener("click", () => {
   hideGuideOverlay();
   runGuideAction(action);
 });
-
-function applyActivePlayerChange(): void {
-  store.guideDismissedKey = null;
-  hideGuideOverlay();
-  syncCursorToBuildableCell(store.current);
-  updateBattlefield(store.current);
-  syncGuideOverlay(store.current);
-  renderToolbar(store.current);
-  renderPlayerCards(store.current);
-}
-
-// Hot-seat play: once a player is ready, hand the screen to the next player who still has to act.
-function passTurnAfterReady(readyPlayerId: string): void {
-  if (!store.current || store.current.phase !== "placement" || selectedPlayerId() !== readyPlayerId) {
-    return;
-  }
-  const nextId = nextPendingPlayerId(store.current.players, readyPlayerId);
-  if (!nextId || nextId === readyPlayerId) {
-    return;
-  }
-  setActivePlayer(nextId);
-  const next = store.current.players.find((player) => player.id === nextId);
-  if (next) {
-    showTurnBanner(next);
-  }
-}
-
-function setActivePlayer(playerId: string): void {
-  if (!store.current || playerId === el.playerId.value || !store.current.players.some((player) => player.id === playerId)) {
-    return;
-  }
-  el.playerId.value = playerId;
-  applyActivePlayerChange();
-}
 
 el.playerId.addEventListener("change", applyActivePlayerChange);
 
