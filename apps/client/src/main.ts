@@ -10,10 +10,12 @@ import type { SoundId } from "./audio/index";
 import { paintHero } from "./art/hero";
 import { createBattlefieldMount } from "./battlefield-scene";
 import { createDemo } from "./demo";
-import { perfRecordBytes, perfTimeApply } from "./perf";
+import { perfTimeApply } from "./perf";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
 import { mountMapPreview } from "./map-preview";
+import { getJson, postJson } from "./api.js";
+import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api.js";
 import { clampCoord, coordValue } from "./coord.js";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import "./style.css";
@@ -39,56 +41,6 @@ declare global {
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
 const DAMAGE_TYPE_OPTIONS: DamageType[] = ["physical", "explosive", "magic"];
 const PLAYER_COLORS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"] as const;
-
-type ApiErrorPayload = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-};
-
-// Snapshot as sent by the host: lite responses carry wornCells/eventsOffset instead of map.cells (see spec/07).
-type WireSnapshot = Omit<MatchSnapshot, "map"> & {
-  map: {
-    schemaVersion: number;
-    width: number;
-    height: number;
-    seed: number;
-    spawn?: { x: number; y: number };
-    goal?: { x: number; y: number };
-    cells?: MapCell[];
-    wornCells?: Array<{ x: number; y: number; pathWear: number }>;
-  };
-  eventsOffset?: number;
-  eventsTotal?: number;
-};
-
-type ApiStartPayload = {
-  ok: boolean;
-  snapshot?: WireSnapshot;
-  setup?: MatchSetup;
-  error?: string;
-  message?: string;
-};
-
-type ApiCommandPayload = {
-  ok: boolean;
-  result?: {
-    accepted: boolean;
-    reason?: string;
-  };
-  snapshot?: WireSnapshot;
-  error?: string;
-  message?: string;
-};
-
-type ApiAdvanceManyPayload = {
-  ok: boolean;
-  acceptedTicks?: number;
-  stoppedReason?: string;
-  snapshot?: WireSnapshot;
-  error?: string;
-  message?: string;
-};
 
 type FeedbackType = "accepted" | "rejected" | "info" | "error";
 
@@ -469,49 +421,6 @@ const demo = createDemo({
     el.demoBtn.textContent = "Demo Combat";
   }
 });
-
-function apiBase(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL;
-  if (typeof configured === "string" && configured.length > 0) {
-    return configured.replace(/\/$/, "");
-  }
-  return "";
-}
-
-// GitHub Pages has no backend, so that build hosts the game API in the page itself.
-const inBrowserServer = import.meta.env.VITE_IN_BROWSER_SERVER === "true";
-
-async function sendRequest(method: "GET" | "POST", path: string, payload?: unknown): Promise<{ ok: boolean; text: string }> {
-  if (inBrowserServer) {
-    const { localRequest } = await import("./local-host.js");
-    return localRequest(method, path, payload);
-  }
-
-  const response = await fetch(`${apiBase()}${path}`, method === "POST"
-    ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
-    : undefined);
-  return { ok: response.ok, text: await response.text() };
-}
-
-async function getJson<T>(path: string): Promise<T> {
-  const { ok, text } = await sendRequest("GET", path);
-  perfRecordBytes(text.length);
-  const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!ok || data.ok === false) {
-    throw new Error(data.message ?? data.error ?? "request-failed");
-  }
-  return data;
-}
-
-async function postJson<T>(path: string, payload: unknown): Promise<T> {
-  const { ok, text } = await sendRequest("POST", path, payload);
-  perfRecordBytes(text.length);
-  const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!ok || data.ok === false) {
-    throw new Error(data.message ?? data.error ?? "request-failed");
-  }
-  return data;
-}
 
 function showMenuScreen(): void {
   // The match keeps running on the host; offer a way back unless it is already over.
