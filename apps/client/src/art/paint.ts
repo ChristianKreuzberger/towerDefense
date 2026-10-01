@@ -328,11 +328,11 @@ export function paintTowerBase(ctx: Ctx, s: number, color: number): void {
 export function paintTurret(ctx: Ctx, s: number, color: number, level: number): void {
   const c = s / 2;
   const lw = Math.max(1.5, s * 0.035);
-  const barrels = level >= 3 ? 2 : 1;
+  const barrels = level >= 5 ? 3 : level >= 3 ? 2 : 1;
   const length = s * (level >= 2 ? 0.64 : 0.58);
   const width = s * (level >= 2 ? 0.17 : 0.15);
   for (let i = 0; i < barrels; i += 1) {
-    const offset = barrels === 1 ? 0 : (i === 0 ? -1 : 1) * s * 0.085;
+    const offset = barrels === 1 ? 0 : barrels === 2 ? (i === 0 ? -1 : 1) * s * 0.085 : (i - 1) * s * 0.12;
     roundRect(ctx, c, c - width / 2 + offset, length, width, width * 0.25);
     outline(ctx, 0x575d6b, lw);
     // muzzle cap and lit top edge
@@ -346,7 +346,7 @@ export function paintTurret(ctx: Ctx, s: number, color: number, level: number): 
     ctx.stroke();
   }
   // Squared cream housing reads as a cannon mount rather than a second ring.
-  const half = s * (0.17 + Math.min(level, 4) * 0.015);
+  const half = s * (0.17 + Math.min(level, 5) * 0.015);
   roundRect(ctx, c - half, c - half, half * 2, half * 2, half * 0.45);
   outline(ctx, 0xf3ead6, lw);
   roundRect(ctx, c - half * 0.5, c - half * 0.5, half, half, half * 0.25);
@@ -356,6 +356,11 @@ export function paintTurret(ctx: Ctx, s: number, color: number, level: number): 
     ctx.strokeStyle = hex(0xf2b84b);
     ctx.lineWidth = lw * 1.4;
     ctx.stroke();
+  }
+  if (level >= 5) {
+    // Top style: a glowing gem in the mount.
+    circle(ctx, c, c, half * 0.3);
+    outline(ctx, 0xffe08a, lw * 0.8, 0xb8791a);
   }
 }
 
