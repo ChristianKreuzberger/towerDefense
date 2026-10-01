@@ -341,6 +341,8 @@ export interface MatchSnapshot {
   wave: number;
   waveTick: number;
   allPlayersReadyForWave: boolean;
+  // Creatures of the current (or, in prep, the upcoming) wave that have not spawned yet.
+  creaturesToSpawn: number;
   telemetry: MatchTelemetrySnapshot;
   balanceAnalysisExports: BalanceAnalysisSnapshot[];
   map: GameMap;
