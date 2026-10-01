@@ -447,8 +447,9 @@ export class MatchSimulation {
     }
 
     if (command.type === "upgrade-tower") {
-      if (this.state.phase !== "wave") {
-        return { accepted: false, reason: "wall-phase-not-active" };
+      // Upgrades are a prep decision made before committing to the wave.
+      if (this.state.phase !== "placement") {
+        return { accepted: false, reason: "upgrade-phase-not-active" };
       }
 
       const player = this.state.players.find((entry) => entry.id === command.playerId);
@@ -458,6 +459,10 @@ export class MatchSimulation {
 
       if (player.eliminated) {
         return { accepted: false, reason: "player-eliminated" };
+      }
+
+      if (player.readyForWave) {
+        return { accepted: false, reason: "player-already-ready-for-wave" };
       }
 
       if (!isValidTowerUpgradeTarget(command.towerId, command.playerId, this.state.towers)) {
@@ -575,7 +580,6 @@ export class MatchSimulation {
     for (const player of this.state.players) {
       this.state.playerAwardedPointsCurrentWave[player.id] = 0;
       this.state.playerSpentOnWallsCurrentWave[player.id] = 0;
-      this.state.playerSpentOnUpgradesCurrentWave[player.id] = 0;
       this.state.playerWaveClearBonusCurrentWave[player.id] = 0;
     }
     this.currentWaveSpawned = 0;
@@ -1283,6 +1287,9 @@ export class MatchSimulation {
     this.state.targetAssignments = [];
     for (const player of this.state.players) {
       player.readyForWave = false;
+      // Upgrades are bought during prep, so this counter belongs to the wave that follows the prep
+      // and is only cleared once the previous wave's telemetry export has consumed it.
+      this.state.playerSpentOnUpgradesCurrentWave[player.id] = 0;
     }
   }
 

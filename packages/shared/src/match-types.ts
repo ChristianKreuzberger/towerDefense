@@ -348,6 +348,7 @@ export type CommandRejectReason =
   | "tower-already-placed"
   | "tower-not-placed"
   | "wall-phase-not-active"
+  | "upgrade-phase-not-active"
   | "player-already-ready-for-wave"
   | "invalid-upgrade-target"
   | "invalid-target-mode-target"
