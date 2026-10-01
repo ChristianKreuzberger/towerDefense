@@ -484,4 +484,6 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
 
   await expect(page.locator("#playerId")).toHaveValue("p2");
   await expect(page.locator("#guideCard")).toContainText("Bravo, it's your turn");
+  // The handoff must refresh the toolbar: p2 is not ready, so Upgrade must not stay dimmed from p1.
+  await expect(page.locator("#upgradeBtn")).not.toHaveClass(/dim/);
 });

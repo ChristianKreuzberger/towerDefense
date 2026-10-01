@@ -55,7 +55,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 
 - placeTower { tileX, tileY, towerType }
 - placeWall { tileX, tileY, wallType }
-- upgradeTower { towerId }
+- upgradeTower { towerId } (prep phase only, rejected once the player is ready or during the wave)
 - setTargetMode { towerId, mode }
 - readyForWave { ready: boolean } (`allPlayersReadyForWave` excludes eliminated players)
 - setPlayerName { playerName }

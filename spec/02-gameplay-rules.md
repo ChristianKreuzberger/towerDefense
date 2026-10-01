@@ -29,7 +29,7 @@
 
 ## Tower lifecycle
 
-- Upgrade (multiple levels)
+- Upgrade (multiple levels); upgrades are bought only during the prep (placement) phase and only while that player has not readied. They are rejected once the player is ready and during the wave
 - Cannot shoot other towers under any condition
 - Can shoot invading creatures based on tower range and targeting rules
 - Range is limited and measured in grid cells (Euclidean distance, inclusive); a creature exactly at range distance can be targeted

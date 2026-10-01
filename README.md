@@ -131,9 +131,9 @@ The local server emits structured JSON lifecycle logs for server startup, match 
 Quick play loop in browser:
 1. Enter player names and click Start Match.
 2. Pick a player and place each tower on buildable cells shown as . in the board.
-3. Click Ready For Wave for each player.
+3. Buy Upgrade Tower now if wanted (upgrades are prep-only), then click Ready For Wave for each player.
 4. Combat starts and advances automatically (Pause/Play and 1x/2x/4x appear during combat; press P to toggle).
-5. Use Place Wall (then click a tile), Upgrade Tower, and Set Target Mode during wave phase.
+5. Use Place Wall (then click a tile) and Set Target Mode during wave phase.
 
 Notes:
 - If a command is rejected, Last Action shows the reason (for example path-blocked or insufficient-points).
