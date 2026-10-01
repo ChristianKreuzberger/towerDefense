@@ -526,7 +526,12 @@ class BattlefieldScene extends Phaser.Scene {
     tooltip.hidden = false;
   }
 
-  removeTooltip(): void {
+  // Everything the scene attached outside Phaser's own object tree: the canvas listener, the input
+  // handlers and the tooltip element. Call before game.destroy(), which removes the canvas.
+  removeListeners(): void {
+    this.game?.canvas?.removeEventListener("pointerleave", this.handlePointerLeave);
+    this.input?.off("pointerdown", this.handlePointerDown, this);
+    this.input?.off("pointermove", this.handlePointerMove, this);
     this.tooltip?.remove();
   }
 
@@ -1220,6 +1225,7 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
     render: { antialias: true }
   });
 
+  let destroyed = false;
   const scene = new BattlefieldScene();
   scene.setOnCellClick(options.onCellClick);
   game.scene.add("battlefield", scene, true);
@@ -1244,8 +1250,15 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
       scene?.setPlacementContext(context);
     },
     destroy(): void {
-      scene.removeTooltip();
+      if (destroyed) {
+        return;
+      }
+      destroyed = true;
+      const canvas = game.canvas;
+      scene.removeListeners();
       game.destroy(true);
+      // Phaser removes the canvas on its next frame; a replacement game must not share the container with it.
+      canvas?.remove();
     }
   };
 }

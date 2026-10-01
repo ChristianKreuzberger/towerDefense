@@ -1,6 +1,7 @@
 import { isInSpawnProtection } from "@tower-defense/shared";
 import type { MatchEvent, MatchSnapshot } from "@tower-defense/shared";
 import { createBattlefieldMount } from "./battlefield-scene";
+import type { BattlefieldMount } from "./battlefield-scene";
 import { DEBUG } from "./constants";
 import { clampCoord, coordValue } from "./coord";
 import { el } from "./dom";
@@ -15,9 +16,30 @@ export function setCellClickHandler(handler: (x: number, y: number) => void): vo
   cellClickHandler = handler;
 }
 
-export const battlefieldMount = createBattlefieldMount(el.board, {
-  onCellClick: (x, y) => cellClickHandler(x, y)
-});
+function mountBattlefield(): BattlefieldMount {
+  return createBattlefieldMount(el.board, {
+    onCellClick: (x, y) => cellClickHandler(x, y)
+  });
+}
+
+let mount = mountBattlefield();
+
+// Callers keep this stable object while the Phaser game behind it is replaced for every new match.
+export const battlefieldMount: BattlefieldMount = {
+  renderMap: (snapshot, transitionMs, events) => mount.renderMap(snapshot, transitionMs, events),
+  creaturePositions: () => mount.creaturePositions(),
+  cellToCss: (x, y) => mount.cellToCss(x, y),
+  cellSize: () => mount.cellSize(),
+  setCursor: (x, y) => mount.setCursor(x, y),
+  setPlacementContext: (context) => mount.setPlacementContext(context),
+  destroy: () => mount.destroy()
+};
+
+// A new match or rematch starts on a fresh Phaser game, so no scene state, listener or canvas outlives the match.
+export function rebuildBattlefield(): void {
+  mount.destroy();
+  mount = mountBattlefield();
+}
 
 export function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0, events: MatchEvent[] = []): void {
   battlefieldMount.renderMap(snapshot, transitionMs, events);

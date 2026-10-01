@@ -3,7 +3,7 @@ import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
 import { applyWireSnapshot } from "./apply";
 import { cueForCommandResult } from "./audio/index";
-import { setMoveMode, setWallMode } from "./board";
+import { rebuildBattlefield, setMoveMode, setWallMode } from "./board";
 import { MAX_PLAYBACK_ERRORS } from "./constants";
 import { el } from "./dom";
 import { closeOverlay } from "./end-overlay";
@@ -71,6 +71,7 @@ export async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<Mat
 
 export function startFreshMatch(wire: WireSnapshot): void {
   resetMatchCaches();
+  rebuildBattlefield();
   store.cursorChosen = false;
   store.guideDismissedKey = null;
   store.playing = true;
