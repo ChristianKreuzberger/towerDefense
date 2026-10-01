@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { GameMap } from "./map-types.js";
+import { SPAWN_PROTECTION_RADIUS } from "./game-rules.js";
+import { isInSpawnProtection, type GameMap } from "./map-types.js";
 import type { Tower } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 import {
@@ -131,4 +132,48 @@ test("upgrade target and target mode checks", () => {
   assert.equal(isValidTowerUpgradeTarget("nope", "p1", towers), false);
   assert.equal(isValidTowerTargetMode("first"), true);
   assert.equal(isValidTowerTargetMode("bogus"), false);
+});
+
+// Cave at (0,5) on a 20x11 open map; protected radius is SPAWN_PROTECTION_RADIUS.
+function mapWithSpawn(): GameMap {
+  const rows = Array.from({ length: 11 }, () => ".".repeat(20));
+  return { ...mapFrom(rows), spawn: { x: 0, y: 5 } };
+}
+
+test("spawn protection: rejects towers and walls inside the protected radius", () => {
+  const map = mapWithSpawn();
+  assert.deepEqual(isValidTowerPlacement({ playerId: "p1", x: SPAWN_PROTECTION_RADIUS, y: 5 }, [], map), {
+    valid: false,
+    reason: "spawn-protected"
+  });
+  assert.deepEqual(isValidWallPlacement({ playerId: "p1", x: 1, y: 4 }, [], [towerAt("t1", 15, 5)], map), {
+    valid: false,
+    reason: "spawn-protected"
+  });
+});
+
+test("spawn protection: allows placement just outside the protected radius", () => {
+  const map = mapWithSpawn();
+  assert.deepEqual(isValidTowerPlacement({ playerId: "p1", x: SPAWN_PROTECTION_RADIUS + 1, y: 5 }, [], map), {
+    valid: true
+  });
+  assert.equal(isInSpawnProtection(map, SPAWN_PROTECTION_RADIUS, 5), true);
+  assert.equal(isInSpawnProtection(map, SPAWN_PROTECTION_RADIUS + 1, 5), false);
+});
+
+test("spawn protection: a wall may not cut the cave's lane even if another left-edge row stays open", () => {
+  const rows = ["##########", "..........", "##########", "..........", "#.########"];
+  const map: GameMap = { ...mapFrom(rows), spawn: { x: 0, y: 1 } };
+  assert.deepEqual(isValidWallPlacement({ playerId: "p1", x: 7, y: 1 }, [], [towerAt("t1", 1, 4)], map), {
+    valid: false,
+    reason: "path-blocked"
+  });
+  // Same wall is fine on a map without a cave: the second row still gives a left-to-right route.
+  assert.deepEqual(isValidWallPlacement({ playerId: "p1", x: 7, y: 1 }, [], [towerAt("t1", 1, 4)], mapFrom(rows)), {
+    valid: true
+  });
+});
+
+test("spawn protection: a map without a cave protects nothing", () => {
+  assert.equal(isInSpawnProtection(OPEN, 0, 0), false);
 });

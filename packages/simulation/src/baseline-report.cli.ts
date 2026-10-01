@@ -172,7 +172,7 @@ function placeTowersDeterministically(simulation: ReturnType<typeof createMatch>
 
   for (const playerId of players) {
     const snapshot = simulation.getSnapshot();
-    // Towers have limited range, so start from the cells closest to the spawn gate (the buildable cells on x = 0).
+    // Towers have limited range, so start from the cells closest to the left edge, where the monster cave sits.
     // Kept as a fixed anchor (not the probe-based helper) so baseline placements stay stable.
     const gate = snapshot.map.cells.filter((cell) => cell.buildable && cell.x === 0);
     const gateY = gate.reduce((sum, cell) => sum + cell.y, 0) / Math.max(1, gate.length);

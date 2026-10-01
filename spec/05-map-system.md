@@ -40,6 +40,14 @@
 - Towers and walls may be placed on lane cells, but the placement path checks (towers and walls) reject any placement that would cut the last route.
 - Rendering follows the same model: buildable cells are the walkable road and non-buildable cells are raised grass pads (see spec/11, Terrain).
 
+## Monster cave (spawn)
+
+- Every map has one monster cave on the left edge (x = 0), at the start cell of the carved lane. All creatures spawn there.
+- The cave is rendered as a visible cave mouth, and its protected area is shown as a faint warning tint.
+- Protected area: every cell within `SPAWN_PROTECTION_RADIUS` (5 cells, Euclidean) of the cave. Towers and walls may not be placed there (reject reason `spawn-protected`).
+- Why 5: towers have a range of 12, so towers just outside the area still cover the cave exit, but nobody can wall the cave in or stand next to it and kill monsters the moment they appear.
+- The left-to-right route check starts from the cave cell, not from any cell on the left edge.
+
 ## Versioning
 
 - Include schemaVersion in map file

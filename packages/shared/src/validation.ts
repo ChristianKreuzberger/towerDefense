@@ -1,4 +1,4 @@
-import { getMapCell, type GameMap } from "./map-types.js";
+import { getMapCell, isInSpawnProtection, type GameMap } from "./map-types.js";
 import { TOWER_TARGET_MODES, type Tower, type TowerTargetMode } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 import type { TowerPlacement, CommandRejectReason } from "./match-types.js";
@@ -47,7 +47,9 @@ function hasLeftToRightPath(map: GameMap, occupied: Set<string>, buildable: Set<
   const queue: Array<{ x: number; y: number }> = [];
   const visited = new Set<string>();
 
-  for (let y = 0; y < map.height; y += 1) {
+  // Creatures only enter through the cave, so the route must start there when the map has one.
+  const startRows = map.spawn ? [map.spawn.y] : Array.from({ length: map.height }, (_, y) => y);
+  for (const y of startRows) {
     const key = toKey(0, y);
     if (buildable.has(key) && !occupied.has(key)) {
       queue.push({ x: 0, y });
@@ -298,6 +300,10 @@ export function isValidWallPlacement(
     return { valid: false, reason: "cell-not-buildable" };
   }
 
+  if (isInSpawnProtection(map, placement.x, placement.y)) {
+    return { valid: false, reason: "spawn-protected" };
+  }
+
   const towerOverlap = existingTowers.some((tower) => tower.x === placement.x && tower.y === placement.y);
   if (towerOverlap) {
     return { valid: false, reason: "tower-overlap" };
@@ -330,6 +336,10 @@ export function isValidTowerPlacement(
 
   if (!cell.buildable) {
     return { valid: false, reason: "cell-not-buildable" };
+  }
+
+  if (isInSpawnProtection(map, placement.x, placement.y)) {
+    return { valid: false, reason: "spawn-protected" };
   }
 
   const overlap = existingTowers.some((tower) => tower.x === placement.x && tower.y === placement.y);

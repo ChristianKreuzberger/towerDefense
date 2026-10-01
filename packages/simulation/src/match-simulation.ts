@@ -182,7 +182,9 @@ function getOpenPathForCreatures(map: GameMap, tower: Tower, walls: Wall[]): Arr
   const parent = new Map<string, string | undefined>();
   const starts: string[] = [];
 
-  for (let y = 0; y < map.height; y += 1) {
+  // Creatures only enter through the monster cave when the map has one.
+  const startRows = map.spawn ? [map.spawn.y] : Array.from({ length: map.height }, (_, y) => y);
+  for (const y of startRows) {
     const key = toCellKey(0, y);
     if (buildable.has(key) && !blocked.has(key)) {
       starts.push(key);
@@ -555,7 +557,8 @@ export class MatchSimulation {
         width: this.state.map.width,
         height: this.state.map.height,
         seed: this.state.map.seed,
-        cells: this.state.map.cells.map((cell) => ({ ...cell }))
+        cells: this.state.map.cells.map((cell) => ({ ...cell })),
+        ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {})
       },
       towers: this.state.towers.map((tower) => ({ ...tower })),
       walls: this.state.walls.map((wall) => ({ ...wall })),

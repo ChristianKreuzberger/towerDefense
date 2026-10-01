@@ -64,7 +64,7 @@ Terrain
 - Grass cells pick one of several variants from a seeded hash of (map seed, x, y), so a map always looks the same
 - The road is drawn as one continuous surface: edges against grass pads are chosen from the four-neighbour mask (rounded edge, shadow), interior cells are plain road
 - Path wear draws darker ruts over the road and scales with the wear value
-- The left map edge is marked as the spawn gate and the right edge as the goal, matching the simulation (creatures enter at x = 0 and leave at the last column)
+- The monster cave (spawn) is drawn as a dark cave mouth on the left edge at the lane start, with a faint red tint over its protected area (no towers or walls, see spec/05). The right edge is marked as the goal; creatures leave at the last column
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower

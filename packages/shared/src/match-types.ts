@@ -357,6 +357,7 @@ export type CommandRejectReason =
   | "tower-overlap"
   | "wall-overlap"
   | "path-blocked"
+  | "spawn-protected"
   | "insufficient-points"
   | "unsupported-command";
 

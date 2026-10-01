@@ -15,9 +15,10 @@ function hashCoordinates(seed: number, x: number, y: number): number {
 
 // Carves a 4-connected left-to-right route so creatures always have somewhere to walk.
 // Out-of-map hash inputs (y = -1 for the start row, y = -2 for the drift) keep the lane independent of the noise layer.
-function carveLane(seed: number, width: number, height: number): Set<string> {
+function carveLane(seed: number, width: number, height: number): { lane: Set<string>; startY: number } {
   const lane = new Set<string>();
   let y = hashCoordinates(seed, -1, -1) % height;
+  const startY = y;
   for (let x = 0; x < width; x += 1) {
     lane.add(`${x},${y}`);
     const drift = (hashCoordinates(seed, x, -2) % 3) - 1;
@@ -27,7 +28,7 @@ function carveLane(seed: number, width: number, height: number): Set<string> {
       y = nextY;
     }
   }
-  return lane;
+  return { lane, startY };
 }
 
 export function generateMap(
@@ -36,7 +37,7 @@ export function generateMap(
   height: number = DEFAULT_MAP_HEIGHT
 ): GameMap {
   const cells: MapCell[] = [];
-  const lane = carveLane(seed, width, height);
+  const { lane, startY } = carveLane(seed, width, height);
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -50,6 +51,7 @@ export function generateMap(
     width,
     height,
     seed,
-    cells
+    cells,
+    spawn: { x: 0, y: startY }
   };
 }

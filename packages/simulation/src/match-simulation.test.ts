@@ -159,6 +159,40 @@ test("generates deterministic maps for identical seeds", () => {
   assert.deepEqual(first, second);
 });
 
+test("every map has a monster cave on the left edge, on a walkable cell", () => {
+  for (const seed of [1, 42, 99, 2024, 777]) {
+    const map = generateMap(seed);
+    assert.ok(map.spawn, `seed ${seed} should have a spawn`);
+    assert.equal(map.spawn.x, 0);
+    const cell = map.cells.find((entry) => entry.x === map.spawn?.x && entry.y === map.spawn?.y);
+    assert.equal(cell?.buildable, true);
+  }
+});
+
+test("creatures spawn in the cave", () => {
+  const seed = 42;
+  const spawn = generateMap(seed).spawn;
+  assert.ok(spawn);
+  const cell = getBuildableCoordinate(seed);
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  assert.equal(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted, true);
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  simulation.applyCommand({ type: "advance-wave" });
+  const creature = simulation.getSnapshot().creatures[0];
+  assert.deepEqual({ x: creature?.x, y: creature?.y }, spawn);
+});
+
+test("towers cannot be placed in the cave's protected area", () => {
+  const seed = 42;
+  const spawn = generateMap(seed).spawn;
+  assert.ok(spawn);
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  assert.deepEqual(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: spawn.x, y: spawn.y }), {
+    accepted: false,
+    reason: "spawn-protected"
+  });
+});
+
 test("different seeds produce different map layouts", () => {
   const first = generateMap(42);
   const second = generateMap(43);
