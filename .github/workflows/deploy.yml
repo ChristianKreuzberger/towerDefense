@@ -32,10 +32,16 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Workspace libraries must be compiled before Vite bundles the client.
+      - name: Build libraries
+        run: npm run build -w @tower-defense/shared -w @tower-defense/simulation -w @tower-defense/transport
+
+      # Pages is static, so the client runs the game server in the browser instead of calling /api.
       - name: Build client
         working-directory: apps/client
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_IN_BROWSER_SERVER: "true"
         run: npm run build
 
       - name: Upload Pages artifact

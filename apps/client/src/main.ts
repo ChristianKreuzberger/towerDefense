@@ -410,28 +410,36 @@ function apiBase(): string {
   return "";
 }
 
+// GitHub Pages has no backend, so that build hosts the game API in the page itself.
+const inBrowserServer = import.meta.env.VITE_IN_BROWSER_SERVER === "true";
+
+async function sendRequest(method: "GET" | "POST", path: string, payload?: unknown): Promise<{ ok: boolean; text: string }> {
+  if (inBrowserServer) {
+    const { localRequest } = await import("./local-host.js");
+    return localRequest(method, path, payload);
+  }
+
+  const response = await fetch(`${apiBase()}${path}`, method === "POST"
+    ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
+    : undefined);
+  return { ok: response.ok, text: await response.text() };
+}
+
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiBase()}${path}`);
-  const text = await response.text();
+  const { ok, text } = await sendRequest("GET", path);
   perfRecordBytes(text.length);
   const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!response.ok) {
+  if (!ok) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
   return data;
 }
 
 async function postJson<T>(path: string, payload: unknown): Promise<T> {
-  const response = await fetch(`${apiBase()}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  const text = await response.text();
+  const { ok, text } = await sendRequest("POST", path, payload);
   perfRecordBytes(text.length);
   const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!response.ok) {
+  if (!ok) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
   return data;

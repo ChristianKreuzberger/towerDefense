@@ -5,6 +5,10 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./match": { "types": "./dist/match-simulation.d.ts", "default": "./dist/match-simulation.js" }
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
