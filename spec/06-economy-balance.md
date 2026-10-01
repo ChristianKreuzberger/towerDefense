@@ -28,8 +28,8 @@ Point economy with per-player score tracking.
 - Win threshold: 1000 points
 - Wall cost scaling: baseWallCost * 1.2^placedWalls
 - Upgrade cost scaling: baseCost * 1.6^level
-- Tower range (grid cells): baseTowerRange + (level - 1) * towerRangePerLevel, with baseTowerRange = 12 and towerRangePerLevel = 1.5 (level 1 = 12, level 2 = 13.5, level 3 = 15). Creatures have no attack range yet and can hit a tower from anywhere, so the base range is kept generous
-- The base range is generous relative to the 50x50 map so a lone level 1 tower can still cover a meaningful stretch of the lane
+- Tower range (grid cells): baseTowerRange + (level - 1) * towerRangePerLevel, with baseTowerRange = 6 and towerRangePerLevel = 1.5 (level 1 = 6, level 2 = 7.5, level 3 = 9). Creatures have no attack range yet and can hit a tower from anywhere, so the short base range is a deliberate trade-off: towers must be placed close to the lane and upgrades matter
+- The base range is short relative to the 50x50 map (it was 12 before), so a lone level 1 tower only covers a small stretch of the lane and range upgrades are a real choice
 
 ## Anti-snowball controls
 

@@ -1552,7 +1552,7 @@ test("ends match with fail-state when all towers are destroyed", () => {
 });
 
 test("emits deterministic tower-repaired events between waves", () => {
-  const simulation = createSinglePlayerWaveSimulation(38);
+  const simulation = createSinglePlayerWaveSimulation(41);
 
   tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 300);
 
@@ -2519,6 +2519,10 @@ test("creatures travel across the map instead of exiting after one cell", () => 
   }
 });
 
+test("level 1 tower range is 6 cells", () => {
+  assert.equal(getTowerRange(1), 6);
+});
+
 test("tower range grows linearly with level and clamps below level 1", () => {
   assert.equal(getTowerRange(1), BASE_TOWER_RANGE);
   assert.equal(getTowerRange(3), BASE_TOWER_RANGE + (2 * TOWER_RANGE_PER_LEVEL));
@@ -2590,7 +2594,8 @@ test("towers ignore creatures outside range in every target mode", () => {
 });
 
 test("range boundary is inclusive: creature at exactly range distance is targetable", () => {
-  const seed = 40;
+  // The halved range of 6 leaves no axis-aligned cell at exactly that distance on seed 40, so use another seed.
+  const seed = 41;
   const range = getTowerRange(1);
   // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance.
   const exact = findTowerCellAtDistance(seed, range - 1e-9, range);

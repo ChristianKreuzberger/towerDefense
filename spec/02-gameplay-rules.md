@@ -33,7 +33,7 @@
 - Cannot shoot other towers under any condition
 - Can shoot invading creatures based on tower range and targeting rules
 - Range is limited and measured in grid cells (Euclidean distance, inclusive); a creature exactly at range distance can be targeted
-- Range grows with upgrade level, so upgrading also extends what a tower can reach
+- Base (level 1) range is 6 cells and grows by 1.5 cells per upgrade level, so upgrading also extends what a tower can reach
 - A tower with no creature in range has no target and does not fire
 - Takes damage from creature attacks
 - Auto-repaired between rounds (must be clearly shown in UI)
