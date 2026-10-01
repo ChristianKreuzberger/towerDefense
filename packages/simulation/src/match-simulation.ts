@@ -13,6 +13,7 @@ import {
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
+  getTowerDamage,
   getTowerRange,
   SPAWN_PROTECTION_TICKS,
   type CommandResult,
@@ -830,6 +831,8 @@ export class MatchSimulation {
         towerId: tower.id,
         playerId: tower.playerId,
         creatureId: creature.id,
+        x: creature.x,
+        y: creature.y,
         damage,
         remainingHp: Math.max(0, creature.hp)
       });
@@ -848,6 +851,8 @@ export class MatchSimulation {
           towerId: tower.id,
           playerId: tower.playerId,
           creatureId: creature.id,
+          x: creature.x,
+          y: creature.y,
           rewardPoints
         });
       } else {
@@ -1121,7 +1126,7 @@ export class MatchSimulation {
   }
 
   private getTowerDamage(tower: Tower): number {
-    return Math.max(1, tower.level);
+    return getTowerDamage(tower.level);
   }
 
   private getCreatureAttackDamage(creature: Creature): number {

@@ -72,7 +72,7 @@ Terrain
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
-- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
+- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. Accuracy is always 100% today because towers do not miss. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
 Creatures
 - Four silhouettes, readable without text: runner (slim, pointed), swarm (small round bug), armored (plated hex), tank (large square with tracks and cannon)
@@ -88,6 +88,7 @@ Effects (driven by snapshot events, presentation only)
 - `tower-destroyed`: smoke
 - `wall-hit`: spark
 - `wave-end`: wave-clear banner
+- `tower-hit` and `creature-defeated` carry the cell the creature was in. Strong towers can kill a creature within the same batched response that spawned it, so it never appears in a snapshot; the client falls back to that cell so shots and kills are still shown
 - Events of one batched response are spread across the glide time of that response so they do not all fire at once; the number of effects per snapshot is capped
 - With `prefers-reduced-motion` there is no shake, no particle burst and no banner animation; flashes become short static highlights
 

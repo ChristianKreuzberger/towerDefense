@@ -49,18 +49,18 @@ jobs:
             cp "${dir}/package.json" "${bundle_dir}/${dir}/package.json"
           done
           cat > "${bundle_dir}/RUN.md" <<'EOF'
-# Tower Defense release bundle
+          # Tower Defense release bundle
 
-This archive contains prebuilt client and server artifacts.
+          This archive contains prebuilt client and server artifacts.
 
-## Run locally
+          ## Run locally
 
-1. Install production dependencies from the repository root:
-   npm ci --omit=dev
-2. Start the server from the repository root:
-   node apps/server/dist/index.js
-3. Open http://localhost:4173
-EOF
+          1. Install production dependencies from the repository root:
+             npm ci --omit=dev
+          2. Start the server from the repository root:
+             node apps/server/dist/index.js
+          3. Open http://localhost:4173
+          EOF
           tar -czf "${bundle_dir}.tar.gz" "${bundle_dir}"
 
       - name: Publish GitHub release

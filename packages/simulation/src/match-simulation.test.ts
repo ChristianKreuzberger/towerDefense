@@ -3229,3 +3229,18 @@ function getWallCellBesideLane(seed: number, tower: { x: number; y: number }): {
   }
   assert.fail("expected a wall cell beside the lane");
 }
+
+// Strong towers can kill a creature before any snapshot shows it, so the client needs the cell from the event.
+test("tower-hit and creature-defeated events carry the cell of the creature", () => {
+  const simulation = createSinglePlayerWaveSimulation(777);
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 500);
+  const events = simulation.getSnapshot().events;
+  const hit = events.find((event) => event.type === "tower-hit");
+  const defeated = events.find((event) => event.type === "creature-defeated");
+  assert.ok(hit && hit.type === "tower-hit");
+  assert.ok(defeated && defeated.type === "creature-defeated");
+  assert.equal(typeof hit.x, "number");
+  assert.equal(typeof hit.y, "number");
+  assert.equal(typeof defeated.x, "number");
+  assert.equal(typeof defeated.y, "number");
+});
