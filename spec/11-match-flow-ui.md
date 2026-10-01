@@ -28,7 +28,7 @@
 - Turn banner: a big, centered banner (separate from the wave banner so both can show after a wave ends) with the player's name and "it's your turn". The text uses the player's colour, at least 40px on desktop (scaled down with the viewport on phones, never below 28px, wrapping instead of overflowing), and stays visible for about 3.5 seconds. It is `aria-live="polite"`, does not take pointer events, and under `prefers-reduced-motion` it appears without animation. It is only shown when more than one player is in the match. Generic action toasts are unchanged
 - The guide card title is larger (18px) so the turn message is readable from across the table
 - Show active wave and remaining creatures
-- Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; the Upgrade button is enabled only in prep for a player who has not readied and whose tower is below max level (it then shows "MAX" instead of a cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
+- Action toolbar (tower, wall, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
 ## Real-time playback
@@ -73,7 +73,7 @@ Terrain
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
-- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. Accuracy is always 100% today because towers do not miss. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
+- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, the level of each upgrade track (range, damage, accuracy), health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. Accuracy is always 100% today because towers do not miss. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
 Ruins
 - A destroyed tower leaves ruins on its cell (broken base in the owner's colour, rubble, scorch mark) for the rest of the match. They are presentation only: they do not block placement, targeting or paths
@@ -123,7 +123,7 @@ Engine rules
 Event to sound table
 | Source | Sound id | Notes |
 | --- | --- | --- |
-| `tower-hit` | `tower-shot` | at most one per tower id, at most 4 per snapshot |
+| `tower-hit`, `tower-miss` | `tower-shot` | at most one per tower id, at most 4 per snapshot; a miss draws the shot flying past the creature with a floating "miss" |
 | `creature-defeated` | `creature-kill` | at most 3 per snapshot |
 | `creature-attack` | `tower-damaged` | |
 | `tower-destroyed` | `tower-destroyed` | priority |
