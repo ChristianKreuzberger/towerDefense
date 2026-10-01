@@ -95,8 +95,8 @@ Common rejection reasons:
 Transport-level validation (host API, before the simulation sees a command or setup). These are structured errors `{ ok: false, error: <code>, message }` with HTTP 400 and never end the session:
 - `invalid-json`: the request body is not valid JSON
 - `invalid-command`: missing or unsupported command, non-string ids, or an unknown `set-target-mode` mode (never coerced to `first`)
-- `invalid-coordinates`: `place-tower` / `place-wall` `x`/`y` are not finite integers inside the map bounds
-- `invalid-setup`: player count outside 1..8, duplicate player IDs (rejected, not de-duplicated), a name longer than `MAX_PLAYER_NAME_LENGTH` (24 characters), or a seed that is present but not a finite integer. A missing seed uses the documented default 777
+- `invalid-coordinates`: `place-tower` / `place-wall` `x`/`y` are not finite integers. Integers outside the map are a normal command rejection with reason `out-of-bounds` (HTTP 200, `result.accepted = false`), decided by the simulation
+- `invalid-setup`: player count outside 1..8, duplicate player IDs (rejected, not de-duplicated), a name longer than `MAX_PLAYER_NAME_LENGTH` (24 characters), or a seed that is present but not a finite integer. A missing seed uses the documented default 777. Blank player names get `Player N`. The client never sends an empty or non-integer seed and also treats `ok: false` in a 200 body as an error
 - CORS: the Node server answers cross-origin requests with `Access-Control-Allow-Origin: *` and handles `OPTIONS` preflight (it is a local, unauthenticated dev host)
 
 ## Contract versioning

@@ -443,7 +443,7 @@ async function getJson<T>(path: string): Promise<T> {
   const { ok, text } = await sendRequest("GET", path);
   perfRecordBytes(text.length);
   const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!ok) {
+  if (!ok || data.ok === false) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
   return data;
@@ -453,7 +453,7 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   const { ok, text } = await sendRequest("POST", path, payload);
   perfRecordBytes(text.length);
   const data = JSON.parse(text) as T & ApiErrorPayload;
-  if (!ok) {
+  if (!ok || data.ok === false) {
     throw new Error(data.message ?? data.error ?? "request-failed");
   }
   return data;
@@ -1388,6 +1388,8 @@ function closeOverlay(): void {
 
 async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnapshot | null> {
   const seq = ++requestSeq;
+  // Only a client that had no match yet is actually reconnecting; later calls are routine refreshes.
+  const reconnecting = current === null;
   try {
     // Without cached map cells the host must send a full snapshot; afterwards lite is enough.
     const path = mapCache ? `/api/snapshot?lite=1&eventsSince=${eventCursor}` : "/api/snapshot";
@@ -1396,7 +1398,9 @@ async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<MatchSnaps
       data = await getJson<{ ok: true; snapshot: WireSnapshot }>("/api/snapshot");
       applyWireSnapshot(data.snapshot, seq);
     }
-    setMenuMessage("Reconnected to running match.");
+    if (reconnecting) {
+      setMenuMessage("Reconnected to running match.");
+    }
     return current;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to fetch snapshot";
@@ -1421,10 +1425,14 @@ async function startMatchFromMenu(): Promise<void> {
   setMenuMessage("");
 
   const players = menuPlayersToSetupPlayers();
-  const payload: MatchSetup = {
-    seed: Number(el.menuSeed.value),
-    players
-  };
+  // Number("") is 0 and Number("abc") is NaN; never send either as a seed.
+  const seedText = el.menuSeed.value.trim();
+  const seed = Number(seedText);
+  if (seedText === "" || !Number.isInteger(seed)) {
+    setMenuMessage("Map seed must be a whole number.");
+    return;
+  }
+  const payload: MatchSetup = { seed, players };
 
   try {
     const data = await postJson<ApiStartPayload>("/api/start", payload);

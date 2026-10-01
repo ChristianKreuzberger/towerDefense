@@ -1,6 +1,9 @@
 // Transport-agnostic game API: the Node server and the in-browser (GitHub Pages) host both route through this.
 import { createMatch, type MatchSimulation } from "@tower-defense/simulation/match";
 import {
+  MAX_PLAYER_NAME_LENGTH,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
   PROJECT_NAME,
   type MatchSetup,
   type MatchSnapshot,
@@ -25,35 +28,51 @@ export interface GameApiLogger {
 }
 
 const TARGET_MODES: TowerTargetMode[] = ["first", "last", "strongest", "nearest"];
+const DEFAULT_SEED = 777;
+
+// Input the host refuses to coerce. Hosts turn it into a structured 400 (see spec/07, error strategy).
+export class GameApiError extends Error {
+  public constructor(public readonly code: string, message: string) {
+    super(message);
+    this.name = "GameApiError";
+  }
+}
 
 function normalizeSetup(body: unknown): MatchSetup {
   const source = typeof body === "object" && body ? (body as Record<string, unknown>) : {};
 
-  const seed = typeof source.seed === "number" && Number.isInteger(source.seed)
-    ? source.seed
-    : Number(source.seed ?? 777);
+  // A missing seed uses the default; a present but invalid one (empty, NaN, fractional, text) is an error.
+  const seed = source.seed === undefined ? DEFAULT_SEED : source.seed;
+  if (typeof seed !== "number" || !Number.isInteger(seed)) {
+    throw new GameApiError("invalid-setup", "seed must be a finite integer");
+  }
 
   const inputPlayers = Array.isArray(source.players) ? source.players : [];
-  const players = inputPlayers
-    .map((entry, index) => {
-      if (typeof entry !== "object" || !entry) {
-        return null;
-      }
+  if (inputPlayers.length < MIN_PLAYERS || inputPlayers.length > MAX_PLAYERS) {
+    throw new GameApiError("invalid-setup", `player count must be between ${MIN_PLAYERS} and ${MAX_PLAYERS}`);
+  }
 
-      const mapped = entry as Record<string, unknown>;
-      const id = typeof mapped.id === "string" && mapped.id.trim().length > 0
-        ? mapped.id.trim()
-        : `p${index + 1}`;
-      const name = typeof mapped.name === "string" && mapped.name.trim().length > 0
-        ? mapped.name.trim()
-        : `Player ${index + 1}`;
+  const players = inputPlayers.map((entry, index) => {
+    if (typeof entry !== "object" || !entry) {
+      throw new GameApiError("invalid-setup", `player ${index + 1} must be an object`);
+    }
 
-      return { id, name };
-    })
-    .filter((entry): entry is { id: string; name: string } => entry !== null);
+    const mapped = entry as Record<string, unknown>;
+    const id = typeof mapped.id === "string" && mapped.id.trim().length > 0
+      ? mapped.id.trim()
+      : `p${index + 1}`;
+    const name = typeof mapped.name === "string" && mapped.name.trim().length > 0
+      ? mapped.name.trim()
+      : `Player ${index + 1}`;
+    if (name.length > MAX_PLAYER_NAME_LENGTH) {
+      throw new GameApiError("invalid-setup", `player names are limited to ${MAX_PLAYER_NAME_LENGTH} characters`);
+    }
 
-  if (players.length < 1 || players.length > 8) {
-    throw new Error("player count must be between 1 and 8");
+    return { id, name };
+  });
+
+  if (new Set(players.map((player) => player.id)).size !== players.length) {
+    throw new GameApiError("invalid-setup", "player ids must be unique");
   }
 
   return { players, seed };
@@ -109,54 +128,48 @@ function parseCommand(body: unknown): SimulationCommand {
     : null;
 
   if (!commandSource || typeof commandSource.type !== "string") {
-    throw new Error("invalid command payload");
+    throw new GameApiError("invalid-command", "invalid command payload");
   }
 
   const type = commandSource.type;
+  const text = (field: string): string => {
+    const value = commandSource[field];
+    if (typeof value !== "string") {
+      throw new GameApiError("invalid-command", `${type}: ${field} must be a string`);
+    }
+    return value;
+  };
 
   if (type === "place-tower" || type === "place-wall") {
-    return {
-      type,
-      playerId: String(commandSource.playerId ?? ""),
-      x: Number(commandSource.x),
-      y: Number(commandSource.y)
-    };
+    const { x, y } = commandSource;
+    // Whether the cell lies inside the map is the simulation's call (reason "out-of-bounds").
+    if (typeof x !== "number" || !Number.isInteger(x) || typeof y !== "number" || !Number.isInteger(y)) {
+      throw new GameApiError("invalid-coordinates", `${type}: x and y must be finite integers`);
+    }
+    return { type, playerId: text("playerId"), x, y };
   }
 
   if (type === "upgrade-tower") {
-    return {
-      type,
-      playerId: String(commandSource.playerId ?? ""),
-      towerId: String(commandSource.towerId ?? "")
-    };
+    return { type, playerId: text("playerId"), towerId: text("towerId") };
   }
 
   if (type === "set-target-mode") {
-    const requestedMode = String(commandSource.mode ?? "first");
-    const normalizedMode: TowerTargetMode = TARGET_MODES.includes(requestedMode as TowerTargetMode)
-      ? (requestedMode as TowerTargetMode)
-      : "first";
-
-    return {
-      type,
-      playerId: String(commandSource.playerId ?? ""),
-      towerId: String(commandSource.towerId ?? ""),
-      mode: normalizedMode
-    };
+    const mode = commandSource.mode;
+    if (typeof mode !== "string" || !TARGET_MODES.includes(mode as TowerTargetMode)) {
+      throw new GameApiError("invalid-command", `set-target-mode: mode must be one of ${TARGET_MODES.join(", ")}`);
+    }
+    return { type, playerId: text("playerId"), towerId: text("towerId"), mode: mode as TowerTargetMode };
   }
 
   if (type === "ready-for-wave") {
-    return {
-      type,
-      playerId: String(commandSource.playerId ?? "")
-    };
+    return { type, playerId: text("playerId") };
   }
 
   if (type === "advance-wave") {
     return { type };
   }
 
-  throw new Error(`unsupported command type: ${type}`);
+  throw new GameApiError("invalid-command", `unsupported command type: ${type}`);
 }
 
 const NOT_STARTED: GameApiResponse = {
@@ -182,8 +195,7 @@ export function createGameApi(log: GameApiLogger = { info: () => undefined }): (
     }
   }
 
-  // Throws on bad input; each host turns that into a 400.
-  return ({ method, pathname, searchParams, body }) => {
+  const handle = ({ method, pathname, searchParams, body }: GameApiRequest): GameApiResponse => {
     if (method === "GET" && pathname === "/health") {
       return { status: 200, payload: { ok: true, project: PROJECT_NAME, runningMatch: simulation !== null, setup } };
     }
@@ -259,5 +271,17 @@ export function createGameApi(log: GameApiLogger = { info: () => undefined }): (
     }
 
     return { status: 404, payload: { ok: false, error: "not-found" } };
+  };
+
+  // Validation problems are structured, non-fatal 400s; anything else is unexpected and left to the host.
+  return (request) => {
+    try {
+      return handle(request);
+    } catch (error) {
+      if (error instanceof GameApiError) {
+        return { status: 400, payload: { ok: false, error: error.code, message: error.message } };
+      }
+      throw error;
+    }
   };
 }
