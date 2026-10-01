@@ -209,7 +209,8 @@ function placeTowersDeterministically(
   // rejects towers anyway.
   const candidates: Array<{ x: number; y: number }> = [];
   for (const laneCell of lane.filter((cell) => cell.x >= SPAWN_ANCHOR_X)) {
-    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]] as const) {
+    // The maze keeps pads off the corridors' 4-neighbourhood, so diagonal pads (within reach of armored and tank creatures) count too.
+    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
       const cell = { x: laneCell.x + dx, y: laneCell.y + dy };
       const onLane = lane.some((entry) => entry.x === cell.x && entry.y === cell.y);
       const known = candidates.some((entry) => entry.x === cell.x && entry.y === cell.y);
