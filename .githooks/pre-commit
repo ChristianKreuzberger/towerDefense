@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Fast local gate: same lint and typecheck CI runs. Skip with `git commit --no-verify`.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-commit: lint"
+npm run --silent lint
+
+echo "pre-commit: typecheck"
+npm run --silent typecheck

@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "build": "npm run build -w @tower-defense/shared -w @tower-defense/simulation -w @tower-defense/transport && npm run -ws --if-present build",
     "typecheck": "npm run -ws --if-present typecheck",
     "lint": "eslint .",
