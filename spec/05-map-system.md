@@ -41,6 +41,14 @@
 - Towers and walls may be placed on lane cells, but the placement path checks (towers and walls) reject any placement that would cut the last route.
 - Rendering follows the same model: buildable cells are the walkable road and non-buildable cells are raised grass pads (see spec/11, Terrain).
 
+## Path wear
+
+- Every map cell has a `pathWear` value from 0 to `PATH_CELL_MAX_WEAR` (8).
+- Wear is added during the wave: each time a creature moves onto a lane cell, that cell gains `PATH_WEAR_PER_TRAVERSAL` (1), clamped to `PATH_CELL_MAX_WEAR`. Wear is tracked per cell, so it does not depend on how the route is computed.
+- Wear slows creatures standing on the cell (`CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR` per point, never below `MIN_CREATURE_MOVEMENT_SPEED_UNITS`), so busy lanes get slower but never come to a standstill.
+- Between waves every cell is repaired by `BETWEEN_WAVE_PATH_WEAR_REPAIR` (3), never below 0. The `path-repaired` event lists each repaired cell with wear before and after.
+- Walls and spawn/exit events add no wear of their own.
+
 ## Monster cave (spawn)
 
 - Every map has one monster cave on the left edge (x = 0), at the start cell of the carved lane. All creatures spawn there.

@@ -21,6 +21,7 @@ Point economy with per-player score tracking.
 - Early waves teach basics with low punishment
 - Mid waves require mixed tower composition
 - Late waves force adaptation to armor/resistance shifts
+- Path wear (spec/05) is a soft brake on busy lanes: it is bounded by the minimum creature speed, and between-wave repair keeps it from building up forever
 
 ## Example tuning parameters
 
