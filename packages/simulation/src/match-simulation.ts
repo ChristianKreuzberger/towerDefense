@@ -39,6 +39,7 @@ import {
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
+  MAX_TOWER_LEVEL,
   isValidWallPlacement,
   WIN_SCORE,
 } from "@tower-defense/shared";
@@ -479,6 +480,10 @@ export class MatchSimulation {
         return { accepted: false, reason: "invalid-upgrade-target" };
       }
 
+      if (tower.level >= MAX_TOWER_LEVEL) {
+        return { accepted: false, reason: "tower-max-level" };
+      }
+
       const upgradeCost = getTowerUpgradeCost(tower.level);
       if (player.points < upgradeCost) {
         return { accepted: false, reason: "insufficient-points" };
@@ -495,10 +500,7 @@ export class MatchSimulation {
     }
 
     if (command.type === "set-target-mode") {
-      if (this.state.phase !== "wave") {
-        return { accepted: false, reason: "wall-phase-not-active" };
-      }
-
+      // Allowed in prep and during the wave so players can set it before committing; "ended" is rejected above.
       const player = this.state.players.find((entry) => entry.id === command.playerId);
       if (!player) {
         return { accepted: false, reason: "unknown-player" };

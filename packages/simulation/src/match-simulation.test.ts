@@ -23,6 +23,7 @@ import {
   getCreatureMovementSpeedUnits,
   getTowerRange,
   getTowerUpgradeCost,
+  MAX_TOWER_LEVEL,
   getWallCost,
   getWaveClearBonus,
   isValidTowerPlacement,
@@ -3275,4 +3276,86 @@ test("tower-hit and creature-defeated events carry the cell of the creature", ()
   assert.equal(typeof hit.y, "number");
   assert.equal(typeof defeated.x, "number");
   assert.equal(typeof defeated.y, "number");
+});
+
+function createPrepMatchWithTower(seed: number): ReturnType<typeof createMatch> {
+  const cell = getBuildableCoordinate(seed);
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  assert.equal(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted, true);
+  return simulation;
+}
+
+test("accepts set-target-mode during the prep phase and changes the tower mode", () => {
+  const simulation = createPrepMatchWithTower(15);
+  assert.equal(simulation.getSnapshot().phase, "placement");
+
+  const result = simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "nearest" });
+
+  assert.deepEqual(result, { accepted: true });
+  assert.equal(simulation.getSnapshot().towers[0]?.targetMode, "nearest");
+});
+
+test("accepts set-target-mode in prep after the player is ready, and keeps it when the wave starts", () => {
+  const simulation = createPrepMatchWithTower(15);
+  simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "last" });
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+
+  const afterWaveStart = simulation.getSnapshot();
+  assert.equal(afterWaveStart.phase, "wave");
+  assert.equal(afterWaveStart.towers[0]?.targetMode, "last");
+  assert.equal(
+    simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "strongest" }).accepted,
+    true
+  );
+});
+
+test("rejects set-target-mode with match-already-ended, never wall-phase-not-active", () => {
+  const simulation = createPrepMatchWithTower(15);
+  simulation.awardPoints("p1", 1000);
+  assert.equal(simulation.getSnapshot().phase, "ended");
+
+  const result = simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "last" });
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.reason, "match-already-ended");
+});
+
+test("keeps walls combat-only and upgrades prep-only after the target-mode change", () => {
+  const simulation = createPrepMatchWithTower(15);
+  const wall = simulation.applyCommand({ type: "place-wall", playerId: "p1", x: 0, y: 0 });
+  assert.equal(wall.reason, "wall-phase-not-active");
+
+  simulation.awardPoints("p1", 200);
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  assert.equal(upgrade.reason, "upgrade-phase-not-active");
+});
+
+test("upgrades up to MAX_TOWER_LEVEL, then rejects with tower-max-level and charges nothing", () => {
+  const simulation = createPrepMatchWithTower(15);
+  // 80 + 128 + 204 + 327: the full cost of going from level 1 to the cap.
+  let total = 0;
+  for (let level = 1; level < MAX_TOWER_LEVEL; level += 1) {
+    total += getTowerUpgradeCost(level);
+  }
+  simulation.awardPoints("p1", total);
+
+  for (let level = 1; level < MAX_TOWER_LEVEL; level += 1) {
+    assert.equal(
+      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" }).accepted,
+      true,
+      `upgrade from level ${level} should be accepted`
+    );
+  }
+  assert.equal(simulation.getSnapshot().towers[0]?.level, MAX_TOWER_LEVEL);
+  assert.equal(simulation.getSnapshot().players[0]?.points, 0);
+
+  simulation.awardPoints("p1", 500);
+  const pointsBefore = simulation.getSnapshot().players[0]?.points;
+  const rejected = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.reason, "tower-max-level");
+  assert.equal(simulation.getSnapshot().towers[0]?.level, MAX_TOWER_LEVEL);
+  assert.equal(simulation.getSnapshot().players[0]?.points, pointsBefore);
 });
