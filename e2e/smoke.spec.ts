@@ -55,7 +55,8 @@ async function clickCellNearSpawn(
   await page.locator("#board canvas").click({ position });
 }
 
-async function startMatch(page: Page, path: string): Promise<void> {
+// Opens the menu, leaving any match the host kept alive from the previous test.
+async function openMenu(page: Page, path: string): Promise<void> {
   // Starting over a running match asks for confirmation; the helper always agrees.
   page.on("dialog", (dialog) => void dialog.accept());
   // Register before goto so the load-time snapshot response can't be missed.
@@ -70,12 +71,19 @@ async function startMatch(page: Page, path: string): Promise<void> {
     await page.getByRole("button", { name: "Back To Menu" }).click();
   }
   await expect(page.locator("#menuScreen")).toBeVisible();
+}
+
+async function startMatch(page: Page, path: string): Promise<void> {
+  await openMenu(page, path);
   await page.locator("#menuSeed").fill("777");
   await page.locator("#menuPlayerName1").fill("Alpha");
   await page.locator("#menuPlayerName2").fill("Bravo");
   await page.getByRole("button", { name: "Start Match" }).click();
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(page.locator("#board canvas")).toBeVisible();
+  // Every new match opens with the map preview; the helper moves on to placement.
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator("#mapPreviewRoot")).toBeHidden();
 }
 
 test("completes the local setup flow, auto-plays combat, and rematches", async ({ page }) => {
@@ -93,6 +101,19 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
 
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(page.locator("#board canvas")).toBeVisible();
+
+  // A new match opens with the map preview: map overview, seed and the player list; nothing can be placed yet.
+  const preview = page.locator("#mapPreviewRoot .map-preview-modal");
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("role", "dialog");
+  await expect(preview).toContainText("Seed 43");
+  await expect(preview).toContainText("Player 1: Alpha");
+  await expect(preview).toContainText("Player 2: Bravo");
+  await expect(page.locator("#mapPreviewContinueBtn")).toBeFocused();
+  await expect(page.locator("#gameScreen")).toHaveAttribute("inert", "");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(preview).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
 
   // Developer controls are hidden by default.
   await expect(page.locator("#snapshot")).toBeHidden();
@@ -770,4 +791,29 @@ test("the move button explains itself while locked and, once unlocked, sends a m
   await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toContain('"type":"move-tower"');
   expect(commands[0]).toContain('"towerId":"tower-p1"');
+});
+
+test("the map preview blocks placement, closes with Esc, and does not reappear on reconnect", async ({ page }) => {
+  await openMenu(page, "/");
+  await page.locator("#menuSeed").fill("777");
+  await page.getByRole("button", { name: "Start Match" }).click();
+  const dialog = page.locator("#mapPreviewRoot");
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#mapPreviewCanvas")).toBeVisible();
+  await expect(dialog).toContainText("Protected area");
+
+  // Hotkeys are off while it is open, and Tab stays on the Continue button.
+  await page.keyboard.press("t");
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#mapPreviewContinueBtn")).toBeFocused();
+  const snapshot = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: unknown[] } };
+  expect(snapshot.snapshot.towers).toEqual([]);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // Reloading reconnects to the running match without the preview.
+  await page.reload();
+  await expect(page.locator("#gameScreen")).toBeVisible();
+  await expect(dialog).toBeHidden();
 });
