@@ -1,4 +1,4 @@
-import { WIN_SCORE, getTowerUpgradeCost, getWallCost } from "@tower-defense/shared";
+import { WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
@@ -42,7 +42,14 @@ type ApiErrorPayload = {
 
 // Snapshot as sent by the host: lite responses carry wornCells/eventsOffset instead of map.cells (see spec/07).
 type WireSnapshot = Omit<MatchSnapshot, "map"> & {
-  map: { width: number; height: number; seed: number; cells?: MapCell[]; wornCells?: Array<{ x: number; y: number; pathWear: number }> };
+  map: {
+    width: number;
+    height: number;
+    seed: number;
+    spawn?: { x: number; y: number };
+    cells?: MapCell[];
+    wornCells?: Array<{ x: number; y: number; pathWear: number }>;
+  };
   eventsOffset?: number;
   eventsTotal?: number;
 };
@@ -478,6 +485,7 @@ const REJECT_REASON_TEXT: Record<string, string> = {
   "tower-overlap": "a tower is already there",
   "wall-overlap": "a wall is already there",
   "path-blocked": "that would block the path",
+  "spawn-protected": "too close to the monster cave",
   "wall-phase-not-active": "walls can only be placed during combat",
   "placement-phase-not-active": "towers can only be placed during placement",
   "tower-already-placed": "you already placed your tower",
@@ -750,7 +758,13 @@ function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEven
 
   const snapshot: MatchSnapshot = {
     ...wire,
-    map: { width: wire.map.width, height: wire.map.height, seed: wire.map.seed, cells: mapCache.cells },
+    map: {
+      width: wire.map.width,
+      height: wire.map.height,
+      seed: wire.map.seed,
+      cells: mapCache.cells,
+      ...(wire.map.spawn ? { spawn: wire.map.spawn } : {})
+    },
     events: eventLog
   };
   return { snapshot, newEvents };
@@ -1430,11 +1444,12 @@ function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y
   const currentX = Number(el.x.value);
   const currentY = Number(el.y.value);
   const currentCell = mapCache.byKey.get(`${currentX},${currentY}`);
-  if (currentCell?.buildable && !occupied.has(`${currentX},${currentY}`)) {
+  const isFree = (x: number, y: number): boolean => !occupied.has(`${x},${y}`) && !isInSpawnProtection(snapshot.map, x, y);
+  if (currentCell?.buildable && isFree(currentX, currentY)) {
     return { x: currentX, y: currentY };
   }
 
-  const cell = mapCache.buildable.find((entry) => !occupied.has(`${entry.x},${entry.y}`));
+  const cell = mapCache.buildable.find((entry) => isFree(entry.x, entry.y));
   return cell ? { x: cell.x, y: cell.y } : null;
 }
 
@@ -1864,8 +1879,9 @@ function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {
   }
 
   const occupied = occupiedCellKeys(current);
+  const map = current.map;
   return mapCache.buildable
-    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`))
+    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`) && !isInSpawnProtection(map, cell.x, cell.y))
     .map((cell) => ({ x: cell.x, y: cell.y }));
 }
 

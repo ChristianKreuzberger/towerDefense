@@ -30,7 +30,8 @@ export function findLane(map: MatchSnapshot["map"]): Array<{ x: number; y: numbe
   }
   const parent = new Map<string, string | null>();
   const queue: Array<{ x: number; y: number }> = [];
-  const y0 = Math.floor(map.height / 3);
+  // Demo creatures enter through the monster cave, like real ones.
+  const y0 = map.spawn?.y ?? Math.floor(map.height / 3);
   for (let offset = 0; offset < map.height; offset += 1) {
     const y = (y0 + offset) % map.height;
     if (byKey.get(`0,${y}`)?.buildable === true) {

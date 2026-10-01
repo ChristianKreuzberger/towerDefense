@@ -21,6 +21,7 @@
 
 - Towers can only be placed on buildable cells
 - Placement cannot overlap existing towers
+- Towers and walls cannot be placed within 5 cells of the monster cave where creatures spawn (see spec/05)
 - Placement cannot make all enemy paths invalid
 - Placement must not cut off any live tower that creatures could reach before it (same per-tower rule as wall placement)
 - Each player places one tower at match start

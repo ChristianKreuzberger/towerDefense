@@ -4,7 +4,8 @@ import {
   CREATURE_ARCHETYPE_STATS,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
-  getTowerRange
+  getTowerRange,
+  isInSpawnProtection
 } from "@tower-defense/shared";
 import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
 
@@ -154,6 +155,7 @@ class BattlefieldScene extends Phaser.Scene {
   private onCellClick: ((x: number, y: number) => void) | undefined;
   private placementContext: PlacementContext | undefined;
   private cellsByKey = new Map<string, MapCell>();
+  private spawn: MatchSnapshot["map"]["spawn"];
   private occupiedCells = new Set<string>();
   private hoverX: number | null = null;
   private hoverY: number | null = null;
@@ -355,7 +357,7 @@ class BattlefieldScene extends Phaser.Scene {
       return false;
     }
     const cell = this.cellsByKey.get(`${x},${y}`);
-    if (!cell || !cell.buildable) {
+    if (!cell || !cell.buildable || isInSpawnProtection({ spawn: this.spawn }, x, y)) {
       return false;
     }
     return !this.occupiedCells.has(`${x},${y}`);
@@ -577,6 +579,7 @@ class BattlefieldScene extends Phaser.Scene {
       cellsByKey.set(`${cell.x},${cell.y}`, cell);
     }
     this.cellsByKey = cellsByKey;
+    this.spawn = map.spawn;
 
     const pixelWidth = map.width * cellSize;
     const pixelHeight = map.height * cellSize;
@@ -588,7 +591,7 @@ class BattlefieldScene extends Phaser.Scene {
     }
     const texture = this.textures.createCanvas(TERRAIN_TEXTURE_KEY, pixelWidth, pixelHeight);
     if (texture) {
-      paintTerrain(texture.context, map.cells, map.width, map.height, cellSize, map.seed);
+      paintTerrain(texture.context, map.cells, map.width, map.height, cellSize, map.seed, map.spawn);
       texture.refresh();
       this.terrainImage = this.add.image(0, 0, TERRAIN_TEXTURE_KEY).setOrigin(0, 0).setDepth(DEPTH_TERRAIN);
     }

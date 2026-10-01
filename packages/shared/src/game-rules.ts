@@ -21,6 +21,9 @@ export const BASE_CREATURE_MOVEMENT_SPEED_UNITS = MOVEMENT_PROGRESS_UNITS_PER_CE
 export const CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR = 10;
 export const MIN_CREATURE_MOVEMENT_SPEED_UNITS = 40;
 export const WAVE_CLEAR_BONUS = 15;
+// Cells (Euclidean) around the monster cave where towers and walls are forbidden. Smaller than the base tower
+// range (12) so towers just outside still cover the cave exit, but nobody can wall in or point-blank the spawn.
+export const SPAWN_PROTECTION_RADIUS = 5;
 export const BASE_TOWER_RANGE = 12;
 export const TOWER_RANGE_PER_LEVEL = 1.5;
 
@@ -49,6 +52,7 @@ export const GAME_RULES = {
   creatureMovementSpeedPenaltyPerWear: CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR,
   minCreatureMovementSpeedUnits: MIN_CREATURE_MOVEMENT_SPEED_UNITS,
   waveClearBonus: WAVE_CLEAR_BONUS,
+  spawnProtectionRadius: SPAWN_PROTECTION_RADIUS,
   baseTowerRange: BASE_TOWER_RANGE,
   towerRangePerLevel: TOWER_RANGE_PER_LEVEL
 } as const;

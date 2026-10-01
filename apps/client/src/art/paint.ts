@@ -1,5 +1,5 @@
 // Pure 2D-canvas painters. They know nothing about Phaser so the menu diorama can reuse them.
-import type { CreatureArchetype, MapCell } from "@tower-defense/shared";
+import { SPAWN_PROTECTION_RADIUS, type CreatureArchetype, type MapCell } from "@tower-defense/shared";
 
 import { CREAM, ENEMY, INK, TERRAIN, hash3, hex, shade } from "./palette";
 
@@ -35,7 +35,15 @@ function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: numb
 // Buildable cells are the walkable layer and are drawn as the road; non-buildable cells are raised grass pads.
 // Grass plots are raised pads on a continuous road: each plot's corners are rounded only where
 // both orthogonal neighbours are road (four-neighbour mask), and the plot casts a soft shadow onto the road.
-export function paintTerrain(ctx: Ctx, cells: MapCell[], width: number, height: number, cs: number, seed: number): void {
+export function paintTerrain(
+  ctx: Ctx,
+  cells: MapCell[],
+  width: number,
+  height: number,
+  cs: number,
+  seed: number,
+  spawn?: { x: number; y: number }
+): void {
   const grass = new Uint8Array(width * height);
   for (const cell of cells) {
     if (!cell.buildable) {
@@ -180,16 +188,76 @@ export function paintTerrain(ctx: Ctx, cells: MapCell[], width: number, height: 
     }
   }
 
-  paintGates(ctx, width, height, cs);
+  if (spawn) {
+    paintSpawnZone(ctx, spawn, cs);
+  }
+  paintGates(ctx, width, height, cs, !spawn);
+  if (spawn) {
+    paintCave(ctx, spawn, cs);
+  }
 }
 
-// Left edge: spawn gate (hazard stripes + chevrons). Right edge: goal (chequered strip).
-function paintGates(ctx: Ctx, width: number, height: number, cs: number): void {
+// Faint warning tint over the cells where towers and walls are not allowed (see SPAWN_PROTECTION_RADIUS).
+function paintSpawnZone(ctx: Ctx, spawn: { x: number; y: number }, cs: number): void {
+  const cx = (spawn.x + 0.5) * cs;
+  const cy = (spawn.y + 0.5) * cs;
+  // Placement distance is measured between cell centres, so the zone edge sits at the radius from the cave cell centre.
+  const r = SPAWN_PROTECTION_RADIUS * cs + cs / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.clip();
+  circle(ctx, cx, cy, r);
+  ctx.fillStyle = "rgba(196, 71, 58, 0.16)";
+  ctx.fill();
+  ctx.setLineDash([cs * 0.3, cs * 0.25]);
+  ctx.lineWidth = Math.max(2, cs * 0.07);
+  ctx.strokeStyle = "rgba(196, 71, 58, 0.7)";
+  ctx.stroke();
+  ctx.restore();
+}
+
+// Monster cave: a rocky mound on the left edge with a dark mouth that faces the map.
+function paintCave(ctx: Ctx, spawn: { x: number; y: number }, cs: number): void {
+  const cy = (spawn.y + 0.5) * cs;
+  const rock = 0x8a7f8c;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, cy, cs * 1.9, cs * 1.6, 0, -Math.PI / 2, Math.PI / 2);
+  ctx.closePath();
+  outline(ctx, rock, Math.max(2, cs * 0.07));
+  // lit upper rim
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = Math.max(1.5, cs * 0.06);
+  ctx.beginPath();
+  ctx.ellipse(0, cy, cs * 1.7, cs * 1.4, 0, -Math.PI / 2, -Math.PI / 5);
+  ctx.stroke();
+  // boulders
+  for (const [bx, by, br] of [[1.5, -1.0, 0.3], [1.55, 1.0, 0.26], [0.7, -1.45, 0.22], [0.8, 1.4, 0.2]] as const) {
+    circle(ctx, bx * cs, cy + by * cs, br * cs);
+    outline(ctx, shade(rock, 1.15), Math.max(1.5, cs * 0.05));
+  }
+  // dark mouth
+  ctx.beginPath();
+  ctx.ellipse(0, cy, cs * 1.25, cs * 0.85, 0, -Math.PI / 2, Math.PI / 2);
+  ctx.closePath();
+  outline(ctx, 0x16121b, Math.max(2, cs * 0.06), INK);
+  // glowing eyes deep inside
+  ctx.fillStyle = "rgba(255, 159, 67, 0.95)";
+  for (const dy of [-0.2, 0.2]) {
+    circle(ctx, cs * 0.45, cy + dy * cs, cs * 0.06);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Left edge: spawn gate (hazard stripes + chevrons), only when the map has no cave. Right edge: goal (chequered strip).
+function paintGates(ctx: Ctx, width: number, height: number, cs: number, spawnGate: boolean): void {
   const band = Math.max(4, Math.round(cs * 0.2));
   const h = height * cs;
   ctx.save();
   for (let y = 0; y < height; y += 1) {
-    for (let k = 0; k < 4; k += 1) {
+    for (let k = 0; k < 4 && spawnGate; k += 1) {
       ctx.fillStyle = (y * 4 + k) % 2 === 0 ? "#c4473a" : hex(INK);
       ctx.fillRect(0, y * cs + (k * cs) / 4, band, cs / 4);
     }
@@ -202,7 +270,7 @@ function paintGates(ctx: Ctx, width: number, height: number, cs: number): void {
     }
   }
   ctx.fillStyle = "rgba(196, 71, 58, 0.9)";
-  for (let y = 1; y < height; y += 4) {
+  for (let y = 1; y < height && spawnGate; y += 4) {
     const cy = y * cs + cs / 2;
     ctx.beginPath();
     ctx.moveTo(band + cs * 0.12, cy - cs * 0.22);

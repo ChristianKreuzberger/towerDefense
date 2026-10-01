@@ -35,7 +35,8 @@ polls and advances many times per second, so GET /api/snapshot, POST
 
 When `lite` is set the response snapshot differs from the full shape as follows:
 
-- `map.cells` is omitted. `map` carries `width`, `height`, `seed` and
+- `map.cells` is omitted. `map` carries `width`, `height`, `seed`, `spawn: { x, y }`
+  (the monster cave, also present in full snapshots) and
   `wornCells: [{ x, y, pathWear }]` (only cells whose pathWear is above 0).
   Cell layout is a pure function of (seed, width, height); clients fetch it once
   with a full snapshot and cache it by that key.
@@ -87,6 +88,7 @@ Common rejection reasons:
 - TOWER_ALREADY_PLACED
 - TOWER_MOVE_NOT_ALLOWED
 - PATH_BLOCKED
+- SPAWN_PROTECTED (tower or wall inside the monster cave's protected area; wire code `spawn-protected`)
 - INSUFFICIENT_POINTS
 
 ## Contract versioning

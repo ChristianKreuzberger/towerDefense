@@ -29,8 +29,9 @@ async function clickBuildableCell(page: Page, index = 0): Promise<void> {
   await page.locator("#board canvas").click({ position: await cellPixel(page, index) });
 }
 
-// Towers have a limited range, so tests that need combat place them beside seed 777's spawn lane.
-const SEED_777_TOWER_CELLS = [{ x: 0, y: 17 }, { x: 1, y: 15 }];
+// Towers have a limited range, so tests that need combat place them just outside the protected area
+// around seed 777's monster cave at (0, 17).
+const SEED_777_TOWER_CELLS = [{ x: 5, y: 16 }, { x: 7, y: 17 }];
 
 async function clickCellNearSpawn(page: Page, slot: 0 | 1): Promise<void> {
   const cell = SEED_777_TOWER_CELLS[slot]!;
