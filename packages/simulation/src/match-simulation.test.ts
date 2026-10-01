@@ -1436,7 +1436,8 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
   advanceToFirstTargetableTick(simulation);
-  advanceWaveTick(simulation);
+  // Accuracy is below 100%, so the kill lands a few ticks later depending on the rolled misses.
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 12);
 
   const snapshot = simulation.getSnapshot();
   const defeatedEvents = snapshot.events.filter((event) => event.type === "creature-defeated");
@@ -1492,7 +1493,8 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     simulation.applyCommand({ type: "set-target-mode", playerId: "p2", towerId: "tower-p2", mode: "first" });
 
     advanceToFirstTargetableTick(simulation);
-  advanceWaveTick(simulation);
+  // Accuracy is below 100%, so the kill lands a few ticks later depending on the rolled misses.
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 12);
 
     const snapshot = simulation.getSnapshot();
     const hitEvents = snapshot.events.filter((event) => event.type === "tower-hit");
@@ -2754,11 +2756,6 @@ type TargetMode = "first" | "last" | "strongest" | "nearest";
 
 // Creatures cannot be targeted for their first SPAWN_PROTECTION_TICKS ticks, so the first creature is
 // shootable on the tick after the protected ones. Wave ticks start at 1 and creature 1 spawns on tick 1.
-// A runner outlives the first volley, so kill assertions need one more tick of tower fire.
-function advanceWaveTick(simulation: ReturnType<typeof createMatch>): void {
-  simulation.applyCommand({ type: "advance-wave" });
-}
-
 function advanceToFirstTargetableTick(simulation: ReturnType<typeof createMatch>): void {
   for (let tick = 0; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
