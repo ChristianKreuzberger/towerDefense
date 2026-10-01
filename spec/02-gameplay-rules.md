@@ -22,6 +22,7 @@
 - Towers can only be placed on buildable cells
 - Placement cannot overlap existing towers
 - Placement cannot make all enemy paths invalid
+- Placement must not cut off any live tower that creatures could reach before it (same per-tower rule as wall placement)
 - Each player places one tower at match start
 - Once placed, a tower cannot be moved or sold
 

@@ -182,54 +182,20 @@ function getReachabilityByTower(
   return reachability;
 }
 
-export function validatePathSafety(
-  placement: TowerPlacement,
+// Shared by tower and wall placement so both enforce the same rule: keep a left-to-right
+// route open and never cut off a tower that creatures could reach before.
+function checkPlacementPathSafety(
+  placement: { x: number; y: number },
+  blockedBefore: Set<string>,
   existingTowers: Tower[],
   map: GameMap
 ): PathSafetyCheckResult {
   const buildable = toBuildableSet(map);
 
-  const occupiedBefore = new Set<string>();
-  for (const tower of existingTowers) {
-    occupiedBefore.add(toKey(tower.x, tower.y));
-  }
-
-  const pathBefore = hasLeftToRightPath(map, occupiedBefore, buildable);
-  const occupiedAfter = new Set(occupiedBefore);
-  occupiedAfter.add(toKey(placement.x, placement.y));
-  const pathAfter = hasLeftToRightPath(map, occupiedAfter, buildable);
-
-  if (pathBefore && !pathAfter) {
-    return { safe: false, reason: "path-blocked" };
-  }
-
-  return { safe: true };
-}
-
-function validateWallPathSafety(
-  placement: WallPlacement,
-  existingWalls: Wall[],
-  existingTowers: Tower[],
-  map: GameMap
-): PathSafetyCheckResult {
-  if (existingTowers.length === 0) {
-    return { safe: true };
-  }
-
-  const buildable = toBuildableSet(map);
-
-  const blockedBefore = new Set<string>();
-  for (const wall of existingWalls) {
-    blockedBefore.add(toKey(wall.x, wall.y));
-  }
-  for (const tower of existingTowers) {
-    blockedBefore.add(toKey(tower.x, tower.y));
-  }
-
-  // Border reachability alone would let a wall cut the only left-to-right lane (creatures then fall back to a one-cell route).
-  const blockedAfterWall = new Set(blockedBefore);
-  blockedAfterWall.add(toKey(placement.x, placement.y));
-  if (hasLeftToRightPath(map, blockedBefore, buildable) && !hasLeftToRightPath(map, blockedAfterWall, buildable)) {
+  // Border reachability alone would let a placement cut the only left-to-right lane (creatures then fall back to a one-cell route).
+  const blockedAfter = new Set(blockedBefore);
+  blockedAfter.add(toKey(placement.x, placement.y));
+  if (hasLeftToRightPath(map, blockedBefore, buildable) && !hasLeftToRightPath(map, blockedAfter, buildable)) {
     return { safe: false, reason: "path-blocked" };
   }
 
@@ -242,8 +208,6 @@ function validateWallPathSafety(
     map
   );
 
-  const blockedAfter = new Set(blockedBefore);
-  blockedAfter.add(toKey(placement.x, placement.y));
   const reachableAfter = getBorderReachableCells(map, blockedAfter, buildable);
   const towerReachabilityAfter = getReachabilityByTower(
     existingTowers,
@@ -262,6 +226,40 @@ function validateWallPathSafety(
   }
 
   return { safe: true };
+}
+
+export function validatePathSafety(
+  placement: TowerPlacement,
+  existingTowers: Tower[],
+  map: GameMap
+): PathSafetyCheckResult {
+  const blockedBefore = new Set<string>();
+  for (const tower of existingTowers) {
+    blockedBefore.add(toKey(tower.x, tower.y));
+  }
+
+  return checkPlacementPathSafety(placement, blockedBefore, existingTowers, map);
+}
+
+function validateWallPathSafety(
+  placement: WallPlacement,
+  existingWalls: Wall[],
+  existingTowers: Tower[],
+  map: GameMap
+): PathSafetyCheckResult {
+  if (existingTowers.length === 0) {
+    return { safe: true };
+  }
+
+  const blockedBefore = new Set<string>();
+  for (const wall of existingWalls) {
+    blockedBefore.add(toKey(wall.x, wall.y));
+  }
+  for (const tower of existingTowers) {
+    blockedBefore.add(toKey(tower.x, tower.y));
+  }
+
+  return checkPlacementPathSafety(placement, blockedBefore, existingTowers, map);
 }
 
 export function getWallCost(existingWallCount: number): number {
