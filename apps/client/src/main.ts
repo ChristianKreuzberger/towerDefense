@@ -7,7 +7,7 @@ import { applyPaletteCssVars } from "./art/palette";
 import { cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
 import type { SoundId } from "./audio/index";
 import { createBattlefieldMount } from "./battlefield-scene";
-import { BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, DAMAGE_TYPE_OPTIONS, DEBUG, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, MAX_TICKS_PER_REQUEST, PLAYBACK_CHECK_INTERVAL_MS, PLAYBACK_SPEEDS, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
+import { BANNER_LIFETIME_MS, DAMAGE_TYPE_OPTIONS, DEBUG, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, PLAYBACK_SPEEDS, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
 import { clampCoord, coordValue } from "./coord";
 import { createDemo } from "./demo";
 import { app, el, must } from "./dom";
@@ -17,6 +17,7 @@ import type { GuideAction } from "./guide";
 import { hydrateSnapshot, resetMatchCaches } from "./hydrate";
 import { perfTimeApply } from "./perf";
 import { resolvePlacementCell } from "./placement";
+import { configurePlayback, msPerTick, setPlaybackSpeed, setPlaying, startPlayback, stopPlayback, syncPlaybackControls } from "./playback";
 import { playerNumber, playerTowerId, selectedPlayerId, towerColorClass } from "./player-util";
 import { mapPreview, settingsDialog, settingsStore, soundEngine } from "./services";
 import { store } from "./state";
@@ -61,6 +62,8 @@ const demo = createDemo({
     el.demoBtn.textContent = "Demo Combat";
   }
 });
+
+configurePlayback({ advance: advanceTicks, blocked: () => demo.running() });
 
 function showMenuScreen(): void {
   // The match keeps running on the host; offer a way back unless it is already over.
@@ -221,54 +224,6 @@ function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["ev
   }
 }
 
-function msPerTick(): number {
-  return 1000 / (BASE_TICKS_PER_SECOND * store.playbackSpeed);
-}
-
-function playbackShouldRun(): boolean {
-  return store.playing && !demo.running() && !document.hidden && store.current?.phase === "wave" && !el.gameScreen.classList.contains("hidden");
-}
-
-function startPlayback(): void {
-  if (store.playbackTimer !== null) {
-    return;
-  }
-  store.playbackLastClock = performance.now();
-  store.tickDebt = 0;
-  store.playbackErrors = 0;
-  store.playbackTimer = setInterval(playbackStep, PLAYBACK_CHECK_INTERVAL_MS);
-}
-
-function stopPlayback(): void {
-  if (store.playbackTimer !== null) {
-    clearInterval(store.playbackTimer);
-    store.playbackTimer = null;
-  }
-  store.tickDebt = 0;
-}
-
-// Fixed-rate tick accumulator: at most one request in flight, and stalls or hidden tabs never cause a catch-up burst.
-function playbackStep(): void {
-  const now = performance.now();
-  const elapsedMs = Math.min(now - store.playbackLastClock, 250);
-  store.playbackLastClock = now;
-  if (!playbackShouldRun()) {
-    store.tickDebt = 0;
-    return;
-  }
-
-  store.tickDebt = Math.min(store.tickDebt + (elapsedMs / 1000) * BASE_TICKS_PER_SECOND * store.playbackSpeed, MAX_TICKS_PER_REQUEST);
-  const ticks = Math.floor(store.tickDebt);
-  if (store.playbackInFlight || ticks < 1) {
-    return;
-  }
-  store.tickDebt -= ticks;
-  store.playbackInFlight = true;
-  void advanceTicks(ticks).finally(() => {
-    store.playbackInFlight = false;
-  });
-}
-
 async function advanceTicks(ticks: number): Promise<void> {
   const seq = ++store.requestSeq;
   try {
@@ -287,37 +242,6 @@ async function advanceTicks(ticks: number): Promise<void> {
     }
   }
 }
-
-function setPlaying(next: boolean): void {
-  store.playing = next;
-  syncPlaybackControls();
-  if (store.playing) {
-    store.tickDebt = 0;
-    // Otherwise a single failure after a failure-triggered pause would pause again immediately.
-    store.playbackErrors = 0;
-    store.playbackLastClock = performance.now();
-  }
-  // The wave guidance button label mirrors the current state.
-  syncGuideOverlay(store.current);
-}
-
-function setPlaybackSpeed(next: (typeof PLAYBACK_SPEEDS)[number]): void {
-  store.playbackSpeed = next;
-  syncPlaybackControls();
-}
-
-function syncPlaybackControls(): void {
-  el.playPauseBtn.textContent = store.playing ? "Pause" : "Play";
-  el.playPauseBtn.setAttribute("aria-pressed", String(store.playing));
-  for (const button of el.playbackControls.querySelectorAll<HTMLButtonElement>(".speed-btn")) {
-    button.setAttribute("aria-pressed", String(Number(button.dataset.speed) === store.playbackSpeed));
-  }
-}
-
-document.addEventListener("visibilitychange", () => {
-  store.tickDebt = 0;
-  store.playbackLastClock = performance.now();
-});
 
 function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
   if (!snapshot || snapshot.players.length === 0) {
