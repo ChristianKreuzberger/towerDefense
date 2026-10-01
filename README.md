@@ -282,3 +282,7 @@ Workspace layout:
 - `packages/shared`
 - `packages/simulation`
 - `packages/transport`
+
+## License
+
+MIT, see [LICENSE](LICENSE).
