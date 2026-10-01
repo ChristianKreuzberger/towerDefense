@@ -175,6 +175,38 @@ export class Effects {
     }
   }
 
+  // Flash, fireball, debris and smoke; the caller keeps the tower visible for EXPLOSION_PEAK_MS so it vanishes inside the blast.
+  explosion(x: number, y: number, delayMs: number): void {
+    const flash = this.acquireSprite("puff", KEY.soft, 0xfff1b8);
+    if (flash) {
+      flash.start = performance.now() + delayMs;
+      flash.duration = this.reducedMotion ? 220 : 380;
+      flash.x0 = x;
+      flash.y0 = y;
+      flash.x1 = x;
+      flash.y1 = y;
+      flash.scale0 = (this.cellSize * (this.reducedMotion ? 2.4 : 1.2)) / 32;
+      flash.scale1 = (this.cellSize * (this.reducedMotion ? 2.4 : 4.2)) / 32;
+    }
+    if (this.reducedMotion) {
+      return;
+    }
+    const fireball = this.acquireSprite("puff", KEY.soft, 0xff8a33);
+    if (fireball) {
+      fireball.start = performance.now() + delayMs + 60;
+      fireball.duration = 520;
+      fireball.x0 = x;
+      fireball.y0 = y;
+      fireball.x1 = x;
+      fireball.y1 = y - this.cellSize * 0.2;
+      fireball.scale0 = (this.cellSize * 0.8) / 32;
+      fireball.scale1 = (this.cellSize * 3.2) / 32;
+    }
+    this.burst(x, y, 0xffb347, delayMs + 40);
+    this.burst(x, y, 0x6b6670, delayMs + 80);
+    this.smoke(x, y, delayMs + 200);
+  }
+
   floatText(x: number, y: number, label: string, color: number, delayMs: number): void {
     let entry = this.texts.find((candidate) => !candidate.active);
     if (!entry) {

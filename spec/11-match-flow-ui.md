@@ -75,6 +75,11 @@ Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
 - The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. Accuracy is always 100% today because towers do not miss. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
+Ruins
+- A destroyed tower leaves ruins on its cell (broken base in the owner's colour, rubble, scorch mark) for the rest of the match. They are presentation only: they do not block placement, targeting or paths
+- Hovering the ruins shows a tooltip with the owner's name and the wave in which the tower was destroyed. Ruins are derived from `tower-destroyed` events, so towers destroyed before the client connected leave none
+- Ruins are cleared when a new map starts (rematch)
+
 Creatures
 - Four silhouettes, readable without text: runner (slim, pointed), swarm (small round bug), armored (plated hex), tank (large square with tracks and cannon)
 - Creatures face their heading, bob while walking, show an HP bar only when damaged, and leave a puff when they die
@@ -86,7 +91,7 @@ Effects (driven by snapshot events, presentation only)
 - `tower-hit`: projectile from tower to creature, hit spark, turret recoil
 - `creature-defeated`: particle burst and a floating "+points" in the scoring player's colour
 - `creature-attack`: tower flash and shake
-- `tower-destroyed`: smoke
+- `tower-destroyed`: explosion (flash, fireball, debris, smoke) played on the tower; the tower vanishes only once the explosion has peaked and leaves ruins behind (see Ruins). With `prefers-reduced-motion` the explosion is a single short static flash
 - `wall-hit`: spark
 - `wave-end`: wave-clear banner
 - `tower-hit` and `creature-defeated` carry the cell the creature was in. Strong towers can kill a creature within the same batched response that spawned it, so it never appears in a snapshot; the client falls back to that cell so shots and kills are still shown
