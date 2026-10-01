@@ -1,29 +1,29 @@
 import { MAX_PLAYER_NAME_LENGTH, UPGRADE_TRACKS, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
-import { getToolbarState } from "./toolbar-state.js";
-import { resolvePlacementCell } from "./placement.js";
-import { formatWavePreview } from "./wave-preview.js";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
-
-import { applyPaletteCssVars } from "./art/palette";
-import { cueForCommandResult, cuesForSnapshotChange, createSoundEngine } from "./audio/index";
-import type { SoundId } from "./audio/index";
+import { getJson, postJson } from "./api";
+import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
 import { paintHero } from "./art/hero";
+import { applyPaletteCssVars } from "./art/palette";
+import { createSoundEngine, cueForCommandResult, cuesForSnapshotChange } from "./audio/index";
+import type { SoundId } from "./audio/index";
 import { createBattlefieldMount } from "./battlefield-scene";
+import { BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, DAMAGE_TYPE_OPTIONS, DEBUG, EVENT_LOG_CAPACITY, MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG, MAX_PLAYBACK_ERRORS, MAX_TICKS_PER_REQUEST, PLAYBACK_CHECK_INTERVAL_MS, PLAYBACK_SPEEDS, RETAINED_EVENT_TYPES, TARGET_MODES, TURN_BANNER_LIFETIME_MS } from "./constants";
+import { clampCoord, coordValue } from "./coord";
 import { createDemo } from "./demo";
+import { app, el, must } from "./dom";
+import { REJECT_REASON_TEXT, addFeedback, setMenuMessage, setStatus } from "./feedback";
+import { mountMapPreview } from "./map-preview";
 import { perfTimeApply } from "./perf";
+import { resolvePlacementCell } from "./placement";
+import { playerNumber, playerTowerId, selectedPlayerId, towerColorClass } from "./player-util";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
-import { mountMapPreview } from "./map-preview";
-import { getJson, postJson } from "./api.js";
-import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api.js";
-import { app, el, must } from "./dom";
 import { store } from "./state";
 import type { MapCache, PlayerChipRefs } from "./state";
-import { TARGET_MODES, DAMAGE_TYPE_OPTIONS, PLAYER_COLORS, TOAST_CAPACITY, TOAST_LIFETIME_MS, BANNER_LIFETIME_MS, TURN_BANNER_LIFETIME_MS, BASE_TICKS_PER_SECOND, PLAYBACK_SPEEDS, PLAYBACK_CHECK_INTERVAL_MS, MAX_TICKS_PER_REQUEST, MAX_PLAYBACK_ERRORS, MANUAL_TRANSITION_MS, RETAINED_EVENT_TYPES, EVENT_LOG_CAPACITY, MAX_FX_EVENT_BACKLOG, DEBUG } from "./constants";
-import { clampCoord, coordValue } from "./coord.js";
+import { getToolbarState } from "./toolbar-state";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
+import { formatWavePreview } from "./wave-preview";
 import "./style.css";
-
 // Player colours live in art/palette.ts; publish them as --p1..--p8 before anything renders.
 applyPaletteCssVars();
 
@@ -41,8 +41,6 @@ declare global {
     __testBoard?: TestBoardHook;
   }
 }
-
-type FeedbackType = "accepted" | "rejected" | "info" | "error";
 
 interface FetchSnapshotOptions {
   silentStatus?: boolean;
@@ -98,83 +96,6 @@ function showMenuScreen(): void {
 function showGameScreen(): void {
   el.menuScreen.classList.add("hidden");
   el.gameScreen.classList.remove("hidden");
-}
-
-function playerTowerId(playerId: string): string {
-  return `tower-${playerId}`;
-}
-
-function setStatus(text: string): void {
-  el.status.textContent = text;
-}
-
-function setMenuMessage(text: string): void {
-  el.menuMessage.textContent = text;
-}
-
-const REJECT_REASON_TEXT: Record<string, string> = {
-  "insufficient-points": "not enough points",
-  "cell-not-buildable": "that tile is not buildable",
-  "tower-overlap": "a tower is already there",
-  "wall-overlap": "a wall is already there",
-  "path-blocked": "that would block the path",
-  "spawn-protected": "too close to the monster cave",
-  "wall-phase-not-active": "walls can only be placed during combat",
-  "upgrade-phase-not-active": "upgrades can only be bought during prep, before you ready",
-  "tower-move-locked": "moving your tower unlocks after round 5",
-  "tower-move-used": "you already used your free move",
-  "move-phase-not-active": "you can only move your tower during prep, before you ready",
-  "invalid-move-target": "you can only move your own tower",
-  "tower-max-level": "your tower is already at max level",
-  "invalid-target-mode-target": "you can only change your own tower",
-  "invalid-target-mode": "unknown target mode",
-  "damage-type-phase-not-active": "damage type can only be changed during prep, before you ready",
-  "invalid-damage-type-target": "you can only change your own tower",
-  "invalid-damage-type": "unknown damage type",
-  "match-already-ended": "the match is over",
-  "player-eliminated": "your tower was destroyed",
-  "unknown-player": "unknown player",
-  "player-already-ready-for-wave": "you are already ready",
-  "placement-phase-not-active": "towers can only be placed during placement",
-  "tower-already-placed": "you already placed your tower",
-  "tower-not-placed": "place your tower first",
-  "out-of-bounds": "outside the map"
-};
-
-const COMMAND_LABEL: Partial<Record<SimulationCommand["type"], string>> = {
-  "place-wall": "Wall",
-  "place-tower": "Tower",
-  "upgrade-tower": "Upgrade",
-  "move-tower": "Move",
-  "set-target-mode": "Target mode",
-  "set-damage-type": "Damage type",
-  "ready-for-wave": "Ready"
-};
-
-// Toasts replace the old persistent feedback log: short-lived, stacked, and announced via aria-live.
-function addFeedback(
-  type: FeedbackType,
-  message: string,
-  commandType?: SimulationCommand["type"],
-  reason?: string
-): void {
-  let text = message;
-  if (commandType && type === "rejected") {
-    text = `${COMMAND_LABEL[commandType] ?? commandType} rejected: ${REJECT_REASON_TEXT[reason ?? ""] ?? reason ?? "unknown reason"}`;
-  } else if (commandType && type === "accepted") {
-    text = `${COMMAND_LABEL[commandType] ?? commandType} done`;
-  } else if (reason) {
-    text = `${message}: ${reason}`;
-  }
-
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.textContent = text;
-  el.feedbackQueue.append(toast);
-  while (el.feedbackQueue.children.length > TOAST_CAPACITY) {
-    el.feedbackQueue.firstElementChild?.remove();
-  }
-  setTimeout(() => toast.remove(), TOAST_LIFETIME_MS);
 }
 
 function renderMenuPlayerInputs(): void {
@@ -648,11 +569,6 @@ function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
   }
 }
 
-function towerColorClass(playerId: string): string {
-  const index = Number(playerId.replace(/\D+/g, "")) - 1;
-  return PLAYER_COLORS[Math.max(0, Math.min(PLAYER_COLORS.length - 1, index))] ?? "p1";
-}
-
 function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0, events: MatchEvent[] = []): void {
   battlefieldMount.renderMap(snapshot, transitionMs, events);
   battlefieldMount.setCursor(coordValue(el.x), coordValue(el.y));
@@ -860,10 +776,6 @@ function buildPlayerChip(player: MatchSnapshot["players"][number], towerId: stri
     body.append(bar);
   }
   return { root, name, state, points, goalFill, meta, bar, barFill };
-}
-
-function playerNumber(playerId: string): number {
-  return Number(playerId.replace(/\D+/g, "")) || 1;
 }
 
 // Chips are created once per (player, tower) and updated in place so HP bar transitions and pulses survive snapshots.
@@ -1207,18 +1119,6 @@ async function rematchWithSamePlayers(): Promise<void> {
     setStatus(`error: ${message}`);
     addFeedback("error", "Rematch failed", undefined, message);
   }
-}
-
-function selectedPlayerId(): string {
-  const value = String(el.playerId.value || "").trim();
-  if (!value) {
-    const fallback = store.current?.players[0]?.id ?? "";
-    if (fallback) {
-      el.playerId.value = fallback;
-      return fallback;
-    }
-  }
-  return value;
 }
 
 function occupiedCellKeys(snapshot: MatchSnapshot): Set<string> {
