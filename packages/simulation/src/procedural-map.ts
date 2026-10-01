@@ -2,6 +2,10 @@ import {
   BUILDABLE_CELL_THRESHOLD,
   DEFAULT_MAP_HEIGHT,
   DEFAULT_MAP_WIDTH,
+  MAP_SCHEMA_VERSION,
+  MIN_TOWER_SITES,
+  SPAWN_PROTECTION_RADIUS,
+  findTowerSites,
   type GameMap,
   type MapCell,
 } from "@tower-defense/shared";
@@ -26,7 +30,7 @@ function carveLane(
   seed: number,
   width: number,
   height: number,
-): { lane: Set<string>; startY: number } {
+): { lane: Set<string>; startY: number; exitY: number } {
   const columns = Math.floor((width - 1) / MAZE_PITCH) + 1;
   const rows = Math.floor((height - 1) / MAZE_PITCH) + 1;
   const lane = new Set<string>();
@@ -136,7 +140,7 @@ function carveLane(
     lane.add(`${x},${exitRow * MAZE_PITCH}`);
   }
 
-  return { lane, startY: startRow * MAZE_PITCH };
+  return { lane, startY: startRow * MAZE_PITCH, exitY: exitRow * MAZE_PITCH };
 }
 
 export function generateMap(
@@ -145,7 +149,8 @@ export function generateMap(
   height: number = DEFAULT_MAP_HEIGHT,
 ): GameMap {
   const cells: MapCell[] = [];
-  const { lane, startY } = carveLane(seed, width, height);
+  const { lane, startY, exitY } = carveLane(seed, width, height);
+  const spawn = { x: 0, y: startY };
 
   // Noise cells next to the maze would open shortcuts through its walls, so they only appear away from the lane.
   const touchesLane = (x: number, y: number): boolean =>
@@ -164,11 +169,35 @@ export function generateMap(
     }
   }
 
-  return {
+  const map: GameMap = {
+    schemaVersion: MAP_SCHEMA_VERSION,
     width,
     height,
     seed,
     cells,
-    spawn: { x: 0, y: startY },
+    spawn,
+    goal: { x: width - 1, y: exitY },
   };
+
+  // Guarantee room for a full match: if the noise left too few tower pads, add pads at the lowest-hash cells that
+  // are off the lane and outside the cave's protected area. Maps that already have enough are left untouched.
+  const missing = MIN_TOWER_SITES - findTowerSites(map).length;
+  if (missing > 0) {
+    const candidates = cells
+      .filter(
+        (cell) =>
+          !cell.buildable &&
+          !touchesLane(cell.x, cell.y) &&
+          Math.hypot(cell.x - spawn.x, cell.y - spawn.y) > SPAWN_PROTECTION_RADIUS,
+      )
+      .sort(
+        (a, b) =>
+          hashCoordinates(seed, a.x, a.y) - hashCoordinates(seed, b.x, b.y) || a.y - b.y || a.x - b.x,
+      );
+    for (const cell of candidates.slice(0, missing)) {
+      cell.buildable = true;
+    }
+  }
+
+  return map;
 }

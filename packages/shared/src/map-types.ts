@@ -7,13 +7,19 @@ export interface MapCell {
   pathWear: number;
 }
 
+// Bump when the map shape changes; validateGameMap rejects versions it does not know.
+export const MAP_SCHEMA_VERSION = 1;
+
 export interface GameMap {
+  schemaVersion: number;
   width: number;
   height: number;
   seed: number;
   cells: MapCell[];
   // Monster cave on the left edge; optional so hand-built test maps need no cave.
   spawn?: { x: number; y: number };
+  // Where the lane leaves the map on the right edge; optional for the same reason as spawn.
+  goal?: { x: number; y: number };
 }
 
 export function getMapCell(map: GameMap, x: number, y: number): MapCell | undefined {

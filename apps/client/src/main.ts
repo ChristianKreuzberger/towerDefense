@@ -48,10 +48,12 @@ type ApiErrorPayload = {
 // Snapshot as sent by the host: lite responses carry wornCells/eventsOffset instead of map.cells (see spec/07).
 type WireSnapshot = Omit<MatchSnapshot, "map"> & {
   map: {
+    schemaVersion: number;
     width: number;
     height: number;
     seed: number;
     spawn?: { x: number; y: number };
+    goal?: { x: number; y: number };
     cells?: MapCell[];
     wornCells?: Array<{ x: number; y: number; pathWear: number }>;
   };
@@ -846,11 +848,13 @@ function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; newEven
   const snapshot: MatchSnapshot = {
     ...wire,
     map: {
+      schemaVersion: wire.map.schemaVersion,
       width: wire.map.width,
       height: wire.map.height,
       seed: wire.map.seed,
       cells: mapCache.cells,
-      ...(wire.map.spawn ? { spawn: wire.map.spawn } : {})
+      ...(wire.map.spawn ? { spawn: wire.map.spawn } : {}),
+      ...(wire.map.goal ? { goal: wire.map.goal } : {})
     },
     events: eventLog
   };

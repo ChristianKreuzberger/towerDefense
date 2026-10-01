@@ -57,6 +57,7 @@ import {
   TOWER_MOVE_AFTER_WAVES,
   isValidWallPlacement,
   WIN_SCORE,
+  validateGameMap,
 } from "@tower-defense/shared";
 
 import { generateMap } from "./procedural-map.js";
@@ -298,11 +299,17 @@ export class MatchSimulation {
       );
     }
 
+    const map = setup.map ?? generateMap(setup.seed);
+    const mapErrors = validateGameMap(map);
+    if (mapErrors.length > 0) {
+      throw new Error(`invalid map: ${mapErrors.map((error) => `${error.code} (${error.message})`).join("; ")}`);
+    }
+
     this.state = {
       phase: "placement",
       wave: 1,
       waveTick: 0,
-      map: generateMap(setup.seed),
+      map,
       towers: [],
       walls: [],
       creatures: [],
@@ -719,11 +726,13 @@ export class MatchSimulation {
         totals: { ...entry.totals }
       })),
       map: {
+        schemaVersion: this.state.map.schemaVersion,
         width: this.state.map.width,
         height: this.state.map.height,
         seed: this.state.map.seed,
         cells: this.state.map.cells.map((cell) => ({ ...cell })),
-        ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {})
+        ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {}),
+        ...(this.state.map.goal ? { goal: { ...this.state.map.goal } } : {})
       },
       towers: this.state.towers.map((tower) => ({ ...tower })),
       walls: this.state.walls.map((wall) => ({ ...wall })),

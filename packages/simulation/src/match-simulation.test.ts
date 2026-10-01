@@ -384,6 +384,7 @@ test("rejects overlapping tower placements", () => {
 
 test("rejects placements that newly block left-to-right path connectivity", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 3,
     seed: 0,
@@ -432,6 +433,7 @@ test("rejects placements that newly block left-to-right path connectivity", () =
 
 test("rejects walls that remove the last left-to-right route even when towers stay reachable", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 2,
     seed: 0,
@@ -455,6 +457,7 @@ test("rejects walls that remove the last left-to-right route even when towers st
 
 test("allows placements when an alternate path remains", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 3,
     seed: 0,
@@ -491,6 +494,7 @@ test("allows placements when an alternate path remains", () => {
 
 test("rejects wall placements that block all paths to a live tower", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 3,
     seed: 0,

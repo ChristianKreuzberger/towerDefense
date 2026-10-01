@@ -11,6 +11,9 @@ export interface PlayerSetup {
 export interface MatchSetup {
   players: PlayerSetup[];
   seed: number;
+  // Optional prebuilt map (for example a debugging snapshot); it is validated before the match starts.
+  // Without it the map is generated from the seed.
+  map?: GameMap;
 }
 
 export type MatchPhase = "placement" | "wave" | "ended";

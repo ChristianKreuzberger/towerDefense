@@ -19,7 +19,7 @@ function mapFrom(rows: string[]): GameMap {
   const cells = rows.flatMap((row, y) =>
     [...row].map((char, x) => ({ x, y, buildable: char === ".", pathWear: 0 }))
   );
-  return { width: rows[0]?.length ?? 0, height: rows.length, seed: 1, cells };
+  return { schemaVersion: 1, width: rows[0]?.length ?? 0, height: rows.length, seed: 1, cells };
 }
 
 function towerAt(id: string, x: number, y: number, playerId = id): Tower {

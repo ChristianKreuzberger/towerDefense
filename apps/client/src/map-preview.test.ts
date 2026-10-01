@@ -6,7 +6,7 @@ import { classifyMapCells } from "./map-preview.js";
 
 function mapFrom(rows: string[], spawn?: { x: number; y: number }): GameMap {
   const cells = rows.flatMap((row, y) => [...row].map((char, x) => ({ x, y, buildable: char === ".", pathWear: 0 })));
-  return { width: rows[0]?.length ?? 0, height: rows.length, seed: 5, cells, ...(spawn ? { spawn } : {}) };
+  return { schemaVersion: 1, width: rows[0]?.length ?? 0, height: rows.length, seed: 5, cells, ...(spawn ? { spawn } : {}) };
 }
 
 test("cells are classified as cave, lane, pad or blocked", () => {

@@ -68,7 +68,7 @@ Hand-built `GameMap` objects in tests are not validated unless a test calls `val
 ## Generation guarantees
 
 - The spawn and goal are the pair of rooms furthest apart in the maze (see Creature lane); the goal is always reachable from the spawn.
-- For every seed there are at least `MIN_TOWER_SITES` (`MAX_PLAYERS` = 8) buildable cells outside the cave's protected area that are not on the lane, so every player can place a tower without cutting the route. Generation is deterministic per seed and the carved lane does not change because of this guarantee; if the noise leaves too few pads, extra pads are added at the lowest-hash cells that do not touch the lane.
+- For every seed there are at least `MIN_TOWER_SITES` (`MAX_PLAYERS` = 8) tower pads: buildable cells outside the cave's protected area that creatures cannot walk to (no buildable path from the cave). A tower on a pad can never cut the lane or another tower's access, so every player can place a tower in any combination, and this is checked by counting pads (`findTowerSites`), not by trying placements. Generation is deterministic per seed and the carved lane does not change because of this guarantee; if the noise leaves too few pads (only on small maps), extra pads are added at the lowest-hash cells that do not touch the lane.
 
 ## Path wear
 

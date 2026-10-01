@@ -2,6 +2,8 @@ import type { TowerUpgrades, UpgradeTrack } from "./tower-types.js";
 
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 8;
+// Every generated map keeps at least this many tower sites, so a full 8-player match is always placeable.
+export const MIN_TOWER_SITES = MAX_PLAYERS;
 // Names are shown in the HUD and the end screen; the cap keeps those layouts intact.
 export const MAX_PLAYER_NAME_LENGTH = 24;
 export const WIN_SCORE = 1000;
