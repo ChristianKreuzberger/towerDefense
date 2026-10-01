@@ -13,6 +13,7 @@ import { createDemo } from "./demo";
 import { perfRecordBytes, perfTimeApply } from "./perf";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
+import { mountMapPreview } from "./map-preview";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import "./style.css";
 
@@ -343,6 +344,7 @@ app.innerHTML = `
   </footer>
 
   <div id="settingsRoot"></div>
+  <div id="mapPreviewRoot"></div>
 
   <div id="feedbackQueue" class="toasts" role="status" aria-live="polite"></div>
 
@@ -363,6 +365,12 @@ app.innerHTML = `
 const settingsStore = createSettingsStore();
 const soundEngine = createSoundEngine({ settings: settingsStore });
 soundEngine.bindUnlock(document);
+const mapPreview = mountMapPreview({
+  root: must<HTMLElement>("mapPreviewRoot"),
+  playerNumber: (playerId) => playerNumber(playerId),
+  // Placement for the first player starts once the preview is dismissed; the guide already points at them.
+  onContinue: () => el.guideActionBtn.focus()
+});
 const settingsDialog = mountSettingsDialog({ root: must<HTMLElement>("settingsRoot"), settings: settingsStore, engine: soundEngine });
 
 const el = {
@@ -1537,6 +1545,10 @@ function startFreshMatch(wire: WireSnapshot): void {
   syncPlaybackControls();
   setWallMode(false);
   applyWireSnapshot(wire, ++requestSeq);
+  // A new match (menu Start or Rematch) opens with the preview; a reconnect never reaches this function.
+  if (current && current.phase === "placement") {
+    mapPreview.open(current);
+  }
 }
 
 async function startMatchFromMenu(): Promise<void> {
@@ -2017,6 +2029,11 @@ app.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (mapPreview.isOpen()) {
+    // The dialog handles Esc and Tab itself; game hotkeys stay off while it is open.
+    return;
+  }
+
   if (settingsDialog.isOpen()) {
     if (event.key === "Escape") {
       event.preventDefault();

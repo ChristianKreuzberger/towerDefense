@@ -18,7 +18,7 @@
 
 Map preview step
 - Shown as a dialog over the board right after a new match (menu Start Match or Rematch) has been generated. It is not shown when the client reconnects to a running match
-- Content: a small overview of the generated map (buildable cells, the lane creatures walk, the monster cave and its protected no-build area, with a legend), the seed and size, and the player list with each player's colour/number and name
+- Content: a small overview of the generated map (tower pads, the lane creatures walk, blocked ground, the monster cave and its protected no-build area, with a legend). The lane is the set of buildable cells connected to the cave; other buildable cells are tower pads, the seed and size, and the player list with each player's colour/number and name
 - A "Continue" button (focused when the dialog opens) closes it and starts placement for the first player; Esc does the same. It follows the match-end modal pattern: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside
 - While it is open no tower can be placed and game hotkeys are ignored
 - The overview is drawn from the snapshot's map cells only, so it shows whatever the map contains
