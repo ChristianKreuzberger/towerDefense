@@ -14,6 +14,7 @@ import { perfRecordBytes, perfTimeApply } from "./perf";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
 import { mountMapPreview } from "./map-preview";
+import { clampCoord, coordValue } from "./coord.js";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 import "./style.css";
 
@@ -1668,8 +1669,8 @@ function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y
   }
 
   const occupied = occupiedCellKeys(snapshot);
-  const currentX = Number(el.x.value);
-  const currentY = Number(el.y.value);
+  const currentX = coordValue(el.x);
+  const currentY = coordValue(el.y);
   const currentCell = mapCache.byKey.get(`${currentX},${currentY}`);
   const isFree = (x: number, y: number): boolean => !occupied.has(`${x},${y}`) && !isInSpawnProtection(snapshot.map, x, y);
   if (currentCell?.buildable && isFree(currentX, currentY)) {
@@ -1688,17 +1689,6 @@ function syncCursorToBuildableCell(snapshot: MatchSnapshot | null): void {
 
   el.x.value = String(nextCell.x);
   el.y.value = String(nextCell.y);
-}
-
-function coordValue(field: HTMLInputElement): number {
-  return Number(field.value);
-}
-
-function clampCoord(value: number, max: number): number {
-  if (max <= 0 || Number.isNaN(value)) {
-    return 0;
-  }
-  return Math.max(0, Math.min(max - 1, value));
 }
 
 function adjustCoord(dx: number, dy: number): void {
