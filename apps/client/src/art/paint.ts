@@ -590,3 +590,38 @@ export function paintDot(ctx: Ctx, s: number): void {
   circle(ctx, s / 2, s / 2, s / 2 - 1);
   ctx.fill();
 }
+
+// Rubble where a tower stood: a broken ring in the owner's colour, scorch mark and a few loose stones.
+// Drawn on the tower-sized canvas (2 cells wide) so it shares the tower's footprint.
+export function paintRuins(ctx: Ctx, s: number, color: number): void {
+  const c = s / 2;
+  const lw = Math.max(1.5, s * 0.03);
+  // scorch
+  circle(ctx, c, c, s * 0.3);
+  ctx.fillStyle = "rgba(30, 26, 24, 0.45)";
+  ctx.fill();
+  // broken base ring: three arcs with gaps
+  ctx.lineCap = "round";
+  for (const [from, to] of [[0.1, 0.9], [1.2, 2.1], [3.3, 4.4]] as const) {
+    ctx.beginPath();
+    ctx.arc(c, c, s * 0.34, from * Math.PI, to * Math.PI);
+    ctx.strokeStyle = hex(INK);
+    ctx.lineWidth = s * 0.1 + lw * 2;
+    ctx.stroke();
+    ctx.strokeStyle = hex(shade(color, 0.55));
+    ctx.lineWidth = s * 0.1;
+    ctx.stroke();
+  }
+  // loose stones
+  for (const [dx, dy, r] of [[-0.12, 0.08, 0.07], [0.1, -0.1, 0.06], [0.05, 0.14, 0.05], [-0.06, -0.14, 0.045]] as const) {
+    circle(ctx, c + s * dx, c + s * dy, s * r);
+    outline(ctx, 0xa59e91, lw);
+  }
+  // a snapped barrel
+  ctx.save();
+  ctx.translate(c + s * 0.12, c + s * 0.02);
+  ctx.rotate(0.6);
+  roundRect(ctx, 0, -s * 0.03, s * 0.2, s * 0.06, s * 0.02);
+  outline(ctx, shade(color, 0.7), lw);
+  ctx.restore();
+}

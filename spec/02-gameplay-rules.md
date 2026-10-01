@@ -38,6 +38,7 @@
 - Damage per shot is 1 at damage level 1 and +1 per damage level
 - A tower with no creature in range has no target and does not fire
 - Takes damage from creature attacks
+- A destroyed tower is removed from play but leaves ruins on its cell (`ruins` in the snapshot: tower id, owner, cell, wave and tick of destruction). Ruins are cosmetic: they never block creatures, and the player stays eliminated
 - Auto-repaired between rounds (must be clearly shown in UI)
 
 ## Walls

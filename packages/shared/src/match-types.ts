@@ -1,6 +1,6 @@
 import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
-import type { Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
+import type { Tower, TowerRuin, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 
 export interface PlayerSetup {
@@ -345,6 +345,7 @@ export interface MatchSnapshot {
   balanceAnalysisExports: BalanceAnalysisSnapshot[];
   map: GameMap;
   towers: Tower[];
+  ruins: TowerRuin[];
   walls: Wall[];
   creatures: Creature[];
   targetAssignments: TowerTargetAssignment[];

@@ -592,3 +592,35 @@ test("wall and target-mode controls follow the phase and a disabled wall button 
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
   await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
 });
+
+test("a destroyed tower leaves ruins whose tooltip names the owner and the wave", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const towers = live.snapshot.towers as Array<{ id: string; x: number; y: number; playerId: string }>;
+  const fallen = towers[0]!;
+  const withRuins = {
+    ...live.snapshot,
+    towers: [],
+    ruins: [{ id: fallen.id, playerId: fallen.playerId, x: fallen.x, y: fallen.y, destroyedWave: 3, destroyedTick: 12 }]
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: withRuins }) });
+  }, { times: 1 });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#playerCards")).not.toContainText("Tower 100/100");
+
+  const tooltip = page.locator(".tower-tooltip");
+  const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, fallen);
+  // Wait out the explosion so the ruins have faded in, then hover them.
+  await page.waitForTimeout(1200);
+  await page.locator("#board canvas").hover({ position: position! });
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Alpha's tower");
+  await expect(tooltip).toContainText("wave 3");
+
+  await page.locator("#board canvas").hover({ position: { x: 2, y: 2 } });
+  await expect(tooltip).toBeHidden();
+});

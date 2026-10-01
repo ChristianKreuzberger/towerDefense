@@ -35,6 +35,7 @@ import {
   type CreatureWallTargetAssignment,
   type TowerTargetAssignment,
   type Tower,
+  type TowerRuin,
   type Wall,
   getWallCost,
   getTowerUpgradeCost,
@@ -57,6 +58,7 @@ interface InternalMatchState {
   waveTick: number;
   map: GameMap;
   towers: Tower[];
+  ruins: TowerRuin[];
   walls: Wall[];
   creatures: Creature[];
   targetAssignments: TowerTargetAssignment[];
@@ -280,6 +282,7 @@ export class MatchSimulation {
       waveTick: 0,
       map: generateMap(setup.seed),
       towers: [],
+      ruins: [],
       walls: [],
       creatures: [],
       targetAssignments: [],
@@ -583,6 +586,7 @@ export class MatchSimulation {
         ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {})
       },
       towers: this.state.towers.map((tower) => ({ ...tower })),
+      ruins: this.state.ruins.map((ruin) => ({ ...ruin })),
       walls: this.state.walls.map((wall) => ({ ...wall })),
       creatures: this.state.creatures.map((creature) => ({ ...creature })),
       targetAssignments: this.state.targetAssignments.map((assignment) => ({ ...assignment })),
@@ -939,6 +943,14 @@ export class MatchSimulation {
 
       if (tower.health <= 0) {
         towersById.delete(tower.id);
+        this.state.ruins.push({
+          id: tower.id,
+          playerId: tower.playerId,
+          x: tower.x,
+          y: tower.y,
+          destroyedWave: this.state.wave,
+          destroyedTick: this.state.waveTick
+        });
         this.state.events.push({
           type: "tower-destroyed",
           wave: this.state.wave,

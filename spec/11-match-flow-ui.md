@@ -77,6 +77,7 @@ Towers
 
 Creatures
 - Four silhouettes, readable without text: runner (slim, pointed), swarm (small round bug), armored (plated hex), tank (large square with tracks and cannon)
+- When a tower is destroyed it explodes (burst, smoke and a short scale-up fade, about half a second) before it vanishes, and ruins in the owner's colour stay on the cell. Hovering the ruins shows a tooltip with whose tower it was and the wave it fell in. With reduced motion the tower disappears without the scale-up
 - Creatures face their heading, bob while walking, show an HP bar only when damaged, and leave a puff when they die
 
 Walls

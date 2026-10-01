@@ -1704,6 +1704,22 @@ test("destroys tower, marks player eliminated, and rejects further player comman
   assert.equal(placeWallAfterElimination.reason, "match-already-ended");
 });
 
+test("a destroyed tower leaves ruins that remember the owner, the cell and when it fell", () => {
+  const simulation = createExposedFragileTowerSimulation();
+  const tower = simulation.getSnapshot().towers[0];
+  assert.ok(tower);
+  assert.deepEqual(simulation.getSnapshot().ruins, []);
+
+  tickUntil(simulation, () => simulation.getSnapshot().towers.length === 0, 1200);
+
+  const snapshot = simulation.getSnapshot();
+  const destroyed = snapshot.events.find((event) => event.type === "tower-destroyed");
+  assert.ok(destroyed && destroyed.type === "tower-destroyed");
+  assert.deepEqual(snapshot.ruins, [
+    { id: tower.id, playerId: tower.playerId, x: tower.x, y: tower.y, destroyedWave: destroyed.wave, destroyedTick: destroyed.tick }
+  ]);
+});
+
 test("ends match with fail-state when all towers are destroyed", () => {
   const simulation = createExposedFragileTowerSimulation();
   tickUntil(simulation, () => simulation.getSnapshot().phase === "ended", 1200);

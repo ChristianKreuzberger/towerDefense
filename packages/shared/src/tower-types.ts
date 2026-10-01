@@ -7,6 +7,16 @@ export type UpgradeTrack = (typeof UPGRADE_TRACKS)[number];
 // Level of each independent upgrade track, 1 (base) up to MAX_TOWER_LEVEL.
 export type TowerUpgrades = Record<UpgradeTrack, number>;
 
+// What is left of a destroyed tower: cosmetic only, it never blocks placement or creatures.
+export interface TowerRuin {
+  id: string;
+  playerId: string;
+  x: number;
+  y: number;
+  destroyedWave: number;
+  destroyedTick: number;
+}
+
 export interface Tower {
   id: string;
   playerId: string;

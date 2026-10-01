@@ -19,6 +19,8 @@ import { KEY, SS, TOWER_SCALE, ensureTextures } from "./art/textures";
 const DEPTH_TERRAIN = 0;
 const DEPTH_WEAR = 0.5;
 const DEPTH_WALLS = 1;
+const TOWER_EXPLOSION_MS = 450;
+const DEPTH_RUINS = 1.5;
 const DEPTH_TOWERS = 2;
 const DEPTH_CREATURES = 3;
 const DEPTH_FX = 4;
@@ -86,6 +88,14 @@ interface TowerVisual {
   recoilUntil: number;
 }
 
+interface RuinVisual {
+  image: Phaser.GameObjects.Image;
+  playerId: string;
+  destroyedWave: number;
+  baseX: number;
+  baseY: number;
+}
+
 interface CreatureVisual {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Image;
@@ -148,6 +158,9 @@ class BattlefieldScene extends Phaser.Scene {
   private fx?: Effects;
   private towerVisuals = new Map<string, TowerVisual>();
   private towerAtCell = new Map<string, string>();
+  private ruinVisuals = new Map<string, RuinVisual>();
+  private ruinAtCell = new Map<string, string>();
+  private playerNames = new Map<string, string>();
   private hasRenderedTowersOnce = false;
   private pendingSnapshot: MatchSnapshot | null = null;
   private pendingEvents: MatchEvent[] = [];
@@ -163,6 +176,7 @@ class BattlefieldScene extends Phaser.Scene {
   private hoverX: number | null = null;
   private hoverY: number | null = null;
   private hoverTowerId: string | null = null;
+  private hoverRuinId: string | null = null;
   private tooltip?: HTMLElement;
   private reducedMotion = false;
   private lastWave = -1;
@@ -345,6 +359,7 @@ class BattlefieldScene extends Phaser.Scene {
     this.hoverX = x;
     this.hoverY = y;
     this.hoverTowerId = this.towerAtCell.get(`${x},${y}`) ?? null;
+    this.hoverRuinId = this.ruinAtCell.get(`${x},${y}`) ?? null;
     this.drawHoverAndGhost();
   };
 
@@ -352,6 +367,7 @@ class BattlefieldScene extends Phaser.Scene {
     this.hoverX = null;
     this.hoverY = null;
     this.hoverTowerId = null;
+    this.hoverRuinId = null;
     this.drawHoverAndGhost();
   };
 
@@ -446,6 +462,13 @@ class BattlefieldScene extends Phaser.Scene {
     if (!tooltip) {
       return;
     }
+    const ruin = this.hoverRuinId && !this.hoverTowerId ? this.ruinVisuals.get(this.hoverRuinId) : undefined;
+    if (ruin) {
+      const owner = this.playerNames.get(ruin.playerId) ?? ruin.playerId;
+      const rows: Array<[string, string]> = [["Ruins of", `${owner}'s tower`], ["Destroyed", `wave ${ruin.destroyedWave}`]];
+      this.fillTooltip(tooltip, rows, ruin.baseX, ruin.baseY);
+      return;
+    }
     const tower = this.hoverTowerId ? this.towerVisuals.get(this.hoverTowerId) : undefined;
     if (!tower) {
       tooltip.hidden = true;
@@ -461,6 +484,10 @@ class BattlefieldScene extends Phaser.Scene {
       ["DPS", String(stats.damagePerSecond)],
       ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
     ];
+    this.fillTooltip(tooltip, rows, tower.baseX, tower.baseY);
+  }
+
+  private fillTooltip(tooltip: HTMLElement, rows: Array<[string, string]>, x: number, y: number): void {
     tooltip.replaceChildren(
       ...rows.map(([label, value]) => {
         const row = document.createElement("div");
@@ -475,8 +502,8 @@ class BattlefieldScene extends Phaser.Scene {
     const canvas = this.game.canvas;
     const rect = canvas.getBoundingClientRect();
     const scale = canvas.width > 0 ? rect.width / canvas.width : 1;
-    tooltip.style.left = `${canvas.offsetLeft + tower.baseX * scale}px`;
-    tooltip.style.top = `${canvas.offsetTop + tower.baseY * scale - this.cellSize * scale * 0.9}px`;
+    tooltip.style.left = `${canvas.offsetLeft + x * scale}px`;
+    tooltip.style.top = `${canvas.offsetTop + y * scale - this.cellSize * scale * 0.9}px`;
     tooltip.hidden = false;
   }
 
@@ -562,7 +589,13 @@ class BattlefieldScene extends Phaser.Scene {
     }
     this.towerVisuals.clear();
     this.towerAtCell.clear();
+    for (const ruin of this.ruinVisuals.values()) {
+      ruin.image.destroy();
+    }
+    this.ruinVisuals.clear();
+    this.ruinAtCell.clear();
     this.hoverTowerId = null;
+    this.hoverRuinId = null;
     this.hasRenderedTowersOnce = false;
     this.fx?.clear();
   }
@@ -614,7 +647,10 @@ class BattlefieldScene extends Phaser.Scene {
     this.lastWaveTick = snapshot.waveTick;
 
     this.syncWalls(snapshot.walls, cellSize);
-    this.syncTowers(snapshot, cellSize);
+    this.playerNames = new Map(snapshot.players.map((player) => [player.id, player.name]));
+    const ruinedIds = new Set(snapshot.ruins.map((ruin) => ruin.id));
+    this.syncTowers(snapshot, cellSize, ruinedIds);
+    this.syncRuins(snapshot, cellSize);
     this.syncCreatures(snapshot.creatures, cellSize, transitionMs);
     this.drawHoverAndGhost();
   }
@@ -739,7 +775,7 @@ class BattlefieldScene extends Phaser.Scene {
     }
   }
 
-  private syncTowers(snapshot: MatchSnapshot, cellSize: number): void {
+  private syncTowers(snapshot: MatchSnapshot, cellSize: number, ruinedIds: ReadonlySet<string>): void {
     const seen = new Set<string>();
     const skipPopAnimation = !this.hasRenderedTowersOnce;
     const targetByTower = new Map<string, string | null>();
@@ -770,12 +806,63 @@ class BattlefieldScene extends Phaser.Scene {
 
     for (const [id, visual] of this.towerVisuals) {
       if (!seen.has(id)) {
-        visual.container.destroy();
+        // Only a tower that turned into ruins was destroyed; a rematch or restart just clears it.
+        if (ruinedIds.has(id)) {
+          this.playTowerExplosion(visual);
+        } else {
+          visual.container.destroy();
+        }
         this.towerVisuals.delete(id);
       }
     }
 
     this.hasRenderedTowersOnce = true;
+  }
+
+  private playTowerExplosion(visual: TowerVisual): void {
+    const fx = this.fx;
+    fx?.burst(visual.baseX, visual.baseY, 0xffb347, 0);
+    fx?.burst(visual.baseX, visual.baseY, 0xff6a3d, 80);
+    fx?.puff(visual.baseX, visual.baseY, 0xffd27a, 0);
+    fx?.smoke(visual.baseX, visual.baseY, 120);
+    if (this.reducedMotion) {
+      visual.container.destroy();
+      return;
+    }
+    this.tweens.add({
+      targets: visual.container,
+      scale: 1.3,
+      alpha: 0,
+      duration: TOWER_EXPLOSION_MS,
+      ease: "Quad.Out",
+      onComplete: () => visual.container.destroy()
+    });
+  }
+
+  private syncRuins(snapshot: MatchSnapshot, cellSize: number): void {
+    const seen = new Set<string>();
+    this.ruinAtCell.clear();
+    for (const ruin of snapshot.ruins) {
+      seen.add(ruin.id);
+      this.ruinAtCell.set(`${ruin.x},${ruin.y}`, ruin.id);
+      if (this.ruinVisuals.has(ruin.id)) {
+        continue;
+      }
+      const { cx, cy } = cellCenter(ruin.x, ruin.y, cellSize);
+      const image = this.add.image(cx, cy, KEY.ruins(playerIndex(ruin.playerId))).setScale(INV).setDepth(DEPTH_RUINS);
+      // Ruins fade in as the explosion clears; on reconnect they are simply there.
+      if (this.hasRenderedTowersOnce && !this.reducedMotion) {
+        image.setAlpha(0);
+        this.tweens.add({ targets: image, alpha: 1, delay: TOWER_EXPLOSION_MS * 0.6, duration: TOWER_EXPLOSION_MS });
+      }
+      this.ruinVisuals.set(ruin.id, { image, playerId: ruin.playerId, destroyedWave: ruin.destroyedWave, baseX: cx, baseY: cy });
+    }
+    for (const [id, visual] of this.ruinVisuals) {
+      if (!seen.has(id)) {
+        visual.image.destroy();
+        this.ruinVisuals.delete(id);
+      }
+    }
   }
 
   private createTowerVisual(tower: Tower, cellSize: number): TowerVisual {
