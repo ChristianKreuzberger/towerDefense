@@ -189,3 +189,14 @@ test("spawn protection: a wall may not cut a tower off from the cave even if it 
 test("spawn protection: a map without a cave protects nothing", () => {
   assert.equal(isInSpawnProtection(OPEN, 0, 0), false);
 });
+
+test("tower placement counts existing walls when it checks that a route stays open", () => {
+  // Two parallel branches joined at both ends; a wall already closes the top one.
+  const ring = mapFrom([".......", ".#####.", "......."]);
+  const walls = [wallAt(3, 0)];
+  const closingBottom = { playerId: "p1", x: 3, y: 2 };
+
+  // Without the wall the bottom cell is harmless, with it the placement would shut the last route.
+  assert.deepEqual(isValidTowerPlacement(closingBottom, [], ring), { valid: true });
+  assert.deepEqual(isValidTowerPlacement(closingBottom, [], ring, walls), { valid: false, reason: "path-blocked" });
+});

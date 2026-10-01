@@ -3713,6 +3713,9 @@ test("a move follows the placement rules and needs prep, before ready, and the p
 
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   assert.equal(move(firstCell.x, firstCell.y + 1).reason, "player-already-ready-for-wave");
+  // The flag means "usable right now", so it drops once the player is ready.
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, false);
+  assert.equal(simulation.getSnapshot().players[1]?.towerMoveAvailable, true);
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
   assert.equal(simulation.getSnapshot().phase, "wave");
   assert.equal(move(firstCell.x, firstCell.y + 1).reason, "move-phase-not-active");

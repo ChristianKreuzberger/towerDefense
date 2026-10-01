@@ -21,7 +21,7 @@ Not part of the schema (documented decisions): multiple lanes, per-tower routes,
 
 ## Validation
 
-`validateGameMap(map)` (packages/shared) returns a list of structured errors (`{ code, message }`); an empty list means the map is valid. `createMatch` runs it before the simulation starts and throws an error that names the first problem if the map is invalid. Checks:
+`validateGameMap(map)` (packages/shared) returns a list of structured errors (`{ code, message }`); an empty list means the map is valid. The match simulation (its constructor, so `createMatch` too) runs it before anything else and throws an error that names the first problem if the map is invalid. Checks:
 
 - `schemaVersion` is supported
 - width and height are positive integers and the cell count equals width x height

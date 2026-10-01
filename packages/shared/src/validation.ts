@@ -234,9 +234,13 @@ function checkPlacementPathSafety(
 export function validatePathSafety(
   placement: TowerPlacement,
   existingTowers: Tower[],
-  map: GameMap
+  map: GameMap,
+  existingWalls: Wall[] = []
 ): PathSafetyCheckResult {
   const blockedBefore = new Set<string>();
+  for (const wall of existingWalls) {
+    blockedBefore.add(toKey(wall.x, wall.y));
+  }
   for (const tower of existingTowers) {
     blockedBefore.add(toKey(tower.x, tower.y));
   }
@@ -332,7 +336,8 @@ export function isValidWallPlacement(
 export function isValidTowerPlacement(
   placement: TowerPlacement,
   existingTowers: Tower[],
-  map: GameMap
+  map: GameMap,
+  existingWalls: Wall[] = []
 ): TowerPlacementValidationResult {
   const cell = getMapCell(map, placement.x, placement.y);
   if (!cell) {
@@ -352,7 +357,11 @@ export function isValidTowerPlacement(
     return { valid: false, reason: "tower-overlap" };
   }
 
-  const pathSafety = validatePathSafety(placement, existingTowers, map);
+  if (existingWalls.some((wall) => wall.x === placement.x && wall.y === placement.y)) {
+    return { valid: false, reason: "wall-overlap" };
+  }
+
+  const pathSafety = validatePathSafety(placement, existingTowers, map, existingWalls);
   if (!pathSafety.safe) {
     return pathSafety.reason
       ? { valid: false, reason: pathSafety.reason }

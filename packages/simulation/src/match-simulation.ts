@@ -368,7 +368,7 @@ export class MatchSimulation {
         return { accepted: false, reason: "tower-already-placed" };
       }
 
-      const validation = isValidTowerPlacement(command, this.state.towers, this.state.map);
+      const validation = isValidTowerPlacement(command, this.state.towers, this.state.map, this.state.walls);
       if (!validation.valid) {
         return validation.reason
           ? { accepted: false, reason: validation.reason }
@@ -534,13 +534,9 @@ export class MatchSimulation {
       }
 
       const others = this.state.towers.filter((entry) => entry.id !== tower.id);
-      const validation = isValidTowerPlacement({ playerId: command.playerId, x: command.x, y: command.y }, others, this.state.map);
+      const validation = isValidTowerPlacement({ playerId: command.playerId, x: command.x, y: command.y }, others, this.state.map, this.state.walls);
       if (!validation.valid) {
         return validation.reason ? { accepted: false, reason: validation.reason } : { accepted: false };
-      }
-
-      if (this.state.walls.some((wall) => wall.x === command.x && wall.y === command.y)) {
-        return { accepted: false, reason: "wall-overlap" };
       }
 
       const fromX = tower.x;
@@ -680,6 +676,7 @@ export class MatchSimulation {
       this.state.phase === "placement"
       && player.hasPlacedTower
       && !player.eliminated
+      && !player.readyForWave
       && !this.towerMovesUsed.has(player.id)
       && this.state.wave > TOWER_MOVE_AFTER_WAVES
     );
