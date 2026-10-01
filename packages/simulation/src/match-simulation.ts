@@ -193,9 +193,12 @@ function toCellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function getOpenPathForCreatures(map: GameMap, tower: Tower, walls: Wall[]): Array<{ x: number; y: number }> {
+// One shared lane: every live tower and wall is an obstacle, so the route cannot depend on the order of the towers.
+function getOpenPathForCreatures(map: GameMap, towers: Tower[], walls: Wall[]): Array<{ x: number; y: number }> {
   const blocked = new Set<string>();
-  blocked.add(toCellKey(tower.x, tower.y));
+  for (const tower of towers) {
+    blocked.add(toCellKey(tower.x, tower.y));
+  }
   for (const wall of walls) {
     blocked.add(toCellKey(wall.x, wall.y));
   }
@@ -749,18 +752,18 @@ export class MatchSimulation {
       this.state.playerSwarmIncomeCappedCurrentWave[player.id] = 0;
     }
     this.currentWaveSpawned = 0;
-    this.currentWavePath.length = 0;
-    if (this.state.towers[0]) {
-      this.currentWavePath.push(
-        ...getOpenPathForCreatures(this.state.map, this.state.towers[0], this.state.walls)
-      );
-    }
+    this.refreshCreatureRoute();
     this.state.events.push({
       type: "wave-start",
       wave: this.state.wave,
       tick: this.state.waveTick
     });
     this.state.targetAssignments = this.computeTargetAssignments();
+  }
+
+  private refreshCreatureRoute(): void {
+    this.currentWavePath.length = 0;
+    this.currentWavePath.push(...getOpenPathForCreatures(this.state.map, this.state.towers, this.state.walls));
   }
 
   private getWaveSpawnPlan(): WaveSpawnPlan {
@@ -786,6 +789,8 @@ export class MatchSimulation {
     }
 
     const spawnOrdinal = this.currentWaveSpawned + 1;
+    // Round robin over the live towers (sorted by id) spreads the preferred targets across players.
+    const liveTowers = [...this.state.towers].sort((a, b) => a.id.localeCompare(b.id));
     const archetype = getWaveCreatureArchetype(spawnOrdinal);
     const creature: Creature = {
       id: `wave-${this.state.wave}-creature-${spawnOrdinal}`,
@@ -796,7 +801,7 @@ export class MatchSimulation {
       pathIndex: 0,
       pathProgressUnits: 0,
       spawnTick: this.state.waveTick,
-      targetTowerId: this.state.towers[0]?.id ?? "tower-missing"
+      targetTowerId: liveTowers[(spawnOrdinal - 1) % liveTowers.length]?.id ?? "tower-missing"
     };
 
     this.currentWaveSpawned += 1;
@@ -1111,7 +1116,11 @@ export class MatchSimulation {
       }
     }
 
+    const towerCountBefore = this.state.towers.length;
     this.state.towers = [...towersById.values()].sort((a, b) => a.id.localeCompare(b.id));
+    if (this.state.towers.length !== towerCountBefore) {
+      this.refreshCreatureRoute();
+    }
     this.checkFailStateAfterTowerDestruction();
   }
 
@@ -1179,11 +1188,8 @@ export class MatchSimulation {
 
     this.state.walls = [...wallsById.values()].sort((a, b) => a.id.localeCompare(b.id));
 
-    if (destroyedWall && this.state.towers[0]) {
-      this.currentWavePath.length = 0;
-      this.currentWavePath.push(
-        ...getOpenPathForCreatures(this.state.map, this.state.towers[0], this.state.walls)
-      );
+    if (destroyedWall) {
+      this.refreshCreatureRoute();
     }
   }
 
