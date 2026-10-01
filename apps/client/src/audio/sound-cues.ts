@@ -121,6 +121,7 @@ export function cueForCommandResult(commandType: string, accepted: boolean): Sou
   const cues: Record<string, SoundId> = {
     "place-tower": "place-tower",
     "place-wall": "place-wall",
+    "move-tower": "place-tower",
     "upgrade-tower": "upgrade",
     "ready-for-wave": "ready"
   };

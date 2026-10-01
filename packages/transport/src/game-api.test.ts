@@ -54,6 +54,15 @@ test("out-of-bounds coordinates come back as a machine-readable command rejectio
   }
 });
 
+test("move-tower validates ids and coordinates like placement", () => {
+  const api = startedApi();
+  assertRejected(command(api, { type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 1.5, y: 2 }), "invalid-coordinates");
+  assertRejected(command(api, { type: "move-tower", playerId: "p1", x: 1, y: 2 }), "invalid-command");
+  // Well-formed but locked this early: a normal command rejection, not a validation error.
+  const locked = command(api, { type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 1, y: 2 });
+  assert.equal(locked.status, 200);
+});
+
 test("a missing or unsupported command is rejected with invalid-command", () => {
   const api = startedApi();
   assertRejected(post(api, "/api/command", {}), "invalid-command");

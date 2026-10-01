@@ -49,6 +49,7 @@ import {
   isValidTowerUpgradeTarget,
   isValidUpgradeTrack,
   MAX_TOWER_LEVEL,
+  TOWER_MOVE_AFTER_WAVES,
   isValidWallPlacement,
   WIN_SCORE,
 } from "@tower-defense/shared";
@@ -270,6 +271,7 @@ export class MatchSimulation {
   private readonly state: InternalMatchState;
   private readonly currentWavePath: Array<{ x: number; y: number }> = [];
   private currentWaveSpawned = 0;
+  private readonly towerMovesUsed = new Set<string>();
 
   public constructor(setup: MatchSetup) {
     if (setup.players.length < GAME_RULES.minPlayers || setup.players.length > GAME_RULES.maxPlayers) {
@@ -308,7 +310,8 @@ export class MatchSimulation {
         points: 0,
         hasPlacedTower: false,
         readyForWave: false,
-        eliminated: false
+        eliminated: false,
+        towerMoveAvailable: false
       }))
     };
   }
@@ -463,6 +466,73 @@ export class MatchSimulation {
       return { accepted: true };
     }
 
+    if (command.type === "move-tower") {
+      // Like upgrades, a move is a prep decision made before committing to the wave.
+      if (this.state.phase !== "placement") {
+        return { accepted: false, reason: "move-phase-not-active" };
+      }
+
+      const player = this.state.players.find((entry) => entry.id === command.playerId);
+      if (!player) {
+        return { accepted: false, reason: "unknown-player" };
+      }
+
+      if (player.eliminated) {
+        return { accepted: false, reason: "player-eliminated" };
+      }
+
+      if (player.readyForWave) {
+        return { accepted: false, reason: "player-already-ready-for-wave" };
+      }
+
+      const tower = this.state.towers.find((entry) => entry.id === command.towerId);
+      if (!tower || tower.playerId !== command.playerId) {
+        return { accepted: false, reason: "invalid-move-target" };
+      }
+
+      if (this.towerMovesUsed.has(player.id)) {
+        return { accepted: false, reason: "tower-move-used" };
+      }
+
+      if (this.state.wave <= TOWER_MOVE_AFTER_WAVES) {
+        return { accepted: false, reason: "tower-move-locked" };
+      }
+
+      // The tower's own cell is free to reuse in principle, but moving onto it would waste the token.
+      if (command.x === tower.x && command.y === tower.y) {
+        return { accepted: false, reason: "tower-overlap" };
+      }
+
+      const others = this.state.towers.filter((entry) => entry.id !== tower.id);
+      const validation = isValidTowerPlacement({ playerId: command.playerId, x: command.x, y: command.y }, others, this.state.map);
+      if (!validation.valid) {
+        return validation.reason ? { accepted: false, reason: validation.reason } : { accepted: false };
+      }
+
+      if (this.state.walls.some((wall) => wall.x === command.x && wall.y === command.y)) {
+        return { accepted: false, reason: "wall-overlap" };
+      }
+
+      const fromX = tower.x;
+      const fromY = tower.y;
+      tower.x = command.x;
+      tower.y = command.y;
+      player.tower = { playerId: command.playerId, x: command.x, y: command.y };
+      this.towerMovesUsed.add(player.id);
+      this.state.events.push({
+        type: "tower-moved",
+        wave: this.state.wave,
+        tick: this.state.waveTick,
+        towerId: tower.id,
+        playerId: tower.playerId,
+        fromX,
+        fromY,
+        x: command.x,
+        y: command.y
+      });
+      return { accepted: true };
+    }
+
     if (command.type === "upgrade-tower") {
       // Upgrades are a prep decision made before committing to the wave.
       if (this.state.phase !== "placement") {
@@ -543,6 +613,16 @@ export class MatchSimulation {
     return { accepted: false, reason: "unsupported-command" };
   }
 
+  private isTowerMoveAvailable(player: PlayerState): boolean {
+    return (
+      this.state.phase === "placement"
+      && player.hasPlacedTower
+      && !player.eliminated
+      && !this.towerMovesUsed.has(player.id)
+      && this.state.wave > TOWER_MOVE_AFTER_WAVES
+    );
+  }
+
   public awardPoints(playerId: string, points: number): void {
     const player = this.state.players.find((entry) => entry.id === playerId);
     if (!player || this.state.phase === "ended") {
@@ -595,7 +675,10 @@ export class MatchSimulation {
       walls: this.state.walls.map((wall) => ({ ...wall })),
       creatures: this.state.creatures.map((creature) => ({ ...creature })),
       targetAssignments: this.state.targetAssignments.map((assignment) => ({ ...assignment })),
-      players: this.state.players.map((player) => ({ ...player })),
+      players: this.state.players.map((player) => ({
+        ...player,
+        towerMoveAvailable: this.isTowerMoveAvailable(player)
+      })),
       events: this.state.events.map((event) => ({ ...event })),
       ...(this.state.winnerId ? { winnerId: this.state.winnerId } : {}),
       ...(this.state.endReason ? { endReason: this.state.endReason } : {})

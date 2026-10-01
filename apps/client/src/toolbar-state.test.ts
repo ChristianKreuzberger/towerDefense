@@ -5,7 +5,7 @@ import { MAX_TOWER_LEVEL, type TowerUpgrades } from "@tower-defense/shared";
 import { getToolbarState, type ToolbarInput } from "./toolbar-state.js";
 
 const base: TowerUpgrades = { range: 1, damage: 1, accuracy: 1 };
-const prep: ToolbarInput = { phase: "placement", upgrades: base, eliminated: false, readyForWave: false };
+const prep: ToolbarInput = { phase: "placement", upgrades: base, eliminated: false, readyForWave: false, towerMoveAvailable: false, wave: 1 };
 const none = { enabled: false, maxed: false };
 
 test("prep: every upgrade track and target mode are enabled, walls are not", () => {
@@ -64,4 +64,15 @@ test("ready needs a tower and prep; placing needs prep and no tower yet", () => 
   assert.equal(getToolbarState({ ...prep, phase: "wave" }).readyEnabled, false);
   assert.equal(getToolbarState({ ...prep, phase: "ended" }).readyEnabled, false);
   assert.equal(getToolbarState({ ...prep, phase: "ended", upgrades: null }).placeTowerEnabled, false);
+});
+
+test("the move button follows the token: locked early, free when unlocked, used after, dimmed once ready", () => {
+  assert.deepEqual([getToolbarState(prep).moveEnabled, getToolbarState(prep).moveLabel], [false, "after R5"]);
+  const unlocked = { ...prep, wave: 6, towerMoveAvailable: true };
+  assert.deepEqual([getToolbarState(unlocked).moveEnabled, getToolbarState(unlocked).moveLabel], [true, "free"]);
+  assert.equal(getToolbarState({ ...unlocked, readyForWave: true }).moveEnabled, false);
+  const used = { ...prep, wave: 7, towerMoveAvailable: false };
+  assert.deepEqual([getToolbarState(used).moveEnabled, getToolbarState(used).moveLabel], [false, "used"]);
+  assert.equal(getToolbarState({ ...unlocked, phase: "wave" }).moveLabel, "-");
+  assert.equal(getToolbarState({ ...unlocked, upgrades: null }).moveLabel, "-");
 });

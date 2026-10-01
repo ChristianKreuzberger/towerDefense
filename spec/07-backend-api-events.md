@@ -93,7 +93,7 @@ Common rejection reasons:
 - INSUFFICIENT_POINTS
 - TOWER_MAX_LEVEL (upgrade track at max level; wire code `tower-max-level`)
 - INVALID_UPGRADE_TRACK (wire code `invalid-upgrade-track`)
-- TOWER_MOVE_LOCKED, TOWER_MOVE_USED, MOVE_PHASE_NOT_ACTIVE (wire codes `tower-move-locked`, `tower-move-used`, `move-phase-not-active`)
+- TOWER_MOVE_LOCKED, TOWER_MOVE_USED, MOVE_PHASE_NOT_ACTIVE, INVALID_MOVE_TARGET (wire codes `tower-move-locked`, `tower-move-used`, `move-phase-not-active`, `invalid-move-target`; the target cell itself is judged by the normal placement reasons)
 
 Transport-level validation (host API, before the simulation sees a command or setup). These are structured errors `{ ok: false, error: <code>, message }` with HTTP 400 and never end the session:
 - `invalid-json`: the request body is not valid JSON

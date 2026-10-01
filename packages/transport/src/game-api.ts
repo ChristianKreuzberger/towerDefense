@@ -142,11 +142,14 @@ function parseCommand(body: unknown): SimulationCommand {
     return value;
   };
 
-  if (type === "place-tower" || type === "place-wall") {
+  if (type === "place-tower" || type === "place-wall" || type === "move-tower") {
     const { x, y } = commandSource;
     // Whether the cell lies inside the map is the simulation's call (reason "out-of-bounds").
     if (typeof x !== "number" || !Number.isInteger(x) || typeof y !== "number" || !Number.isInteger(y)) {
       throw new GameApiError("invalid-coordinates", `${type}: x and y must be finite integers`);
+    }
+    if (type === "move-tower") {
+      return { type, playerId: text("playerId"), towerId: text("towerId"), x, y };
     }
     return { type, playerId: text("playerId"), x, y };
   }

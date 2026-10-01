@@ -300,6 +300,17 @@ export type MatchEvent =
       remainingHp: number;
     }
   | {
+      type: "tower-moved";
+      wave: number;
+      tick: number;
+      towerId: string;
+      playerId: string;
+      fromX: number;
+      fromY: number;
+      x: number;
+      y: number;
+    }
+  | {
       type: "tower-destroyed";
       wave: number;
       tick: number;
@@ -333,6 +344,8 @@ export interface PlayerState {
   hasPlacedTower: boolean;
   readyForWave: boolean;
   eliminated: boolean;
+  // True while the player still holds their one free tower move (unlocked after 5 completed rounds).
+  towerMoveAvailable: boolean;
   tower?: TowerPlacement;
 }
 
@@ -370,6 +383,10 @@ export type CommandRejectReason =
   | "upgrade-phase-not-active"
   | "tower-max-level"
   | "invalid-upgrade-track"
+  | "tower-move-locked"
+  | "tower-move-used"
+  | "move-phase-not-active"
+  | "invalid-move-target"
   | "player-already-ready-for-wave"
   | "invalid-upgrade-target"
   | "invalid-target-mode-target"
@@ -398,6 +415,13 @@ export type SimulationCommand =
   | {
       type: "place-wall";
       playerId: string;
+      x: number;
+      y: number;
+    }
+  | {
+      type: "move-tower";
+      playerId: string;
+      towerId: string;
       x: number;
       y: number;
     }

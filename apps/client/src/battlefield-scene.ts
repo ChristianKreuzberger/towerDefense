@@ -67,6 +67,8 @@ export interface PlacementContext {
   playerId: string;
   hasTowerAlready: boolean;
   wallMode?: boolean;
+  // Moving the tower: the ghost tower is shown even though the player already has one.
+  moveMode?: boolean;
 }
 
 interface TowerVisual {
@@ -395,7 +397,7 @@ class BattlefieldScene extends Phaser.Scene {
     if (!this.placementContext) {
       return false;
     }
-    if (!this.placementContext.wallMode && this.placementContext.hasTowerAlready) {
+    if (!this.placementContext.wallMode && !this.placementContext.moveMode && this.placementContext.hasTowerAlready) {
       return false;
     }
     return this.isHoverValid(x, y);
@@ -896,8 +898,12 @@ class BattlefieldScene extends Phaser.Scene {
 
   private updateTowerVisual(visual: TowerVisual, tower: Tower, cellSize: number): void {
     const { cx, cy } = cellCenter(tower.x, tower.y, cellSize);
+    const relocated = visual.baseX !== cx || visual.baseY !== cy;
     visual.baseX = cx;
     visual.baseY = cy;
+    if (relocated) {
+      this.glideTowerTo(visual, cx, cy);
+    }
     visual.upgrades = { ...tower.upgrades };
     if (visual.level !== tower.level) {
       const bought = tower.level > visual.level;
@@ -923,6 +929,17 @@ class BattlefieldScene extends Phaser.Scene {
       const ratio = tower.maxHealth > 0 ? Math.max(0, Math.min(1, tower.health / tower.maxHealth)) : 0;
       visual.hpFill.setDisplaySize(Math.max(0, cellSize * 1.5 * ratio), cellSize * 0.2).setTint(hpColor(ratio));
     }
+  }
+
+  // The one free tower move: the tower glides to its new tile and settles with a small pop.
+  private glideTowerTo(visual: TowerVisual, x: number, y: number): void {
+    if (this.reducedMotion) {
+      visual.container.setPosition(x, y);
+      return;
+    }
+    this.fx?.puff(visual.container.x, visual.container.y, 0xd9d2c0, 0);
+    this.tweens.add({ targets: visual.container, x, y, duration: 350, ease: "Quad.InOut" });
+    this.tweens.add({ targets: visual.container, scale: 1.12, duration: 175, yoyo: true, delay: 100 });
   }
 
   private playLevelUp(visual: TowerVisual, newStyle: boolean): void {
