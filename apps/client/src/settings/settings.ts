@@ -18,6 +18,10 @@ export function clampVolume(value: unknown): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function isValidVolume(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
 // Field-wise fallback so one bad field never throws away the user's other choices.
 export function parseSettings(raw: string | null): AudioSettings {
   let parsed: unknown = null;
@@ -30,7 +34,8 @@ export function parseSettings(raw: string | null): AudioSettings {
   }
   const record = typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   return {
-    effectsVolume: clampVolume(record.effectsVolume),
+    // Out-of-range stored values are invalid per the schema, so they fall back instead of clamping.
+    effectsVolume: isValidVolume(record.effectsVolume) ? record.effectsVolume : DEFAULT_AUDIO_SETTINGS.effectsVolume,
     muted: typeof record.muted === "boolean" ? record.muted : DEFAULT_AUDIO_SETTINGS.muted
   };
 }

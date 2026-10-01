@@ -14,6 +14,7 @@ function fakeContext(state: "running" | "suspended" = "running") {
   const created: FakeNode[] = [];
   const starts: number[] = [];
   const stateListeners: Array<() => void> = [];
+  const disconnected: FakeNode[] = [];
   const masterTargets: number[] = [];
   const param = () => ({ value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime(v: number) { masterTargets.push(v); } });
   const node = (kind: string): FakeNode => {
@@ -22,7 +23,9 @@ function fakeContext(state: "running" | "suspended" = "running") {
       gain: param(),
       frequency: param(),
       connect() {},
-      disconnect() {},
+      disconnect() {
+        disconnected.push(n);
+      },
       start(at: number) {
         starts.push(at);
       },
@@ -57,10 +60,10 @@ function fakeContext(state: "running" | "suspended" = "running") {
     createBufferSource: () => node("source"),
     createBuffer: (_c: number, length: number) => ({ getChannelData: () => new Float32Array(length) })
   };
-  return { ctx, created, masterTargets, starts };
+  return { ctx, created, masterTargets, starts, disconnected };
 }
 
-function setup(opts: { state?: "running" | "suspended"; hidden?: () => boolean; muted?: boolean } = {}) {
+function setup(opts: { state?: "running" | "suspended"; hidden?: () => boolean; muted?: boolean; visibilityTarget?: EventTarget | undefined } = {}) {
   const fake = fakeContext(opts.state);
   const settings = createSettingsStore(null);
   if (opts.muted) {
@@ -71,7 +74,8 @@ function setup(opts: { state?: "running" | "suspended"; hidden?: () => boolean; 
     settings,
     createContext: () => fake.ctx as unknown as AudioContext,
     now: () => time,
-    isHidden: opts.hidden ?? (() => false)
+    isHidden: opts.hidden ?? (() => false),
+    visibilityTarget: opts.visibilityTarget
   });
   return { fake, settings, engine, advance: (ms: number) => (time += ms) };
 }
@@ -278,4 +282,44 @@ test("listeners are re-armed when a running context is later suspended", async (
   target.dispatchEvent(new Event("keydown"));
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(target.active.size, 0);
+});
+
+test("a running transition removes the re-armed gesture listeners", async () => {
+  const { fake, engine } = setup({ state: "suspended" });
+  const target = new TrackingTarget();
+  engine.bindUnlock(target);
+  target.dispatchEvent(new Event("pointerdown"));
+  await new Promise((resolve) => setImmediate(resolve));
+  fake.ctx.setState("suspended");
+  assert.equal(target.active.size, 3);
+  fake.ctx.setState("running");
+  assert.equal(target.active.size, 0);
+});
+
+test("delayed cues are cancelled when the context is suspended before they start", () => {
+  const { fake, engine } = setup();
+  engine.unlock();
+  engine.playCues([{ id: "creature-kill" }, { id: "creature-kill" }], 600);
+  assert.equal(fake.disconnected.length, 0);
+  fake.ctx.setState("suspended");
+  assert.ok(fake.disconnected.length > 0);
+});
+
+test("delayed cues are cancelled when the tab becomes hidden", () => {
+  const target = new EventTarget();
+  let hidden = false;
+  const { fake, engine } = setup({ hidden: () => hidden, visibilityTarget: target });
+  engine.unlock();
+  engine.playCues([{ id: "creature-kill" }, { id: "creature-kill" }], 600);
+  hidden = true;
+  target.dispatchEvent(new Event("visibilitychange"));
+  assert.ok(fake.disconnected.length > 0);
+});
+
+test("delayed cues are cancelled when muted before they start", () => {
+  const { fake, settings, engine } = setup();
+  engine.unlock();
+  engine.playCues([{ id: "creature-kill" }, { id: "creature-kill" }], 600);
+  settings.set({ muted: true });
+  assert.ok(fake.disconnected.length > 0);
 });

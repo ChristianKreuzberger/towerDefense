@@ -17,6 +17,8 @@ export interface SoundEngineOptions {
   createContext?: () => AudioContext | null;
   now?: () => number;
   isHidden?: () => boolean;
+  /** Where `visibilitychange` is observed; defaults to `document`. */
+  visibilityTarget?: EventTarget | undefined;
 }
 
 interface Throttle {
@@ -233,11 +235,20 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
   interface Voice {
     start: number;
     end: number;
+    // Only delayed voices get their own bus, so they can be silenced before they start.
+    bus?: AudioNode | undefined;
   }
   const voices = new Map<SoundId, Voice[]>();
   let allVoices: Voice[] = [];
   let unlockTarget: EventTarget | null = null;
   let gestureTarget: EventTarget | null = null;
+
+  const visibilityTarget = options.visibilityTarget ?? (typeof document !== "undefined" ? document : null);
+  visibilityTarget?.addEventListener("visibilitychange", () => {
+    if (isHidden()) {
+      cancelPending();
+    }
+  });
 
   const gesture = () => unlock();
   const GESTURES = ["pointerdown", "keydown", "touchend"];
@@ -262,9 +273,30 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
     }
   }
 
+  // Delayed cues are already queued as Web Audio nodes; the guards in play() ran at queue time, so
+  // re-check them on state changes by cutting the not-yet-started ones off from the output.
+  function cancelPending(): void {
+    const current = now();
+    const isPending = (voice: Voice) => voice.bus !== undefined && voice.start > current;
+    for (const voice of allVoices.filter(isPending)) {
+      try {
+        voice.bus?.disconnect();
+      } catch {
+        // Already disconnected.
+      }
+    }
+    allVoices = allVoices.filter((voice) => !isPending(voice));
+    for (const [id, list] of voices) {
+      voices.set(id, list.filter((voice) => !isPending(voice)));
+    }
+  }
+
   function applyGain(): void {
     if (!ctx || !master) {
       return;
+    }
+    if (settings.effectiveGain() <= 0) {
+      cancelPending();
     }
     const volume = settings.effectiveGain();
     master.gain.setTargetAtTime(volume * volume, ctx.currentTime, 0.02);
@@ -297,8 +329,11 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
       settings.subscribe(applyGain);
       // Safari can suspend or interrupt a running context later (tab switch, call); the next gesture must be able to resume it.
       created.addEventListener?.("statechange", () => {
-        if (created.state !== "running") {
+        if (created.state === "running") {
+          detach();
+        } else {
           arm();
+          cancelPending();
         }
       });
       return ctx;
@@ -356,15 +391,20 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
       }
     }
     try {
+      let bus: GainNode | undefined;
+      if (delayMs > 0) {
+        bus = ctx.createGain();
+        bus.connect(master);
+      }
       const seconds = RECIPES[cue.id]({
         ctx,
-        out: master,
+        out: bus ?? master,
         noiseBuffer,
         t: ctx.currentTime + delayMs / 1000,
         k: pitchRatio(cue.playerNumber),
         g: cue.intensity ?? 1
       });
-      const voice = { start: at, end: at + seconds * 1000 };
+      const voice: Voice = { start: at, end: at + seconds * 1000, bus };
       own.push(voice);
       voices.set(cue.id, own);
       allVoices.push(voice);

@@ -54,6 +54,15 @@ test("parseSettings falls back field-wise and on corrupt input", () => {
   });
 });
 
+test("parseSettings falls back to the default for out-of-range stored volumes", () => {
+  for (const effectsVolume of [-1, 7]) {
+    assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume, muted: true })), {
+      effectsVolume: DEFAULT_AUDIO_SETTINGS.effectsVolume,
+      muted: true
+    });
+  }
+});
+
 test("serializeSettings round-trips through parseSettings", () => {
   const settings = { effectsVolume: 0.25, muted: true };
   assert.deepEqual(JSON.parse(serializeSettings(settings)), { version: 1, effectsVolume: 0.25, muted: true });
