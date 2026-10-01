@@ -30,7 +30,7 @@ export function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
   store.playerSignature = signature;
 
   const previous = el.playerId.value;
-  el.playerId.innerHTML = "";
+  el.playerId.replaceChildren();
   for (const player of players) {
     const option = document.createElement("option");
     option.value = player.id;
