@@ -1,4 +1,4 @@
-import { WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
+import { TICKS_PER_SECOND, WIN_SCORE, getTowerUpgradeCost, getWallCost, isInSpawnProtection } from "@tower-defense/shared";
 import type { MapCell, MatchEvent, MatchSetup, MatchSnapshot, SimulationCommand, TowerTargetMode } from "@tower-defense/shared";
 
 import { applyPaletteCssVars } from "./art/palette";
@@ -117,7 +117,7 @@ const TOAST_CAPACITY = 5;
 const TOAST_LIFETIME_MS = 4500;
 const BANNER_LIFETIME_MS = 2600;
 // 5 ticks/s at 1x: creatures cover up to 5 cells/s, slow enough to follow and fast enough that a wave is over in seconds.
-const BASE_TICKS_PER_SECOND = 5;
+const BASE_TICKS_PER_SECOND = TICKS_PER_SECOND;
 const PLAYBACK_SPEEDS = [1, 2, 4] as const;
 const PLAYBACK_CHECK_INTERVAL_MS = 50;
 const MAX_TICKS_PER_REQUEST = 4;

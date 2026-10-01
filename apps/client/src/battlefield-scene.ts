@@ -4,7 +4,7 @@ import {
   CREATURE_ARCHETYPE_STATS,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
-  getTowerRange,
+  getTowerStats,
   isInSpawnProtection
 } from "@tower-defense/shared";
 import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
@@ -160,6 +160,7 @@ class BattlefieldScene extends Phaser.Scene {
   private hoverX: number | null = null;
   private hoverY: number | null = null;
   private hoverTowerId: string | null = null;
+  private tooltip?: HTMLElement;
   private reducedMotion = false;
   private lastWave = -1;
   private lastWaveTick = 0;
@@ -185,6 +186,10 @@ class BattlefieldScene extends Phaser.Scene {
     this.input.on("pointerdown", this.handlePointerDown, this);
     this.input.on("pointermove", this.handlePointerMove, this);
     this.game.canvas.addEventListener("pointerleave", this.handlePointerLeave);
+    this.tooltip = document.createElement("div");
+    this.tooltip.className = "tower-tooltip";
+    this.tooltip.hidden = true;
+    this.game.canvas.parentElement?.appendChild(this.tooltip);
     if (this.pendingCursor !== null) {
       this.cursorX = this.pendingCursor.x;
       this.cursorY = this.pendingCursor.y;
@@ -399,9 +404,10 @@ class BattlefieldScene extends Phaser.Scene {
       if (hovered) {
         hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
         hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
-        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerRange(hovered.level));
+        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.level).range);
       }
     }
+    this.updateTowerTooltip();
 
     if (this.hoverX === null || this.hoverY === null) {
       return;
@@ -427,9 +433,51 @@ class BattlefieldScene extends Phaser.Scene {
         ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
         ghostTurret.setTexture(KEY.turret(index, 1)).setPosition(cx, cy).setVisible(true);
         // Placement is one-shot, so show the coverage before the player commits.
-        this.drawRangeCircle(hover, cx, cy, getTowerRange(1));
+        this.drawRangeCircle(hover, cx, cy, getTowerStats(1).range);
       }
     }
+  }
+
+  private updateTowerTooltip(): void {
+    const tooltip = this.tooltip;
+    if (!tooltip) {
+      return;
+    }
+    const tower = this.hoverTowerId ? this.towerVisuals.get(this.hoverTowerId) : undefined;
+    if (!tower) {
+      tooltip.hidden = true;
+      return;
+    }
+    const stats = getTowerStats(tower.level);
+    const rows: Array<[string, string]> = [
+      ["Level", String(stats.level)],
+      ["Health", `${tower.hp}/${tower.maxHp}`],
+      ["Range", `${stats.range} cells`],
+      ["Damage", `${stats.damagePerShot} per shot`],
+      ["DPS", String(stats.damagePerSecond)],
+      ["Accuracy", `${Math.round(stats.accuracy * 100)}%`]
+    ];
+    tooltip.replaceChildren(
+      ...rows.map(([label, value]) => {
+        const row = document.createElement("div");
+        const name = document.createElement("span");
+        name.textContent = label;
+        const val = document.createElement("strong");
+        val.textContent = value;
+        row.append(name, val);
+        return row;
+      })
+    );
+    const canvas = this.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const scale = canvas.width > 0 ? rect.width / canvas.width : 1;
+    tooltip.style.left = `${canvas.offsetLeft + tower.baseX * scale}px`;
+    tooltip.style.top = `${canvas.offsetTop + tower.baseY * scale - this.cellSize * scale * 0.9}px`;
+    tooltip.hidden = false;
+  }
+
+  removeTooltip(): void {
+    this.tooltip?.remove();
   }
 
   private drawRangeCircle(graphics: Phaser.GameObjects.Graphics, cx: number, cy: number, rangeCells: number): void {
@@ -1030,6 +1078,7 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
       scene?.setPlacementContext(context);
     },
     destroy(): void {
+      scene.removeTooltip();
       game.destroy(true);
     }
   };
