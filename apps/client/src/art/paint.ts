@@ -32,12 +32,13 @@ function roundRect(ctx: Ctx, x: number, y: number, w: number, h: number, r: numb
 
 // ---------------------------------------------------------------- terrain
 
+// Buildable cells are the walkable layer and are drawn as the road; non-buildable cells are raised grass pads.
 // Grass plots are raised pads on a continuous road: each plot's corners are rounded only where
 // both orthogonal neighbours are road (four-neighbour mask), and the plot casts a soft shadow onto the road.
 export function paintTerrain(ctx: Ctx, cells: MapCell[], width: number, height: number, cs: number, seed: number): void {
   const grass = new Uint8Array(width * height);
   for (const cell of cells) {
-    if (cell.buildable) {
+    if (!cell.buildable) {
       grass[cell.y * width + cell.x] = 1;
     }
   }

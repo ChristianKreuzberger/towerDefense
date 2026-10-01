@@ -14,7 +14,7 @@ function hashCoordinates(seed: number, x: number, y: number): number {
 }
 
 // Carves a 4-connected left-to-right route so creatures always have somewhere to walk.
-// Uses x = -1 / -2 as hash inputs so the lane does not correlate with the noise layer.
+// Out-of-map hash inputs (y = -1 for the start row, y = -2 for the drift) keep the lane independent of the noise layer.
 function carveLane(seed: number, width: number, height: number): Set<string> {
   const lane = new Set<string>();
   let y = hashCoordinates(seed, -1, -1) % height;

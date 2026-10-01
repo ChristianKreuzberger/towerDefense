@@ -36,7 +36,7 @@ export function paintHero(canvas: HTMLCanvasElement): void {
     for (let x = 0; x < COLS; x += 1) {
       const forced = TOWERS.some((tower) => tower.x === x && tower.y === y);
       const lane = y >= 3 && y <= 4;
-      cells.push({ x, y, buildable: forced || (!lane && hash3(SEED, x, y) < 0.5), pathWear: 0 });
+      cells.push({ x, y, buildable: forced || lane || hash3(SEED, x, y) < 0.5, pathWear: 0 });
     }
   }
   paintTerrain(ctx, cells, COLS, ROWS, CELL, SEED);

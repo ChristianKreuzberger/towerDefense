@@ -295,6 +295,29 @@ test("rejects placements that newly block left-to-right path connectivity", () =
   assert.equal(result.reason, "path-blocked");
 });
 
+test("rejects walls that remove the last left-to-right route even when towers stay reachable", () => {
+  const map: GameMap = {
+    width: 3,
+    height: 2,
+    seed: 0,
+    cells: [
+      { x: 0, y: 0, buildable: true, pathWear: 0 },
+      { x: 1, y: 0, buildable: true, pathWear: 0 },
+      { x: 2, y: 0, buildable: true, pathWear: 0 },
+      { x: 0, y: 1, buildable: true, pathWear: 0 },
+      { x: 1, y: 1, buildable: false, pathWear: 0 },
+      { x: 2, y: 1, buildable: false, pathWear: 0 }
+    ]
+  };
+  const towers: Tower[] = [
+    { id: "t-1", playerId: "p1", x: 0, y: 1, health: 100, maxHealth: 100, level: 1, targetMode: "first" }
+  ];
+
+  const result = isValidWallPlacement({ playerId: "p1", x: 1, y: 0 }, [], towers, map);
+  assert.equal(result.valid, false);
+  assert.equal(result.reason, "path-blocked");
+});
+
 test("allows placements when an alternate path remains", () => {
   const map: GameMap = {
     width: 3,
