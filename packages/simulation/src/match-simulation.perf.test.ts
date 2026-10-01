@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 
 import { createMatch } from "./match-simulation.js";
-import { generateMap } from "./procedural-map.js";
+import { getBuildableCellsNearSpawn } from "./spawn-order.js";
 
 test("8-player match reports tick runtime over three waves", () => {
   const playerIds = Array.from({ length: 8 }, (_, index) => `p${index + 1}`);
@@ -11,18 +11,7 @@ test("8-player match reports tick runtime over three waves", () => {
     players: playerIds.map((id) => ({ id, name: `Player ${id.slice(1)}` })),
     seed: 2024
   });
-  // Towers have a limited range, so candidates are ordered by distance to the spawn gate (the lane start).
-  const spawnProbe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed: 2024 });
-  const probeCell = generateMap(2024).cells.find((cell) => cell.buildable);
-  assert.ok(probeCell);
-  spawnProbe.applyCommand({ type: "place-tower", playerId: "p1", x: probeCell.x, y: probeCell.y });
-  spawnProbe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
-  spawnProbe.applyCommand({ type: "advance-wave" });
-  const spawn = spawnProbe.getSnapshot().creatures[0];
-  assert.ok(spawn);
-  const candidates = generateMap(2024)
-    .cells.filter((cell) => cell.buildable)
-    .sort((a, b) => Math.hypot(a.x - spawn.x, a.y - spawn.y) - Math.hypot(b.x - spawn.x, b.y - spawn.y));
+  const candidates = getBuildableCellsNearSpawn(2024);
 
   for (const playerId of playerIds) {
     let placed = false;

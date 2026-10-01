@@ -26,28 +26,7 @@ import {
   type Wall
 } from "@tower-defense/shared";
 import { generateMap } from "./procedural-map.js";
-
-// Buildable cells ordered by distance to where creatures spawn, so default test towers
-// sit inside their limited range instead of in a far corner of the map.
-function getBuildableCellsNearSpawn(seed: number): Array<{ x: number; y: number }> {
-  const map = generateMap(seed);
-  const buildable = map.cells.filter((entry) => entry.buildable);
-  const first = buildable[0];
-  assert.ok(first, "expected at least one buildable cell");
-
-  const probe = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
-  probe.applyCommand({ type: "place-tower", playerId: "p1", x: first.x, y: first.y });
-  probe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
-  probe.applyCommand({ type: "advance-wave" });
-  const spawn = probe.getSnapshot().creatures[0];
-  assert.ok(spawn, "expected a spawned creature");
-
-  return buildable
-    .filter((cell) => cell.x !== spawn.x || cell.y !== spawn.y)
-    .map((cell) => ({ x: cell.x, y: cell.y, distance: Math.hypot(cell.x - spawn.x, cell.y - spawn.y) }))
-    .sort((a, b) => a.distance - b.distance || a.y - b.y || a.x - b.x)
-    .map(({ x, y }) => ({ x, y }));
-}
+import { getBuildableCellsNearSpawn } from "./spawn-order.js";
 
 // Greedily places one tower per player so combinations that block the lane are skipped.
 function getPlaceableCellsNearSpawn(seed: number, count: number): Array<{ x: number; y: number }> {
@@ -2474,6 +2453,12 @@ test("tower range grows linearly with level and clamps below level 1", () => {
   assert.equal(getTowerRange(0), BASE_TOWER_RANGE);
 });
 
+test("tower range scales consistently for fractional levels", () => {
+  assert.equal(getTowerRange(1.5), BASE_TOWER_RANGE + (0.5 * TOWER_RANGE_PER_LEVEL));
+  assert.equal(getTowerRange(0.5), BASE_TOWER_RANGE);
+  assert.ok(getTowerRange(1.5) > getTowerRange(1) && getTowerRange(1.5) < getTowerRange(2));
+});
+
 type TargetMode = "first" | "last" | "strongest" | "nearest";
 
 // Finds a tower cell whose distance to the first spawned creature lies in (minExclusive, maxInclusive].
@@ -2529,6 +2514,21 @@ test("towers ignore creatures outside range in every target mode", () => {
   for (const mode of ["first", "last", "strongest", "nearest"] as const) {
     assert.equal(firstTickTarget(seed, outOfRange, mode, 0), null, mode);
   }
+});
+
+test("range boundary is inclusive: creature at exactly range distance is targetable", () => {
+  const seed = 40;
+  const range = getTowerRange(1);
+  // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance.
+  const exact = findTowerCellAtDistance(seed, range - 1e-9, range);
+  assert.equal(firstTickTarget(seed, exact, "first", 0), "wave-1-creature-1");
+});
+
+test("creature just beyond range is not targetable", () => {
+  const seed = 40;
+  const range = getTowerRange(1);
+  const beyond = findTowerCellAtDistance(seed, range + 1e-9, range + 1);
+  assert.equal(firstTickTarget(seed, beyond, "first", 0), null);
 });
 
 test("towers target creatures inside range in every target mode", () => {

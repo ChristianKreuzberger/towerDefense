@@ -161,6 +161,9 @@ function applyCommandOrThrow(
   }
 }
 
+// Slightly inside the gate column so the first towers cover the start of the lane; changing it shifts the balance baseline.
+const SPAWN_ANCHOR_X = 8;
+
 function placeTowersDeterministically(simulation: ReturnType<typeof createMatch>, scenarioId: string): void {
   const players = simulation.getSnapshot().players
     .filter((player) => !player.eliminated)
@@ -170,11 +173,12 @@ function placeTowersDeterministically(simulation: ReturnType<typeof createMatch>
   for (const playerId of players) {
     const snapshot = simulation.getSnapshot();
     // Towers have limited range, so start from the cells closest to the spawn gate (the buildable cells on x = 0).
+    // Kept as a fixed anchor (not the probe-based helper) so baseline placements stay stable.
     const gate = snapshot.map.cells.filter((cell) => cell.buildable && cell.x === 0);
     const gateY = gate.reduce((sum, cell) => sum + cell.y, 0) / Math.max(1, gate.length);
     const available = snapshot.map.cells
       .filter((cell) => cell.buildable)
-      .sort((a, b) => (Math.hypot(a.x - 8, a.y - gateY) - Math.hypot(b.x - 8, b.y - gateY)) || (a.y - b.y) || (a.x - b.x));
+      .sort((a, b) => (Math.hypot(a.x - SPAWN_ANCHOR_X, a.y - gateY) - Math.hypot(b.x - SPAWN_ANCHOR_X, b.y - gateY)) || (a.y - b.y) || (a.x - b.x));
 
     let placed = false;
     for (const cell of available) {

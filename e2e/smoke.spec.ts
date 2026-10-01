@@ -34,6 +34,12 @@ const SEED_777_TOWER_CELLS = [{ x: 0, y: 17 }, { x: 1, y: 15 }];
 
 async function clickCellNearSpawn(page: Page, slot: 0 | 1): Promise<void> {
   const cell = SEED_777_TOWER_CELLS[slot]!;
+  // Fail with a clear message if map generation changes, instead of a silent "tower never fires" later.
+  const { snapshot } = (await (await page.request.get("/api/snapshot")).json()) as {
+    snapshot: { map: { cells: Array<{ x: number; y: number; buildable: boolean }> } };
+  };
+  const buildable = snapshot.map.cells.some((entry) => entry.x === cell.x && entry.y === cell.y && entry.buildable);
+  expect(buildable, `SEED_777_TOWER_CELLS[${slot}] (${cell.x},${cell.y}) is no longer buildable on seed 777; update the cells`).toBe(true);
   const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, cell);
   if (!position) {
     throw new Error("No board hook available to locate the tower cell");

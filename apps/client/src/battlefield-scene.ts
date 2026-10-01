@@ -397,11 +397,7 @@ class BattlefieldScene extends Phaser.Scene {
       if (hovered) {
         hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
         hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
-        const rangeRadius = getTowerRange(hovered.level) * cellSize;
-        hover.fillStyle(UI_COLORS.hover, 0.08);
-        hover.fillCircle(hovered.baseX, hovered.baseY, rangeRadius);
-        hover.lineStyle(Math.max(2, cellSize * 0.06), UI_COLORS.hover, 0.5);
-        hover.strokeCircle(hovered.baseX, hovered.baseY, rangeRadius);
+        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerRange(hovered.level));
       }
     }
 
@@ -429,13 +425,17 @@ class BattlefieldScene extends Phaser.Scene {
         ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
         ghostTurret.setTexture(KEY.turret(index, 1)).setPosition(cx, cy).setVisible(true);
         // Placement is one-shot, so show the coverage before the player commits.
-        const ghostRange = getTowerRange(1) * cellSize;
-        hover.fillStyle(UI_COLORS.hover, 0.08);
-        hover.fillCircle(cx, cy, ghostRange);
-        hover.lineStyle(Math.max(2, cellSize * 0.06), UI_COLORS.hover, 0.5);
-        hover.strokeCircle(cx, cy, ghostRange);
+        this.drawRangeCircle(hover, cx, cy, getTowerRange(1));
       }
     }
+  }
+
+  private drawRangeCircle(graphics: Phaser.GameObjects.Graphics, cx: number, cy: number, rangeCells: number): void {
+    const radius = rangeCells * this.cellSize;
+    graphics.fillStyle(UI_COLORS.hover, 0.08);
+    graphics.fillCircle(cx, cy, radius);
+    graphics.lineStyle(Math.max(2, this.cellSize * 0.06), UI_COLORS.hover, 0.5);
+    graphics.strokeCircle(cx, cy, radius);
   }
 
   // Hovering a tower links it to its current target; the range circle itself is drawn with the hover highlight.
