@@ -17,6 +17,8 @@ export const DEFAULT_WALL_HEALTH = 60;
 export const BETWEEN_WAVE_WALL_REPAIR_PERCENT = 0.25;
 export const BETWEEN_WAVE_WALL_REPAIR_MIN = 4;
 export const PATH_CELL_MAX_WEAR = 8;
+// Wear a lane cell gains each time a creature moves onto it during a wave.
+export const PATH_WEAR_PER_TRAVERSAL = 1;
 export const BETWEEN_WAVE_PATH_WEAR_REPAIR = 3;
 export const MOVEMENT_PROGRESS_UNITS_PER_CELL = 100;
 export const BASE_CREATURE_MOVEMENT_SPEED_UNITS = MOVEMENT_PROGRESS_UNITS_PER_CELL;
@@ -62,6 +64,7 @@ export const GAME_RULES = {
   betweenWaveWallRepairPercent: BETWEEN_WAVE_WALL_REPAIR_PERCENT,
   betweenWaveWallRepairMin: BETWEEN_WAVE_WALL_REPAIR_MIN,
   pathCellMaxWear: PATH_CELL_MAX_WEAR,
+  pathWearPerTraversal: PATH_WEAR_PER_TRAVERSAL,
   betweenWavePathWearRepair: BETWEEN_WAVE_PATH_WEAR_REPAIR,
   movementProgressUnitsPerCell: MOVEMENT_PROGRESS_UNITS_PER_CELL,
   baseCreatureMovementSpeedUnits: BASE_CREATURE_MOVEMENT_SPEED_UNITS,

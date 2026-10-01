@@ -21,6 +21,7 @@ import {
   type CreatureArchetype,
   isWithinCreatureAttackRange,
   getCreatureMovementSpeedUnits,
+  PATH_CELL_MAX_WEAR,
   getTowerRange,
   getCreatureBaseHp,
   getWaveCreatureCount,
@@ -1133,6 +1134,29 @@ test("applies deterministic movement speed modifiers from path wear", () => {
   assert.equal(getCreatureMovementSpeedUnits(6), 40);
   assert.equal(getCreatureMovementSpeedUnits(8), 40);
   assert.equal(getCreatureMovementSpeedUnits(99), 40);
+});
+
+test("raises path wear on a lane cell when a creature walks onto it during the wave", () => {
+  const simulation = createSinglePlayerWaveSimulation(48);
+  let steppedCell: { x: number; y: number } | undefined;
+
+  for (let step = 0; step < 200 && !steppedCell; step += 1) {
+    assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+    const movement = simulation.getSnapshot().events.find(
+      (event): event is Extract<MatchEvent, { type: "movement-resolved" }> =>
+        event.type === "movement-resolved" && event.steps.length > 0
+    );
+    const lastStep = movement?.steps[movement.steps.length - 1];
+    if (lastStep) {
+      steppedCell = { x: lastStep.toX, y: lastStep.toY };
+    }
+  }
+
+  assert.ok(steppedCell);
+  const cell = simulation.getSnapshot().map.cells.find((entry) => entry.x === steppedCell?.x && entry.y === steppedCell?.y);
+  assert.ok(cell);
+  assert.ok(cell.pathWear > 0);
+  assert.ok(cell.pathWear <= PATH_CELL_MAX_WEAR);
 });
 
 test("emits deterministic movement-resolved event payload and ordering", () => {
