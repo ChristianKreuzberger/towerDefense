@@ -25,7 +25,7 @@
 - Placement cannot make all enemy paths invalid
 - Placement must not cut off any live tower that creatures could reach before it (same per-tower rule as wall placement)
 - Each player places one tower at match start
-- Once placed, a tower cannot be moved or sold
+- Once placed, a tower cannot be sold. It cannot be moved either, with one exception: after the first 5 completed rounds (`TOWER_MOVE_AFTER_WAVES` = 5, so from the prep before wave 6) every player has one free move for their tower (a reward, not an upgrade track). The move follows the placement rules (buildable cell, outside the cave's protected area, no overlap with towers or walls, no blocked route), keeps the tower's level, upgrades, target mode and health, and like upgrades it is only possible during prep before the player is ready. Using it spends the token; a second move is rejected (`tower-move-used`), and before round 5 is done it is rejected with `tower-move-locked`
 
 ## Tower lifecycle
 

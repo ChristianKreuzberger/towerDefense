@@ -28,7 +28,7 @@
 - Turn banner: a big, centered banner (separate from the wave banner so both can show after a wave ends) with the player's name and "it's your turn". The text uses the player's colour, at least 40px on desktop (scaled down with the viewport on phones, never below 28px, wrapping instead of overflowing), and stays visible for about 3.5 seconds. It is `aria-live="polite"`, does not take pointer events, and under `prefers-reduced-motion` it appears without animation. It is only shown when more than one player is in the match. Generic action toasts are unchanged
 - The guide card title is larger (18px) so the turn message is readable from across the table
 - Show active wave and remaining creatures
-- Action toolbar (tower, wall, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
+- Action toolbar (tower, wall, move, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
 ## Real-time playback
@@ -117,6 +117,11 @@ Next-wave preview and HUD
 - During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner, 1x Swarm, 1x Armored, 1x Tank"; it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
 - The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
 - The ended status text names the winner (never the raw id)
+
+Move tower
+- A "Move Tower" button (hotkey `V`, cost shown as "free") appears in the toolbar. It is available only when the simulation would accept a move (`towerMoveAvailable` for the player, prep phase, not ready); before the unlock it is dimmed and a press explains "unlocks after round 5"
+- Pressing it enters move mode (like wall mode: the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted or the phase changes
+- The tower glides to its new tile with a short pop; the used token is shown by the button reading "used"
 
 Match lifecycle and hotkeys
 - "Back To Menu" leaves the match running on the host and stops playback. While a match that has not ended exists, the menu shows a "Resume Match" button that returns to it
