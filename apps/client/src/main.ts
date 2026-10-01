@@ -472,7 +472,7 @@ const REJECT_REASON_TEXT: Record<string, string> = {
   "path-blocked": "that would block the path",
   "wall-phase-not-active": "walls can only be placed during combat",
   "upgrade-phase-not-active": "upgrades can only be bought during prep, before you ready",
-  "player-already-ready-for-wave": "you are already ready, upgrades are locked",
+  "player-already-ready-for-wave": "you are already ready",
   "placement-phase-not-active": "towers can only be placed during placement",
   "tower-already-placed": "you already placed your tower",
   "tower-not-placed": "place your tower first",
@@ -1037,7 +1037,7 @@ function renderToolbar(snapshot: MatchSnapshot | null): void {
   el.upgradeCost.textContent = upgradeCost === null ? "-" : `${upgradeCost}`;
   el.upgradeCost.classList.toggle("short", upgradeCost !== null && points < upgradeCost);
   // Upgrades are prep-only and locked once this player readies (matches the simulation rule).
-  el.upgradeBtn.classList.toggle("dim", !tower || snapshot.phase !== "placement" || Boolean(player?.readyForWave));
+  el.upgradeBtn.classList.toggle("dim", !tower || Boolean(player?.eliminated) || snapshot.phase !== "placement" || Boolean(player?.readyForWave));
   el.placeTowerBtn.classList.toggle("dim", Boolean(tower) || snapshot.phase !== "placement");
   if (tower) {
     el.mode.value = tower.targetMode;
