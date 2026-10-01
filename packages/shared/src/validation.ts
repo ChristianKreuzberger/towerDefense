@@ -226,6 +226,13 @@ function validateWallPathSafety(
     blockedBefore.add(toKey(tower.x, tower.y));
   }
 
+  // Border reachability alone would let a wall cut the only left-to-right lane (creatures then fall back to a one-cell route).
+  const blockedAfterWall = new Set(blockedBefore);
+  blockedAfterWall.add(toKey(placement.x, placement.y));
+  if (hasLeftToRightPath(map, blockedBefore, buildable) && !hasLeftToRightPath(map, blockedAfterWall, buildable)) {
+    return { safe: false, reason: "path-blocked" };
+  }
+
   const reachableBefore = getBorderReachableCells(map, blockedBefore, buildable);
   const towerReachabilityBefore = getReachabilityByTower(
     existingTowers,

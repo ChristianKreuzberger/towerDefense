@@ -22,7 +22,7 @@ export interface DemoDeps {
   onFinished(): void;
 }
 
-// Shortest walkable (non-buildable) route from the left edge to the right edge; falls back to a straight row.
+// Shortest walkable (buildable) route from the left edge to the right edge; falls back to a straight row.
 export function findLane(map: MatchSnapshot["map"]): Array<{ x: number; y: number }> {
   const byKey = new Map<string, MapCell>();
   for (const cell of map.cells) {
@@ -33,7 +33,7 @@ export function findLane(map: MatchSnapshot["map"]): Array<{ x: number; y: numbe
   const y0 = Math.floor(map.height / 3);
   for (let offset = 0; offset < map.height; offset += 1) {
     const y = (y0 + offset) % map.height;
-    if (byKey.get(`0,${y}`)?.buildable === false) {
+    if (byKey.get(`0,${y}`)?.buildable === true) {
       parent.set(`0,${y}`, null);
       queue.push({ x: 0, y });
       break;
@@ -58,7 +58,7 @@ export function findLane(map: MatchSnapshot["map"]): Array<{ x: number; y: numbe
       const nx = cur.x + dx;
       const ny = cur.y + dy;
       const key = `${nx},${ny}`;
-      if (parent.has(key) || byKey.get(key)?.buildable !== false) {
+      if (parent.has(key) || byKey.get(key)?.buildable !== true) {
         continue;
       }
       parent.set(key, `${cur.x},${cur.y}`);

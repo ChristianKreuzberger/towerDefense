@@ -42,7 +42,7 @@
 
 ## Visual design
 
-Art direction: clean tabletop / toy diorama. Flat shapes, soft drop shadows, crisp dark outlines, a limited desaturated palette, and strong contrast between walkable ground and buildable plots.
+Art direction: clean tabletop / toy diorama. Flat shapes, soft drop shadows, crisp dark outlines, a limited desaturated palette, and strong contrast between the walkable road and the raised grass pads.
 
 Asset policy
 - All art is procedural. Textures are drawn once with the 2D canvas API at boot (and again only when the cell size changes) and uploaded as Phaser textures; nothing is downloaded and there are no image or font files
@@ -60,9 +60,9 @@ Board scaling
 - Pointer to cell conversion measures the canvas rectangle at event time, so any CSS scaling stays correct
 
 Terrain
-- The map only distinguishes buildable cells from non-buildable ones. Buildable cells are grass plots; non-buildable cells are the road. There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
+- The map only distinguishes buildable cells from non-buildable ones. Buildable cells are the walkable layer: they are drawn as the road, creatures walk on them and towers and walls are placed on them (see spec/05, Creature lane). Non-buildable cells are raised grass pads that creatures never enter. There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
 - Grass cells pick one of several variants from a seeded hash of (map seed, x, y), so a map always looks the same
-- The road is drawn as one continuous surface: edges against grass are chosen from the four-neighbour mask (rounded edge, shadow), interior cells are plain road
+- The road is drawn as one continuous surface: edges against grass pads are chosen from the four-neighbour mask (rounded edge, shadow), interior cells are plain road
 - Path wear draws darker ruts over the road and scales with the wear value
 - The left map edge is marked as the spawn gate and the right edge as the goal, matching the simulation (creatures enter at x = 0 and leave at the last column)
 
