@@ -335,7 +335,14 @@ function runScenario(scenario: BaselineScenario, outputDir: string): ScenarioRes
 
   const maxWave = scenario.waveLoop.completedWaves;
   for (let wave = 1; wave <= maxWave; wave += 1) {
+    const waveActions = scenario.waveStartActions?.[wave] ?? [];
     if (simulation.getSnapshot().phase !== "wave") {
+      // Upgrades are only allowed in prep, before players ready; walls and target modes are wave-only.
+      for (const action of waveActions) {
+        if (action.type === "upgrade-tower") {
+          applyWaveStartAction(simulation, action, scenario.id, wave);
+        }
+      }
       readyAllPlacedPlayers(simulation, scenario.id, wave);
     }
 
@@ -344,8 +351,10 @@ function runScenario(scenario: BaselineScenario, outputDir: string): ScenarioRes
       throw new Error(`scenario ${scenario.id} failed to enter wave ${wave}`);
     }
 
-    const waveActions = scenario.waveStartActions?.[wave] ?? [];
     for (const action of waveActions) {
+      if (action.type === "upgrade-tower") {
+        continue;
+      }
       applyWaveStartAction(simulation, action, scenario.id, wave);
     }
 
