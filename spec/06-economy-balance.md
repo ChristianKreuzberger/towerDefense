@@ -8,6 +8,7 @@ Point economy with per-player score tracking.
 
 - Creature kill rewards (primary)
 - Wave-clear bonus: every surviving player with a living tower is rewarded `WAVE_CLEAR_BONUS` (15 points) when a wave completes with zero creature leaks. Leaking a single creature forfeits the bonus for that wave. If the bonus lifts a player to 1000 points, the wave still completes its normal end-of-wave events and telemetry before the match ends with a score win.
+- Catch-up bonus: see "Anti-snowball controls"
 - Optional assist bonus for multiplayer balancing
 
 ## Spend sinks
@@ -39,8 +40,15 @@ Point economy with per-player score tracking.
 
 ## Anti-snowball controls
 
-- Catch-up bonus on low remaining base HP
-- Cap burst income from swarm kills
+There is no base, so "trailing" is measured in points. Both levers are driven by values in `packages/shared/src/game-rules.ts`. The numbers below are defaults chosen by the implementer (issue #17 left them open) and should be tuned with the balance reports.
+
+- Catch-up bonus: at the end of every wave, after the wave-clear bonus, each surviving player with a living tower who is trailing the leader gets a bonus. The leader is the surviving player with the most points (points after the wave-clear bonus). Gap = leader points - player points. A player is trailing when gap >= `CATCH_UP_GAP_THRESHOLD` (100). Bonus = min(`CATCH_UP_MAX_BONUS` (30), floor(gap * `CATCH_UP_GAP_FRACTION` (0.1))), so a 100 point gap pays 10 and a 300+ point gap pays 30.
+  - The leader (and anyone tied with the leader) never gets it, and eliminated players never get it.
+  - It is paid in player id order, is counted as awarded points, and is never paid if the match already ended (a wave-clear score win still ends the match after the normal end-of-wave events, and the catch-up bonus does not run then).
+  - It can never lift a player to the win score by itself: the bonus is reduced so the player stays at `WIN_SCORE - 1` at most (and skipped when that leaves nothing).
+  - Emits a `catch-up-bonus` event and is recorded in wave telemetry (`catchUpBonusAwarded`) and per player balance data.
+- Swarm income cap: each player may earn at most `SWARM_KILL_INCOME_CAP_PER_WAVE` (80) points from swarm kills per wave (10 swarm kills at the current reward of 8). A kill that would exceed the cap pays only what is left (possibly 0). The kill itself still counts as a kill; only the points are forfeited. The counter resets at wave start. Forfeited points are recorded in wave telemetry (`swarmIncomeCapped`), per player balance data, and a `swarm-income-capped` event.
+- Both rules are deterministic: they use only points, wave state and player id order, no randomness.
 
 ## Constraints
 

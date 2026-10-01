@@ -25,6 +25,13 @@ export const BASE_CREATURE_MOVEMENT_SPEED_UNITS = MOVEMENT_PROGRESS_UNITS_PER_CE
 export const CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR = 10;
 export const MIN_CREATURE_MOVEMENT_SPEED_UNITS = 40;
 export const WAVE_CLEAR_BONUS = 15;
+// Anti-snowball (spec/06). Defaults chosen by the implementer; tune with balance reports.
+// A surviving player at least this many points behind the leader gets a catch-up bonus at wave end.
+export const CATCH_UP_GAP_THRESHOLD = 100;
+export const CATCH_UP_GAP_FRACTION = 0.1;
+export const CATCH_UP_MAX_BONUS = 30;
+// Most points one player can earn from swarm kills in a single wave.
+export const SWARM_KILL_INCOME_CAP_PER_WAVE = 80;
 // Cells (Euclidean) around the monster cave where towers and walls are forbidden. Slightly smaller than the base
 // tower range (6), so towers just outside barely reach the cave exit, and nobody can wall in or point-blank the spawn.
 export const SPAWN_PROTECTION_RADIUS = 5;
@@ -73,6 +80,10 @@ export const GAME_RULES = {
   creatureMovementSpeedPenaltyPerWear: CREATURE_MOVEMENT_SPEED_PENALTY_PER_WEAR,
   minCreatureMovementSpeedUnits: MIN_CREATURE_MOVEMENT_SPEED_UNITS,
   waveClearBonus: WAVE_CLEAR_BONUS,
+  catchUpGapThreshold: CATCH_UP_GAP_THRESHOLD,
+  catchUpGapFraction: CATCH_UP_GAP_FRACTION,
+  catchUpMaxBonus: CATCH_UP_MAX_BONUS,
+  swarmKillIncomeCapPerWave: SWARM_KILL_INCOME_CAP_PER_WAVE,
   spawnProtectionRadius: SPAWN_PROTECTION_RADIUS,
   creatureSpawnProtectionSeconds: CREATURE_SPAWN_PROTECTION_SECONDS,
   spawnProtectionTicks: SPAWN_PROTECTION_TICKS,
@@ -108,6 +119,14 @@ export function getCreatureMovementSpeedUnits(pathWear: number): number {
 
 export function getWaveClearBonus(): number {
   return WAVE_CLEAR_BONUS;
+}
+
+// Bonus for a player trailing the leader by `gap` points: nothing below the threshold, else a capped fraction of the gap.
+export function getCatchUpBonus(gap: number): number {
+  if (gap < CATCH_UP_GAP_THRESHOLD) {
+    return 0;
+  }
+  return Math.min(CATCH_UP_MAX_BONUS, Math.floor(gap * CATCH_UP_GAP_FRACTION));
 }
 
 // Range is measured in grid cells (Euclidean) and grows with each range level.

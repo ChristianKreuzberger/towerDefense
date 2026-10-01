@@ -37,7 +37,9 @@
         "wallDamageIntake": 0,
         "towerRepairApplied": 4,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 15
+        "waveClearBonusAwarded": 15,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
@@ -57,7 +59,9 @@
         "wallDamageIntake": 0,
         "towerRepairApplied": 4,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 15
+        "waveClearBonusAwarded": 15,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "players": [
         {
@@ -75,6 +79,10 @@
           "endingPoints": 47,
           "waveClearBonusThisWave": 15,
           "waveClearBonusTotal": 15,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
           "towerHealth": 100,
           "wallCount": 0,
@@ -93,6 +101,10 @@
         "endingPoints": 47,
         "waveClearBonusThisWave": 15,
         "waveClearBonusTotal": 15,
+        "catchUpBonusThisWave": 0,
+        "catchUpBonusTotal": 0,
+        "swarmIncomeCappedThisWave": 0,
+        "swarmIncomeCappedTotal": 0,
         "livingTowers": 1,
         "livingWalls": 0,
         "totalTowerHealth": 100,
@@ -125,7 +137,9 @@
         "wallDamageIntake": 0,
         "towerRepairApplied": 5,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 0
+        "waveClearBonusAwarded": 0,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
@@ -145,7 +159,9 @@
         "wallDamageIntake": 0,
         "towerRepairApplied": 9,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 15
+        "waveClearBonusAwarded": 15,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "players": [
         {
@@ -163,6 +179,10 @@
           "endingPoints": 79,
           "waveClearBonusThisWave": 0,
           "waveClearBonusTotal": 15,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
           "towerHealth": 100,
           "wallCount": 0,
@@ -181,6 +201,10 @@
         "endingPoints": 79,
         "waveClearBonusThisWave": 0,
         "waveClearBonusTotal": 15,
+        "catchUpBonusThisWave": 0,
+        "catchUpBonusTotal": 0,
+        "swarmIncomeCappedThisWave": 0,
+        "swarmIncomeCappedTotal": 0,
         "livingTowers": 1,
         "livingWalls": 0,
         "totalTowerHealth": 100,

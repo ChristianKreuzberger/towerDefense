@@ -10,10 +10,11 @@ Damage intake: towers=0 walls=0
 Repairs: towers=0 walls=0
 Economy delta: awarded=77 spentWalls=0 spentUpgrades=0 net=77
 Wave-clear bonus: awarded=45
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=33 bonus=15 total=33 ending=33 towerLv=1 towerHp=100 walls=0 wallHp=0
-- p2 (Beta) status=active delta=29 bonus=15 total=29 ending=29 towerLv=1 towerHp=100 walls=0 wallHp=0
-- p3 (Gamma) status=active delta=15 bonus=15 total=15 ending=15 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p1 (Alpha) status=active delta=33 bonus=15 catchUp=0 swarmCapped=0 total=33 ending=33 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p2 (Beta) status=active delta=29 bonus=15 catchUp=0 swarmCapped=0 total=29 ending=29 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p3 (Gamma) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=0 wallHp=0
 
 === Wave 2 (export=2, tick=27) ===
 DPS proxy: 0.67 dmg/tick (dealt=18, ticks=27)
@@ -22,10 +23,11 @@ Damage intake: towers=3 walls=0
 Repairs: towers=3 walls=1
 Economy delta: awarded=97 spentWalls=25 spentUpgrades=0 net=72
 Wave-clear bonus: awarded=45
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=8 bonus=15 total=41 ending=41 towerLv=1 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=49 bonus=15 total=78 ending=78 towerLv=1 towerHp=100 walls=0 wallHp=0
-- p3 (Gamma) status=active delta=15 bonus=15 total=30 ending=30 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p1 (Alpha) status=active delta=8 bonus=15 catchUp=0 swarmCapped=0 total=41 ending=41 towerLv=1 towerHp=100 walls=1 wallHp=60
+- p2 (Beta) status=active delta=49 bonus=15 catchUp=0 swarmCapped=0 total=78 ending=78 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p3 (Gamma) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=30 ending=30 towerLv=1 towerHp=100 walls=0 wallHp=0
 
 === Wave 3 (export=3, tick=24) ===
 DPS proxy: 1.00 dmg/tick (dealt=24, ticks=24)
@@ -34,10 +36,11 @@ Damage intake: towers=0 walls=0
 Repairs: towers=0 walls=2
 Economy delta: awarded=107 spentWalls=30 spentUpgrades=96 net=-19
 Wave-clear bonus: awarded=45
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=-19 bonus=15 total=77 ending=77 towerLv=2 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=15 bonus=15 total=93 ending=93 towerLv=1 towerHp=100 walls=0 wallHp=0
-- p3 (Gamma) status=active delta=-15 bonus=15 total=15 ending=15 towerLv=1 towerHp=100 walls=1 wallHp=60
+- p1 (Alpha) status=active delta=-19 bonus=15 catchUp=0 swarmCapped=0 total=77 ending=77 towerLv=2 towerHp=100 walls=1 wallHp=60
+- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=93 ending=93 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p3 (Gamma) status=active delta=-15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=1 wallHp=60
 
 === Cumulative Summary ===
 Waves completed: 3
@@ -46,9 +49,10 @@ Kills by archetype: runner=4 swarm=3 armored=3 tank=2
 Damage intake totals: towers=3 walls=0
 Repairs totals: towers=3 walls=3
 Wave-clear bonus total: 135
+Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
 Economy totals: awarded=336 spentWalls=55 spentUpgrades=96 net=185 ending=185
 Structures: livingTowers=3 livingWalls=2 towerHp=300 wallHp=120 pathWearTotal=20
 Players (final):
-- p1 (Alpha) status=active delta=-19 bonus=15 total=77 ending=77 towerLv=2 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=15 bonus=15 total=93 ending=93 towerLv=1 towerHp=100 walls=0 wallHp=0
-- p3 (Gamma) status=active delta=-15 bonus=15 total=15 ending=15 towerLv=1 towerHp=100 walls=1 wallHp=60
+- p1 (Alpha) status=active delta=-19 bonus=15 catchUp=0 swarmCapped=0 total=77 ending=77 towerLv=2 towerHp=100 walls=1 wallHp=60
+- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=93 ending=93 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p3 (Gamma) status=active delta=-15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=1 wallHp=60

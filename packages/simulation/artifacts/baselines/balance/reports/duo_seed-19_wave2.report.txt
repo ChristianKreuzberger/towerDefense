@@ -10,9 +10,10 @@ Damage intake: towers=2 walls=0
 Repairs: towers=2 walls=0
 Economy delta: awarded=62 spentWalls=0 spentUpgrades=0 net=62
 Wave-clear bonus: awarded=30
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=47 bonus=15 total=47 ending=47 towerLv=1 towerHp=100 walls=0 wallHp=0
-- p2 (Beta) status=active delta=15 bonus=15 total=15 ending=15 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p1 (Alpha) status=active delta=47 bonus=15 catchUp=0 swarmCapped=0 total=47 ending=47 towerLv=1 towerHp=100 walls=0 wallHp=0
+- p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=15 towerLv=1 towerHp=100 walls=0 wallHp=0
 
 === Wave 2 (export=2, tick=21) ===
 DPS proxy: 0.86 dmg/tick (dealt=18, ticks=21)
@@ -21,9 +22,10 @@ Damage intake: towers=3 walls=0
 Repairs: towers=3 walls=1
 Economy delta: awarded=105 spentWalls=25 spentUpgrades=109 net=-29
 Wave-clear bonus: awarded=30
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=6 bonus=15 total=53 ending=53 towerLv=2 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=-35 bonus=15 total=29 ending=29 towerLv=2 towerHp=100 walls=0 wallHp=0
+- p1 (Alpha) status=active delta=6 bonus=15 catchUp=0 swarmCapped=0 total=53 ending=53 towerLv=2 towerHp=100 walls=1 wallHp=60
+- p2 (Beta) status=active delta=-35 bonus=15 catchUp=0 swarmCapped=0 total=29 ending=29 towerLv=2 towerHp=100 walls=0 wallHp=0
 
 === Cumulative Summary ===
 Waves completed: 2
@@ -32,8 +34,9 @@ Kills by archetype: runner=2 swarm=2 armored=2 tank=1
 Damage intake totals: towers=5 walls=0
 Repairs totals: towers=5 walls=1
 Wave-clear bonus total: 60
+Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
 Economy totals: awarded=216 spentWalls=25 spentUpgrades=109 net=82 ending=82
 Structures: livingTowers=2 livingWalls=1 towerHp=200 wallHp=60 pathWearTotal=5
 Players (final):
-- p1 (Alpha) status=active delta=6 bonus=15 total=53 ending=53 towerLv=2 towerHp=100 walls=1 wallHp=60
-- p2 (Beta) status=active delta=-35 bonus=15 total=29 ending=29 towerLv=2 towerHp=100 walls=0 wallHp=0
+- p1 (Alpha) status=active delta=6 bonus=15 catchUp=0 swarmCapped=0 total=53 ending=53 towerLv=2 towerHp=100 walls=1 wallHp=60
+- p2 (Beta) status=active delta=-35 bonus=15 catchUp=0 swarmCapped=0 total=29 ending=29 towerLv=2 towerHp=100 walls=0 wallHp=0

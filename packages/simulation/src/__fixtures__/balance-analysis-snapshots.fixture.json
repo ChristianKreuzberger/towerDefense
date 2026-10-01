@@ -25,7 +25,9 @@
         "wallDamageIntake": 5,
         "towerRepairApplied": 2,
         "wallRepairApplied": 3,
-        "waveClearBonusAwarded": 0
+        "waveClearBonusAwarded": 0,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
@@ -45,7 +47,9 @@
         "wallDamageIntake": 9,
         "towerRepairApplied": 3,
         "wallRepairApplied": 4,
-        "waveClearBonusAwarded": 0
+        "waveClearBonusAwarded": 0,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "players": [
         {
@@ -66,7 +70,11 @@
           "wallCount": 0,
           "wallHealthTotal": 0,
           "waveClearBonusThisWave": 0,
-          "waveClearBonusTotal": 0
+          "waveClearBonusTotal": 0,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0
         },
         {
           "playerId": "p1",
@@ -86,7 +94,11 @@
           "wallCount": 1,
           "wallHealthTotal": 13,
           "waveClearBonusThisWave": 0,
-          "waveClearBonusTotal": 0
+          "waveClearBonusTotal": 0,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0
         }
       ],
       "totals": {
@@ -105,7 +117,11 @@
         "totalWallHealth": 13,
         "mapPathWearTotal": 6,
         "waveClearBonusThisWave": 0,
-        "waveClearBonusTotal": 0
+        "waveClearBonusTotal": 0,
+        "catchUpBonusThisWave": 0,
+        "catchUpBonusTotal": 0,
+        "swarmIncomeCappedThisWave": 0,
+        "swarmIncomeCappedTotal": 0
       }
     },
     {
@@ -133,7 +149,9 @@
         "wallDamageIntake": 4,
         "towerRepairApplied": 1,
         "wallRepairApplied": 1,
-        "waveClearBonusAwarded": 0
+        "waveClearBonusAwarded": 0,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
@@ -153,7 +171,9 @@
         "wallDamageIntake": 4,
         "towerRepairApplied": 1,
         "wallRepairApplied": 1,
-        "waveClearBonusAwarded": 0
+        "waveClearBonusAwarded": 0,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "players": [
         {
@@ -174,7 +194,11 @@
           "wallCount": 1,
           "wallHealthTotal": 10,
           "waveClearBonusThisWave": 0,
-          "waveClearBonusTotal": 0
+          "waveClearBonusTotal": 0,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0
         },
         {
           "playerId": "p1",
@@ -194,7 +218,11 @@
           "wallCount": 1,
           "wallHealthTotal": 12,
           "waveClearBonusThisWave": 0,
-          "waveClearBonusTotal": 0
+          "waveClearBonusTotal": 0,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0
         }
       ],
       "totals": {
@@ -213,7 +241,11 @@
         "totalWallHealth": 22,
         "mapPathWearTotal": 4,
         "waveClearBonusThisWave": 0,
-        "waveClearBonusTotal": 0
+        "waveClearBonusTotal": 0,
+        "catchUpBonusThisWave": 0,
+        "catchUpBonusTotal": 0,
+        "swarmIncomeCappedThisWave": 0,
+        "swarmIncomeCappedTotal": 0
       }
     }
   ]
