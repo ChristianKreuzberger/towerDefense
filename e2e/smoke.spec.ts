@@ -846,3 +846,23 @@ test("the map preview blocks placement, closes with Esc, and does not reappear o
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(dialog).toBeHidden();
 });
+
+test("starting further matches replaces the board instead of leaking canvases and tooltips", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await startMatch(page, "/");
+  for (let round = 0; round < 3; round += 1) {
+    await page.getByRole("button", { name: "Back To Menu" }).click();
+    await page.getByRole("button", { name: "Start Match" }).click();
+    await expect(page.locator("#gameScreen")).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator("#mapPreviewRoot")).toBeHidden();
+    await expect(page.locator("#board canvas")).toHaveCount(1);
+    await expect(page.locator("#board .tower-tooltip")).toHaveCount(1);
+  }
+
+  // The fresh board still takes clicks: placing a tower works after the replacements.
+  await clickBuildableCell(page);
+  await expect(page.locator("#status")).toHaveText("accepted");
+  expect(pageErrors).toEqual([]);
+});
