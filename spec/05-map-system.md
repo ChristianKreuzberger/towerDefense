@@ -61,7 +61,7 @@ Hand-built `GameMap` objects in tests are not validated unless a test calls `val
 
 - There is one shared lane from the cave to the goal. Creatures walk it and attack whatever is in range while moving (spec/02); they never leave it to chase a tower.
 - The route is the shortest walkable path from spawn to goal with all live towers and all walls as obstacles. It does not depend on the order of the tower list.
-- The route is computed when a wave starts and recomputed whenever a wall or a tower is destroyed during the wave. Creatures already on the lane keep their cell: each is re-anchored to the closest cell of the new route (ties go to the earlier cell), so a recompute never makes a creature jump.
+- The route is computed when a wave starts and recomputed whenever a wall or a tower is destroyed during the wave. Creatures already on the lane keep their cell when it is still on the new route; otherwise (for example a destroyed wall opens a shortcut that bypasses it) each snaps to the closest cell of the new route (ties go to the earlier cell).
 - Each spawned creature gets a `targetTowerId` from the live towers: round robin by spawn ordinal over the live towers sorted by id (`tower-missing` only when no tower is alive). It is a sticky preference for attack target selection and only counts while that tower is in range, so it never changes the route.
 - If a player's tower is destroyed or the first tower is gone, routing and spawning keep working for the remaining towers.
 
