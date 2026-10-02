@@ -3867,6 +3867,74 @@ test("when the route is recomputed mid-wave, live creatures stay on their own ce
   assert.deepEqual({ x: anchored?.x, y: anchored?.y }, cell);
 });
 
+test("a creature cut off from its route cell is re-anchored by walking distance and moved onto the new route", () => {
+  const simulation = createSinglePlayerWaveSimulation(31);
+  tickUntil(simulation, () => simulation.getSnapshot().creatures.length > 0 && simulation.getSnapshot().waveTick > 12, 60);
+  const internals = simulation as unknown as {
+    state: {
+      creatures: Array<{ x: number; y: number; pathIndex: number; pathProgressUnits: number }>;
+      walls: Array<{ id: string; playerId: string; x: number; y: number; hp: number; maxHp: number }>;
+    };
+    currentWavePath: Array<{ x: number; y: number }>;
+    refreshCreatureRoute(): void;
+  };
+  const snapshot = simulation.getSnapshot();
+  const walkable = new Set(snapshot.map.cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
+  const towers = new Set(snapshot.towers.map((tower) => `${tower.x},${tower.y}`));
+  const walkingDistance = (from: { x: number; y: number }, to: { x: number; y: number }, wall: { x: number; y: number }): number => {
+    const seen = new Map<string, number>([[`${from.x},${from.y}`, 0]]);
+    const queue = [from];
+    for (let i = 0; i < queue.length; i += 1) {
+      const cell = queue[i]!;
+      const dist = seen.get(`${cell.x},${cell.y}`)!;
+      if (cell.x === to.x && cell.y === to.y) {
+        return dist;
+      }
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const next = { x: cell.x + dx, y: cell.y + dy };
+        const key = `${next.x},${next.y}`;
+        if (walkable.has(key) && !towers.has(key) && key !== `${wall.x},${wall.y}` && !seen.has(key)) {
+          seen.set(key, dist + 1);
+          queue.push(next);
+        }
+      }
+    }
+    return Number.POSITIVE_INFINITY;
+  };
+
+  const creature = internals.state.creatures[0]!;
+  const original = [...internals.currentWavePath];
+  let reanchored = 0;
+  // Block each route cell in turn; where the maze offers a detour, the cells it bypasses leave the route.
+  for (let blockIndex = 2; blockIndex < original.length - 2; blockIndex += 1) {
+    const blocked = original[blockIndex]!;
+    internals.state.walls = [{ id: "wall-test", playerId: "p1", x: blocked.x, y: blocked.y, hp: 1, maxHp: 1 }];
+    internals.refreshCreatureRoute();
+    const detour = new Set(internals.currentWavePath.map((cell) => `${cell.x},${cell.y}`));
+    const bypassed = original.slice(blockIndex + 1).find((cell) => !detour.has(`${cell.x},${cell.y}`));
+    if (!bypassed) {
+      continue;
+    }
+    // Put the creature on a cell the detour no longer uses, then recompute the route as a destroyed wall would.
+    internals.state.walls = [];
+    internals.refreshCreatureRoute();
+    internals.state.walls = [{ id: "wall-test", playerId: "p1", x: blocked.x, y: blocked.y, hp: 1, maxHp: 1 }];
+    Object.assign(creature, { x: bypassed.x, y: bypassed.y, pathProgressUnits: 500 });
+    internals.refreshCreatureRoute();
+    const anchor = internals.currentWavePath[creature.pathIndex]!;
+    assert.deepEqual({ x: creature.x, y: creature.y }, { x: anchor.x, y: anchor.y }, "x/y follow the new anchor");
+    assert.equal(creature.pathProgressUnits, 0, "progress resets when the creature moves to another cell");
+    const nearestByWalking = Math.min(
+      ...internals.currentWavePath.map((cell) => walkingDistance(bypassed, cell, blocked))
+    );
+    assert.equal(walkingDistance(bypassed, anchor, blocked), nearestByWalking, "anchor is the closest route cell by walking distance");
+    reanchored += 1;
+    internals.state.walls = [];
+    internals.refreshCreatureRoute();
+  }
+  assert.ok(reanchored > 0, "expected the maze to offer at least one detour");
+});
+
 test("move-tower and set-damage-type reject eliminated players", () => {
   const eliminated = createPrepMatchWithTower(31);
   jumpToWave(eliminated, 6);

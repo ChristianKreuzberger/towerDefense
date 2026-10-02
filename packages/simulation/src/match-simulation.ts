@@ -770,20 +770,71 @@ export class MatchSimulation {
   private refreshCreatureRoute(): void {
     this.currentWavePath.length = 0;
     this.currentWavePath.push(...getOpenPathForCreatures(this.state.map, this.state.towers, this.state.walls));
-    // Creatures keep their cell when the route changes: re-anchor each one to the closest cell of the new route
-    // (ties go to the earlier cell), so a freed or newly blocked cell never makes them jump along the lane.
+    // Creatures keep their cell when the route changes. One that is no longer on the route moves to the closest route
+    // cell by walking distance (not straight-line: in the maze that picks a neighbouring corridor), ties to the earlier cell.
+    const routeIndexByCell = new Map<string, number>();
+    this.currentWavePath.forEach((cell, index) => routeIndexByCell.set(toCellKey(cell.x, cell.y), index));
     for (const creature of this.state.creatures) {
-      let best = 0;
-      let bestDistance = Number.POSITIVE_INFINITY;
-      this.currentWavePath.forEach((cell, index) => {
-        const distance = Math.hypot(cell.x - creature.x, cell.y - creature.y);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = index;
-        }
-      });
-      creature.pathIndex = best;
+      const onRoute = routeIndexByCell.get(toCellKey(creature.x, creature.y));
+      if (onRoute !== undefined) {
+        creature.pathIndex = onRoute;
+        continue;
+      }
+      const anchor = this.findClosestRouteIndexByWalking(creature, routeIndexByCell);
+      const cell = this.currentWavePath[anchor];
+      creature.pathIndex = anchor;
+      if (cell) {
+        creature.x = cell.x;
+        creature.y = cell.y;
+      }
+      creature.pathProgressUnits = 0;
     }
+  }
+
+  // BFS over the cells the route may use, level by level so the earliest route index wins among equally near cells.
+  private findClosestRouteIndexByWalking(
+    from: { x: number; y: number; pathIndex: number },
+    routeIndexByCell: Map<string, number>
+  ): number {
+    const walkable = new Set<string>();
+    for (const cell of this.state.map.cells) {
+      if (cell.buildable) {
+        walkable.add(toCellKey(cell.x, cell.y));
+      }
+    }
+    for (const tower of this.state.towers) {
+      walkable.delete(toCellKey(tower.x, tower.y));
+    }
+    for (const wall of this.state.walls) {
+      walkable.delete(toCellKey(wall.x, wall.y));
+    }
+    const seen = new Set<string>([toCellKey(from.x, from.y)]);
+    let level = [{ x: from.x, y: from.y }];
+    while (level.length > 0) {
+      let best: number | undefined;
+      const next: Array<{ x: number; y: number }> = [];
+      for (const cell of level) {
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const neighbor = { x: cell.x + dx, y: cell.y + dy };
+          const key = toCellKey(neighbor.x, neighbor.y);
+          if (seen.has(key) || !walkable.has(key)) {
+            continue;
+          }
+          seen.add(key);
+          const index = routeIndexByCell.get(key);
+          if (index !== undefined && (best === undefined || index < best)) {
+            best = index;
+          }
+          next.push(neighbor);
+        }
+      }
+      if (best !== undefined) {
+        return best;
+      }
+      level = next;
+    }
+    // Sealed in by obstacles: keep the old index, clamped to the new route.
+    return Math.min(from.pathIndex, Math.max(0, this.currentWavePath.length - 1));
   }
 
   private getWaveSpawnPlan(): WaveSpawnPlan {
