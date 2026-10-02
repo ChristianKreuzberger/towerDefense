@@ -71,6 +71,8 @@ export async function fetchSnapshot(options?: FetchSnapshotOptions): Promise<Mat
 
 export function startFreshMatch(wire: WireSnapshot): void {
   resetMatchCaches();
+  // Drop the replaced match so the mode resets below never re-render it into the new scene or diff effects against it.
+  store.current = null;
   rebuildBattlefield();
   store.cursorChosen = false;
   store.guideDismissedKey = null;
@@ -80,8 +82,10 @@ export function startFreshMatch(wire: WireSnapshot): void {
   setMoveMode(false);
   applyWireSnapshot(wire, ++store.requestSeq);
   // A new match (menu Start or Rematch) opens with the preview; a reconnect never reaches this function.
-  if (store.current && store.current.phase === "placement") {
-    mapPreview.open(store.current);
+  // Re-read through a copy of the store reference: TypeScript still narrows store.current to null after the reset above.
+  const fresh = (store as { current: MatchSnapshot | null }).current;
+  if (fresh && fresh.phase === "placement") {
+    mapPreview.open(fresh);
   }
 }
 

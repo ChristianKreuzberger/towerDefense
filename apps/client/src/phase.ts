@@ -110,7 +110,11 @@ export function renderPhase(snapshot: MatchSnapshot | null): void {
 
   el.phaseLabel.textContent = label;
   el.phaseSub.textContent = sub;
-  el.wavePreview.textContent = snapshot.phase === "placement" ? formatWavePreview(snapshot.wave) : "";
+  // The element is an aria-live region: rewriting identical text can make screen readers announce it again.
+  const preview = snapshot.phase === "placement" ? formatWavePreview(snapshot.wave) : "";
+  if (el.wavePreview.textContent !== preview) {
+    el.wavePreview.textContent = preview;
+  }
   el.shortcutBar.style.display = snapshot.phase === "ended" ? "none" : "flex";
 
   if (snapshot.phase === "wave") {
