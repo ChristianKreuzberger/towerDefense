@@ -75,9 +75,10 @@ test("move-tower validates ids and coordinates like placement", () => {
   const api = startedApi();
   assertRejected(command(api, { type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 1.5, y: 2 }), "invalid-coordinates");
   assertRejected(command(api, { type: "move-tower", playerId: "p1", x: 1, y: 2 }), "invalid-command");
-  // Well-formed but locked this early: a normal command rejection, not a validation error.
+  // Well-formed but without a tower to move: a normal command rejection, not a validation error.
   const locked = command(api, { type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 1, y: 2 });
   assert.equal(locked.status, 200);
+  assert.deepEqual((locked.payload as { result: unknown }).result, { accepted: false, reason: "invalid-move-target" });
 });
 
 test("a missing or unsupported command is rejected with invalid-command", () => {
@@ -94,6 +95,8 @@ test("upgrade-tower needs a known track", () => {
   }
   const response = command(api, { type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" });
   assert.equal(response.status, 200);
+  // A valid track passes validation; with no tower placed yet the simulation rejects it normally.
+  assert.equal((response.payload as { result: { accepted: boolean } }).result.accepted, false);
 });
 
 test("duplicate player ids are rejected", () => {

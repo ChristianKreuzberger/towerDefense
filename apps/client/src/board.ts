@@ -37,8 +37,11 @@ export const battlefieldMount: BattlefieldMount = {
 
 // A new match or rematch starts on a fresh Phaser game, so no scene state, listener or canvas outlives the match.
 export function rebuildBattlefield(): void {
-  mount.destroy();
-  mount = mountBattlefield();
+  // Build the new game first: if Phaser fails to start, the old mount stays the (working) current one.
+  const next = mountBattlefield();
+  const previous = mount;
+  mount = next;
+  previous.destroy();
 }
 
 export function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs = 0, events: MatchEvent[] = []): void {

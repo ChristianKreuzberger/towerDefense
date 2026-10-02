@@ -3838,3 +3838,45 @@ test("set-damage-type is rejected once the player is ready while others still pr
     { accepted: true }
   );
 });
+
+test("a snapshot is a copy: later upgrades do not change an earlier snapshot's tower", () => {
+  const simulation = createPrepMatchWithTower(15);
+  simulation.awardPoints("p1", 200);
+  const before = simulation.getSnapshot();
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
+  assert.deepEqual(before.towers[0]?.upgrades, { range: 1, damage: 1, accuracy: 1 });
+  assert.equal(before.towers[0]?.level, 1);
+  assert.deepEqual(simulation.getSnapshot().towers[0]?.upgrades, { range: 1, damage: 2, accuracy: 1 });
+});
+
+test("when the route is recomputed mid-wave, live creatures stay on their own cell", () => {
+  const simulation = createSinglePlayerWaveSimulation(31);
+  tickUntil(simulation, () => simulation.getSnapshot().creatures.length > 0 && simulation.getSnapshot().waveTick > 12, 60);
+  const internals = simulation as unknown as {
+    state: { creatures: Array<{ x: number; y: number; pathIndex: number }> };
+    currentWavePath: Array<{ x: number; y: number }>;
+    refreshCreatureRoute(): void;
+  };
+  const creature = internals.state.creatures[0];
+  assert.ok(creature && creature.pathIndex > 0);
+  const cell = { x: creature.x, y: creature.y };
+  // A stale index (as after a route change) must be re-anchored to the creature's own position on the new route.
+  creature.pathIndex = 0;
+  internals.refreshCreatureRoute();
+  const anchored = internals.currentWavePath[creature.pathIndex];
+  assert.deepEqual({ x: anchored?.x, y: anchored?.y }, cell);
+});
+
+test("move-tower and set-damage-type reject eliminated players", () => {
+  const eliminated = createPrepMatchWithTower(31);
+  jumpToWave(eliminated, 6);
+  (eliminated as unknown as { state: { players: Array<{ eliminated: boolean }> } }).state.players[0]!.eliminated = true;
+  assert.equal(
+    eliminated.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 5, y: 5 }).reason,
+    "player-eliminated"
+  );
+  assert.equal(
+    eliminated.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" }).reason,
+    "player-eliminated"
+  );
+});

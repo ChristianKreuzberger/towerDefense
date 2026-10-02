@@ -64,7 +64,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 
 ## Server event contracts
 
-- matchSnapshot
+- matchSnapshot (always carries `towers[].upgrades`, `players[].towerMoveAvailable` and `creaturesToSpawn`; the host serves current clients only)
 - entitySpawned
 - entityUpdated
 - entityRemoved
@@ -75,6 +75,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 - towerDamaged
 - towerDestroyed
 - towersAutoRepaired
+- towerMissed (`tower-miss`: a shot that missed), towerMoved (`tower-moved`), catchUpBonus (`catch-up-bonus`), swarmIncomeCapped (`swarm-income-capped`), waveClearBonus (`wave-clear-bonus`)
 - commandRejected
 - matchEnded
 

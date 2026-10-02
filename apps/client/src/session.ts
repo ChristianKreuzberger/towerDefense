@@ -77,6 +77,7 @@ export function startFreshMatch(wire: WireSnapshot): void {
   store.playing = true;
   syncPlaybackControls();
   setWallMode(false);
+  setMoveMode(false);
   applyWireSnapshot(wire, ++store.requestSeq);
   // A new match (menu Start or Rematch) opens with the preview; a reconnect never reaches this function.
   if (store.current && store.current.phase === "placement") {

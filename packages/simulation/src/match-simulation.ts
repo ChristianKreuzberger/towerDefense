@@ -731,7 +731,7 @@ export class MatchSimulation {
         ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {}),
         ...(this.state.map.goal ? { goal: { ...this.state.map.goal } } : {})
       },
-      towers: this.state.towers.map((tower) => ({ ...tower })),
+      towers: this.state.towers.map((tower) => ({ ...tower, upgrades: { ...tower.upgrades } })),
       walls: this.state.walls.map((wall) => ({ ...wall })),
       creatures: this.state.creatures.map((creature) => ({ ...creature })),
       targetAssignments: this.state.targetAssignments.map((assignment) => ({ ...assignment })),
@@ -770,6 +770,20 @@ export class MatchSimulation {
   private refreshCreatureRoute(): void {
     this.currentWavePath.length = 0;
     this.currentWavePath.push(...getOpenPathForCreatures(this.state.map, this.state.towers, this.state.walls));
+    // Creatures keep their cell when the route changes: re-anchor each one to the closest cell of the new route
+    // (ties go to the earlier cell), so a freed or newly blocked cell never makes them jump along the lane.
+    for (const creature of this.state.creatures) {
+      let best = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      this.currentWavePath.forEach((cell, index) => {
+        const distance = Math.hypot(cell.x - creature.x, cell.y - creature.y);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = index;
+        }
+      });
+      creature.pathIndex = best;
+    }
   }
 
   private getWaveSpawnPlan(): WaveSpawnPlan {
