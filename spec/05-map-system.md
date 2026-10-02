@@ -25,7 +25,8 @@ Not part of the schema (documented decisions): multiple lanes, per-tower routes,
 
 - `schemaVersion` is supported
 - width and height are positive integers and the cell count equals width x height
-- every cell is inside the grid and no coordinate appears twice
+- `cells` is an array; every cell sits on a whole-number position inside the grid and no coordinate appears twice
+- every cell has a boolean `buildable` and a finite `pathWear` from 0 to the maximum wear (`invalid-cell` otherwise)
 - the spawn is on the left edge and on a buildable cell
 - the goal is on the right edge and on a buildable cell
 - the goal can be reached from the spawn over buildable cells

@@ -1,3 +1,4 @@
+import { PATH_CELL_MAX_WEAR } from "./game-rules.js";
 import { MAP_SCHEMA_VERSION, isInSpawnProtection, type GameMap } from "./map-types.js";
 
 export type MapValidationErrorCode =
@@ -5,6 +6,7 @@ export type MapValidationErrorCode =
   | "invalid-dimensions"
   | "cell-count-mismatch"
   | "cell-out-of-bounds"
+  | "invalid-cell"
   | "duplicate-cell"
   | "spawn-missing"
   | "spawn-not-on-left-edge"
@@ -76,6 +78,12 @@ export function validateGameMap(map: GameMap): MapValidationError[] {
     add("unsupported-schema-version", `schemaVersion ${String(map.schemaVersion)} is not supported`);
   }
 
+  if (!Array.isArray(map.cells)) {
+    // Nothing below can run without a list of cells.
+    add("cell-count-mismatch", "cells must be an array");
+    return errors;
+  }
+
   if (!Number.isInteger(map.width) || !Number.isInteger(map.height) || map.width <= 0 || map.height <= 0) {
     add("invalid-dimensions", `width and height must be positive integers, got ${map.width}x${map.height}`);
   } else if (map.cells.length !== map.width * map.height) {
@@ -85,8 +93,19 @@ export function validateGameMap(map: GameMap): MapValidationError[] {
   const buildable = new Set<string>();
   const seen = new Set<string>();
   for (const cell of map.cells) {
-    if (cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height) {
-      add("cell-out-of-bounds", `cell ${key(cell.x, cell.y)} is outside the grid`);
+    if (
+      !Number.isInteger(cell.x) || !Number.isInteger(cell.y)
+      || cell.x < 0 || cell.y < 0 || cell.x >= map.width || cell.y >= map.height
+    ) {
+      add("cell-out-of-bounds", `cell ${key(cell.x, cell.y)} is not a whole-number position inside the grid`);
+      continue;
+    }
+    if (
+      typeof cell.buildable !== "boolean"
+      || typeof cell.pathWear !== "number" || !Number.isFinite(cell.pathWear)
+      || cell.pathWear < 0 || cell.pathWear > PATH_CELL_MAX_WEAR
+    ) {
+      add("invalid-cell", `cell ${key(cell.x, cell.y)} needs a boolean buildable and a pathWear from 0 to ${PATH_CELL_MAX_WEAR}`);
       continue;
     }
     if (seen.has(key(cell.x, cell.y))) {

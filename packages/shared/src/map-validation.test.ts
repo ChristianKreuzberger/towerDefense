@@ -84,3 +84,25 @@ test("findTowerSites returns only pads that creatures cannot walk to, outside th
   // Open cells beside the lane are walkable, so they are not sites.
   assert.deepEqual(findTowerSites(mapFrom([lane, lane, lane], { spawn: { x: 0, y: 1 }, goal: { x: 11, y: 1 } })), []);
 });
+
+test("rejects fractional cell coordinates", () => {
+  const map = mapFrom(VALID_ROWS);
+  map.cells[2] = { x: 0.5, y: 0, buildable: false, pathWear: 0 };
+  assert.ok(codes(map).includes("cell-out-of-bounds"));
+});
+
+test("rejects a non-boolean buildable flag and a bad pathWear", () => {
+  const badBuildable = mapFrom(VALID_ROWS);
+  badBuildable.cells[0] = { x: 0, y: 0, buildable: "yes" as unknown as boolean, pathWear: 0 };
+  assert.ok(codes(badBuildable).includes("invalid-cell"));
+  for (const pathWear of [Number.NaN, -1, 9, Number.POSITIVE_INFINITY, "3" as unknown as number]) {
+    const map = mapFrom(VALID_ROWS);
+    map.cells[0] = { x: 0, y: 0, buildable: false, pathWear };
+    assert.ok(codes(map).includes("invalid-cell"), `pathWear ${String(pathWear)}`);
+  }
+});
+
+test("a non-array cells value returns an error instead of throwing", () => {
+  const map = { ...mapFrom(VALID_ROWS), cells: null as unknown as GameMap["cells"] };
+  assert.ok(codes(map).includes("cell-count-mismatch"));
+});
