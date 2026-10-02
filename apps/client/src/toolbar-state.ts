@@ -23,7 +23,7 @@ export interface ToolbarState {
   readyEnabled: boolean;
   placeTowerEnabled: boolean;
   moveEnabled: boolean;
-  // What the move button's cost slot shows: "free", "after R5" (still locked), "used", or "-" outside prep.
+  // What the move button's cost slot shows: "free", "after R5" (still locked), "used", "ready" or "-" outside prep.
   moveLabel: string;
   // Why the move button is off right now (empty when it is available).
   moveHint: string;
@@ -34,10 +34,12 @@ function moveInfo(input: ToolbarInput): { label: string; hint: string } {
   if (input.phase !== "placement" || input.upgrades === null || input.eliminated) {
     return { label: "-", hint: "You can only move your tower during prep" };
   }
+  // Before the token check: the simulation reports no move for a ready player, so the snapshot cannot tell used from ready.
+  if (input.readyForWave && input.wave > TOWER_MOVE_AFTER_WAVES) {
+    return { label: "ready", hint: "You can only move your tower before you ready up (if you have not used your free move yet)" };
+  }
   if (input.towerMoveAvailable) {
-    return input.readyForWave
-      ? { label: "ready", hint: "You are ready; you can only move your tower before you ready up" }
-      : { label: "free", hint: "" };
+    return { label: "free", hint: "" };
   }
   return input.wave <= TOWER_MOVE_AFTER_WAVES
     ? { label: `after R${TOWER_MOVE_AFTER_WAVES}`, hint: `Moving your tower unlocks after round ${TOWER_MOVE_AFTER_WAVES}` }

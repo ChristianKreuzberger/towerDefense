@@ -131,7 +131,8 @@ Damage type selector
 Move tower
 - A "Move Tower" button (hotkey `V`, cost shown as "free") appears in the toolbar. It is available only when the simulation would accept a move (`towerMoveAvailable` for the player, prep phase, not ready); before the unlock it is dimmed and a press explains "unlocks after round 5"
 - Pressing it enters move mode (like wall mode: the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted, the phase changes or the active player changes
-- The tower glides to its new tile with a short pop; the used token is shown by the button reading "used"
+- The tower glides to its new tile with a short pop
+- Cost-slot label (from state, never from DOM text): `free` (move available), `after R5` (locked, wave 5 or earlier), `used` (unlocked, not ready, token spent), `ready` (unlocked and the player is ready; the snapshot cannot tell a spent token from an unspent one, so the hint is hedged: "You can only move your tower before you ready up (if you have not used your free move yet)"), and `-` outside prep, with no living tower or when eliminated. The `ready` check comes before the token check because the simulation reports `towerMoveAvailable: false` for a ready player
 
 Match lifecycle and hotkeys
 - "Back To Menu" leaves the match running on the host and stops playback. While a match that has not ended exists, the menu shows a "Resume Match" button that returns to it

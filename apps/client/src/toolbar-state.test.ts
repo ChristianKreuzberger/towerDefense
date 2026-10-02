@@ -70,7 +70,7 @@ test("the move button follows the token: locked early, free when unlocked, used 
   assert.deepEqual([getToolbarState(prep).moveEnabled, getToolbarState(prep).moveLabel], [false, "after R5"]);
   const unlocked = { ...prep, wave: 6, towerMoveAvailable: true };
   assert.deepEqual([getToolbarState(unlocked).moveEnabled, getToolbarState(unlocked).moveLabel], [true, "free"]);
-  assert.equal(getToolbarState({ ...unlocked, readyForWave: true }).moveEnabled, false);
+  assert.equal(getToolbarState({ ...unlocked, towerMoveAvailable: false, readyForWave: true }).moveEnabled, false);
   const used = { ...prep, wave: 7, towerMoveAvailable: false };
   assert.deepEqual([getToolbarState(used).moveEnabled, getToolbarState(used).moveLabel], [false, "used"]);
   assert.equal(getToolbarState({ ...unlocked, phase: "wave" }).moveLabel, "-");
@@ -88,9 +88,11 @@ test("damage type is selectable only in prep, before ready, with a living tower"
 
 test("the move button explains why it is off, from state", () => {
   assert.match(getToolbarState(prep).moveHint, /unlocks after round 5/);
-  const ready = getToolbarState({ ...prep, wave: 6, towerMoveAvailable: true, readyForWave: true });
+  // The simulation reports towerMoveAvailable: false for a ready player, so that is the input to test.
+  const ready = getToolbarState({ ...prep, wave: 6, towerMoveAvailable: false, readyForWave: true });
   assert.equal(ready.moveLabel, "ready");
   assert.match(ready.moveHint, /before you ready/);
+  assert.equal(getToolbarState({ ...prep, wave: 3, towerMoveAvailable: false, readyForWave: true }).moveLabel, "after R5");
   assert.match(getToolbarState({ ...prep, wave: 8 }).moveHint, /already used/);
   assert.equal(getToolbarState({ ...prep, wave: 6, towerMoveAvailable: true }).moveHint, "");
   assert.match(getToolbarState({ ...prep, phase: "wave" }).moveHint, /during prep/);
