@@ -20,7 +20,7 @@ const requester: GameRequester = inBrowserServer
       const { localRequest } = await import("./local-host.js");
       return localRequest(method, path, payload);
     }
-  : createFetchRequester(apiBase());
+  : createFetchRequester(apiBase(), undefined, { timeoutMs: 10_000 });
 
 const client = createGameClient(requester, { onResponseText: (text) => perfRecordBytes(text.length) });
 

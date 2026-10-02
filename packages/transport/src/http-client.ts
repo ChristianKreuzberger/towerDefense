@@ -19,13 +19,29 @@ interface ErrorFields {
   message?: string;
 }
 
-export function createFetchRequester(baseUrl: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): GameRequester {
+export function createFetchRequester(
+  baseUrl: string,
+  fetchImpl: typeof fetch = (...args) => fetch(...args),
+  options?: { timeoutMs?: number }
+): GameRequester {
   const base = baseUrl.replace(/\/$/, "");
+  const timeoutMs = options?.timeoutMs;
   return async (method, path, payload) => {
-    const response = await fetchImpl(`${base}${path}`, method === "POST"
+    // A host that never answers would leave the caller's in-flight guards set forever, so a timeout aborts the request.
+    const controller = timeoutMs === undefined ? undefined : new AbortController();
+    const timer = controller && setTimeout(() => controller.abort(), timeoutMs);
+    const init: RequestInit | undefined = method === "POST"
       ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
-      : undefined);
-    return { ok: response.ok, text: await response.text() };
+      : undefined;
+    try {
+      const response = await fetchImpl(
+        `${base}${path}`,
+        controller ? { ...init, signal: controller.signal } : init
+      );
+      return { ok: response.ok, text: await response.text() };
+    } finally {
+      clearTimeout(timer);
+    }
   };
 }
 
@@ -33,9 +49,15 @@ export function createGameClient(request: GameRequester, options?: { onResponseT
   async function send<T>(method: "GET" | "POST", path: string, payload?: unknown): Promise<T> {
     const { ok, text } = await request(method, path, payload);
     options?.onResponseText?.(text);
-    const data = JSON.parse(text) as T & ErrorFields;
-    if (!ok || data.ok === false) {
-      throw new Error(data.message ?? data.error ?? "request-failed");
+    // An HTML error page, an empty body or `null` must not surface as a raw SyntaxError/TypeError.
+    let data: (T & ErrorFields) | null;
+    try {
+      data = JSON.parse(text) as T & ErrorFields;
+    } catch {
+      data = null;
+    }
+    if (!ok || data === null || typeof data !== "object" || data.ok === false) {
+      throw new Error(data?.message ?? data?.error ?? "request-failed");
     }
     return data;
   }

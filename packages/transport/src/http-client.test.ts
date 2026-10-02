@@ -37,3 +37,31 @@ test("game client throws the host message for failed responses", async () => {
   const unnamed = createGameClient(async () => ({ ok: false, text: "{}" }));
   await assert.rejects(() => unnamed.get("/x"), /request-failed/);
 });
+
+test("game client reports request-failed for non-JSON, empty or null bodies", async () => {
+  for (const text of ["<html>502</html>", "", "null"]) {
+    for (const ok of [true, false]) {
+      const client = createGameClient(async () => ({ ok, text }));
+      await assert.rejects(() => client.get("/x"), /request-failed/, `ok=${ok} text=${text}`);
+    }
+  }
+});
+
+test("fetch requester aborts a request that outlives its timeout", async () => {
+  const hangingFetch = ((_url: string, init?: RequestInit) =>
+    new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+    })) as unknown as typeof fetch;
+  const request = createFetchRequester("http://host", hangingFetch, { timeoutMs: 10 });
+  await assert.rejects(() => request("GET", "/api/snapshot"), /aborted/);
+});
+
+test("fetch requester without a timeout sends no abort signal", async () => {
+  let signal: AbortSignal | null | undefined = null;
+  const fakeFetch = (async (_url: string, init?: RequestInit) => {
+    signal = init?.signal;
+    return { ok: true, text: async () => "{}" };
+  }) as unknown as typeof fetch;
+  await createFetchRequester("http://host", fakeFetch)("POST", "/x", {});
+  assert.equal(signal, undefined);
+});
