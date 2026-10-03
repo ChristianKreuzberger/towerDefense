@@ -25,6 +25,10 @@ export const CREATURE_PROXIMITY_DAMAGE_BANDS = [
   { maxDistance: 3.5, multiplier: 1 }
 ] as const;
 
+// Play-testing (issue #84) found the game too easy, so every creature hit lands 20% harder.
+// Applied to the final hit and rounded, so tower health stays an integer.
+export const CREATURE_ATTACK_DAMAGE_SCALE = 1.2;
+
 // Damage multiplier per archetype and damage type: 0.5 resists, 1 neutral, 1.5 weak. Data, not simulation logic.
 export const CREATURE_DAMAGE_MULTIPLIERS: Record<CreatureArchetype, Record<DamageType, number>> = {
   runner: { physical: 1.5, explosive: 1, magic: 0.5 },
@@ -88,7 +92,7 @@ export function getCreatureAttackDamageAt(
   const dy = from.y - to.y;
   const squaredDistance = dx * dx + dy * dy;
   const band = CREATURE_PROXIMITY_DAMAGE_BANDS.find((entry) => squaredDistance <= entry.maxDistance * entry.maxDistance);
-  return band ? getCreatureAttackDamage(archetype) * band.multiplier : 0;
+  return band ? Math.round(getCreatureAttackDamage(archetype) * band.multiplier * CREATURE_ATTACK_DAMAGE_SCALE) : 0;
 }
 
 export interface Creature {
