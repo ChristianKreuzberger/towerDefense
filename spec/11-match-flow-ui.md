@@ -16,6 +16,12 @@
 3. Ask each player to place exactly one tower
 4. Prevent wave start until all required towers are placed
 
+How-to-play tour
+- A short step-by-step dialog (goal, prep, combat, between waves, controls) that explains the game. It is shown automatically before the map preview the first time a match starts in this browser (menu Start Match or Rematch, never on reconnect). Dismissing it, by finishing, "Skip tour" or Esc, marks it as seen (spec/08), so later matches go straight to the map preview
+- A "How to play" button in the main menu actions (`#menuTourBtn`) and in the match session row (`#tourBtn`) reopens it at any time; opened that way it only closes and returns focus to the opener, it does not open the map preview
+- Controls: Back, Next (on the last step "Start playing"), Skip tour, and a "Step n of N" indicator. Numbers in the text (win score, starting points, wave-clear bonus, round of the free move) come from the shared rules, never a client copy
+- Same dialog pattern as the map preview: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside, game hotkeys are ignored while it is open
+
 Map preview step
 - Shown as a dialog over the board right after a new match (menu Start Match or Rematch) has been generated. It is not shown when the client reconnects to a running match
 - Content: a small overview of the generated map (tower pads, the lane creatures walk, blocked ground, the monster cave and its protected no-build area, with a legend). The lane is the set of buildable cells connected to the cave; other buildable cells are tower pads, the seed and size, and the player list with each player's colour/number and name

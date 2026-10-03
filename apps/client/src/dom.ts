@@ -26,6 +26,8 @@ export const el = {
   menuMessage: must<HTMLElement>("menuMessage"),
   menuSettingsBtn: must<HTMLButtonElement>("menuSettingsBtn"),
   settingsBtn: must<HTMLButtonElement>("settingsBtn"),
+  menuTourBtn: must<HTMLButtonElement>("menuTourBtn"),
+  tourBtn: must<HTMLButtonElement>("tourBtn"),
   menuStartBtn: must<HTMLButtonElement>("menuStartBtn"),
   menuRefreshBtn: must<HTMLButtonElement>("menuRefreshBtn"),
   menuResumeBtn: must<HTMLButtonElement>("menuResumeBtn"),

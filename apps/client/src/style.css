@@ -1155,6 +1155,24 @@ label .hint {
   display: none;
 }
 
+.tour-modal {
+  width: min(460px, 92vw);
+}
+
+.tour-body p {
+  margin: 0 0 10px;
+  line-height: 1.45;
+}
+
+.tour-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.tour-actions [hidden] {
+  display: none;
+}
+
 .map-preview-canvas {
   display: block;
   width: min(100%, 320px);

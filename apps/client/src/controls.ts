@@ -14,7 +14,7 @@ import { renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
 import { configurePlayback, setPlaybackSpeed, setPlaying } from "./playback";
 import { playerTowerId, selectedPlayerId } from "./player-util";
 import { setChipSelectHandler } from "./scoreboard";
-import { settingsDialog, soundEngine } from "./services";
+import { settingsDialog, soundEngine, tour } from "./services";
 import { advanceMany, advanceTicks, fetchSnapshot, rematchWithSamePlayers, sendCommand, startMatchFromMenu } from "./session";
 import { store } from "./state";
 import { applyActivePlayerChange, setActivePlayer } from "./turns";
@@ -164,6 +164,8 @@ export function installControls(): void {
 
   el.menuSettingsBtn.addEventListener("click", () => settingsDialog.open(el.menuSettingsBtn));
   el.settingsBtn.addEventListener("click", () => settingsDialog.open(el.settingsBtn));
+  el.menuTourBtn.addEventListener("click", () => tour.open({ opener: el.menuTourBtn }));
+  el.tourBtn.addEventListener("click", () => tour.open({ opener: el.tourBtn }));
 
   // Menu and in-match buttons share one click sound; data-sfx="none" opts out and any other value names a SoundId.
   app.addEventListener("click", (event) => {
