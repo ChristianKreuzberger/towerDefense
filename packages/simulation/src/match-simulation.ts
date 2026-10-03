@@ -64,6 +64,14 @@ import {
   createWaveTelemetrySnapshot
 } from "./telemetry.js";
 import { rollShot } from "./shot-roll.js";
+import {
+  compareFirst,
+  compareLast,
+  compareNearest,
+  compareStrongest,
+  getSquaredDistance,
+  isTowerBetterCreatureTarget
+} from "./targeting.js";
 
 interface InternalMatchState {
   phase: "placement" | "wave" | "ended";
@@ -945,7 +953,7 @@ export class MatchSimulation {
     // Squared comparison keeps the range check free of sqrt and float drift.
     const range = getTowerRange(tower.upgrades.range);
     const creatures = this.state.creatures
-      .filter((creature) => !this.isSpawnProtected(creature) && this.getSquaredDistance(tower, creature) <= range * range)
+      .filter((creature) => !this.isSpawnProtected(creature) && getSquaredDistance(tower, creature) <= range * range)
       .sort((a, b) => a.id.localeCompare(b.id));
     let best = creatures[0];
     if (!best) {
@@ -963,85 +971,18 @@ export class MatchSimulation {
 
   private isCreatureBetterTarget(tower: Tower, candidate: Creature, current: Creature): boolean {
     if (tower.targetMode === "first") {
-      return this.compareFirst(tower, candidate, current) < 0;
+      return compareFirst(tower, candidate, current) < 0;
     }
 
     if (tower.targetMode === "last") {
-      return this.compareLast(tower, candidate, current) < 0;
+      return compareLast(tower, candidate, current) < 0;
     }
 
     if (tower.targetMode === "strongest") {
-      return this.compareStrongest(tower, candidate, current) < 0;
+      return compareStrongest(tower, candidate, current) < 0;
     }
 
-    return this.compareNearest(tower, candidate, current) < 0;
-  }
-
-  private compareFirst(tower: Tower, a: Creature, b: Creature): number {
-    const pathIndexCompare = b.pathIndex - a.pathIndex;
-    if (pathIndexCompare !== 0) {
-      return pathIndexCompare;
-    }
-
-    return this.compareByFallbackOrder(tower, a, b);
-  }
-
-  private compareLast(tower: Tower, a: Creature, b: Creature): number {
-    const pathIndexCompare = a.pathIndex - b.pathIndex;
-    if (pathIndexCompare !== 0) {
-      return pathIndexCompare;
-    }
-
-    return this.compareByFallbackOrder(tower, a, b);
-  }
-
-  private compareStrongest(tower: Tower, a: Creature, b: Creature): number {
-    const hpCompare = b.hp - a.hp;
-    if (hpCompare !== 0) {
-      return hpCompare;
-    }
-
-    const pathIndexCompare = b.pathIndex - a.pathIndex;
-    if (pathIndexCompare !== 0) {
-      return pathIndexCompare;
-    }
-
-    return this.compareByFallbackOrder(tower, a, b);
-  }
-
-  private compareNearest(tower: Tower, a: Creature, b: Creature): number {
-    const distanceA = this.getSquaredDistance(tower, a);
-    const distanceB = this.getSquaredDistance(tower, b);
-    if (distanceA !== distanceB) {
-      return distanceA - distanceB;
-    }
-
-    const pathIndexCompare = b.pathIndex - a.pathIndex;
-    if (pathIndexCompare !== 0) {
-      return pathIndexCompare;
-    }
-
-    return this.compareByFallbackOrder(tower, a, b);
-  }
-
-  private compareByFallbackOrder(tower: Tower, a: Creature, b: Creature): number {
-    const spawnTickCompare = a.spawnTick - b.spawnTick;
-    if (spawnTickCompare !== 0) {
-      return spawnTickCompare;
-    }
-
-    const distanceCompare = this.getSquaredDistance(tower, a) - this.getSquaredDistance(tower, b);
-    if (distanceCompare !== 0) {
-      return distanceCompare;
-    }
-
-    return a.id.localeCompare(b.id);
-  }
-
-  private getSquaredDistance(tower: Tower, creature: Creature): number {
-    const dx = tower.x - creature.x;
-    const dy = tower.y - creature.y;
-    return (dx * dx) + (dy * dy);
+    return compareNearest(tower, candidate, current) < 0;
   }
 
   private getTowerDamage(tower: Tower): number {
@@ -1117,7 +1058,7 @@ export class MatchSimulation {
       return undefined;
     }
     for (const candidate of candidates.slice(1)) {
-      if (this.isTowerBetterCreatureTarget(creature, candidate, best)) {
+      if (isTowerBetterCreatureTarget(creature, candidate, best)) {
         best = candidate;
       }
     }
@@ -1125,28 +1066,8 @@ export class MatchSimulation {
     return best;
   }
 
-  private isTowerBetterCreatureTarget(creature: Creature, candidate: Tower, current: Tower): boolean {
-    const candidateDistance = this.getSquaredTowerDistanceForCreature(creature, candidate);
-    const currentDistance = this.getSquaredTowerDistanceForCreature(creature, current);
-    if (candidateDistance !== currentDistance) {
-      return candidateDistance < currentDistance;
-    }
-
-    if (candidate.health !== current.health) {
-      return candidate.health < current.health;
-    }
-
-    return candidate.id.localeCompare(current.id) < 0;
-  }
-
   private isTowerInCreatureRange(creature: Creature, tower: Tower): boolean {
     return isWithinCreatureAttackRange(creature.archetype, creature, tower);
-  }
-
-  private getSquaredTowerDistanceForCreature(creature: Creature, tower: Tower): number {
-    const dx = creature.x - tower.x;
-    const dy = creature.y - tower.y;
-    return (dx * dx) + (dy * dy);
   }
 
   private addPathWear(x: number, y: number): void {
