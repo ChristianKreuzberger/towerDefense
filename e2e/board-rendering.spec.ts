@@ -76,8 +76,10 @@ test("creatures glide between snapshots instead of jumping", async ({ page }) =>
   // Sample the drawn x position: a smooth glide yields values strictly between cell centers.
   const samples = await page.evaluate(async () => {
     const xs: number[] = [];
-    const end = performance.now() + 1500;
-    while (performance.now() < end) {
+    const start = performance.now();
+    // At least 1.5 s, and keep going (up to 10 s) until enough frames were seen: a slow CI runner renders far
+    // fewer frames per second, which must not fail the test as long as the glide itself is observable.
+    while (performance.now() - start < 1500 || (xs.length <= 10 && performance.now() - start < 10_000)) {
       const creature = window.__testBoard?.creaturePositions()[0];
       if (creature) {
         xs.push(creature.x);
