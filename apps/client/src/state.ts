@@ -15,6 +15,8 @@ export interface MenuPlayerInput {
   id: string;
   inputId: string;
   defaultName: string;
+  // Set for a bot row: the id of its difficulty select instead of a name input.
+  botSelectId?: string;
 }
 
 export interface PlayerChipRefs {

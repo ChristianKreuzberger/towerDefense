@@ -8,6 +8,7 @@
 
 ## High-value test cases
 
+- AI players: every planned command is accepted by a real simulation; the same seed gives the same command list; hard beats medium beats easy over fixed seeds; a bots-only match reaches `ended` deterministically; bots wait for humans to place; unknown difficulty is a 400; rematch keeps `ai`; matches without bots and the balance baselines are unchanged
 - Tower placement rejection when path would be fully blocked
 - Tower cannot target or damage other towers
 - Damage types: every type against every archetype gives max(1, round(damage * multiplier)); the minimum of 1 holds; `tower-hit.damage` equals the damage applied and the telemetry total; the same seed replays identically; set-damage-type is accepted only in prep before ready, and the transport rejects unknown types

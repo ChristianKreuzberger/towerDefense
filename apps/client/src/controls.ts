@@ -54,6 +54,7 @@ export function installControls(): void {
   });
 
   el.menuPlayerCount.addEventListener("change", renderMenuPlayerInputs);
+  el.menuAiPlayers.addEventListener("change", renderMenuPlayerInputs);
   el.menuStartBtn.addEventListener("click", () => {
     void startMatchFromMenu();
   });

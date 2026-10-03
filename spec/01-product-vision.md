@@ -27,8 +27,8 @@ Build an offline local multiplayer browser tower-defense game where 1 to 8 named
 
 ## Game modes at MVP
 
-- Offline local match with 1 to 8 human players
-- AI player menu entry visible but disabled (placeholder for future)
+- Offline local match with 1 to 8 players, humans and AI players (bots) mixed; a match may also be bots only (spectator style)
+- AI players come in three difficulties: easy, medium, hard
 
 ## Non-goals at MVP
 

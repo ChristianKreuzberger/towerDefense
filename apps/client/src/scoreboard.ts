@@ -18,7 +18,8 @@ export function pickDefaultPlayer(snapshot: MatchSnapshot | null): string {
   if (!snapshot || snapshot.players.length === 0) {
     return "";
   }
-  return snapshot.players[0]?.id ?? "";
+  // The first human; a bots-only match has nobody to act for, so the first seat is shown.
+  return (snapshot.players.find((player) => !player.ai) ?? snapshot.players[0])?.id ?? "";
 }
 
 export function updatePlayerOptions(snapshot: MatchSnapshot | null): void {
@@ -63,7 +64,15 @@ export function buildPlayerChip(player: MatchSnapshot["players"][number], towerI
   name.className = "player-chip-name";
   const state = document.createElement("span");
   state.className = "chip-state";
-  top.append(name, state);
+  if (player.ai) {
+    const badge = document.createElement("span");
+    badge.className = "chip-bot";
+    badge.textContent = "BOT";
+    badge.title = `${player.ai} bot`;
+    top.append(name, badge, state);
+  } else {
+    top.append(name, state);
+  }
   const scoreRow = document.createElement("div");
   scoreRow.className = "chip-score";
   const points = document.createElement("span");
@@ -105,7 +114,7 @@ export function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: Mat
   const repairedTowerIds = new Set(
     newEvents.filter((event) => event.type === "tower-repaired").map((event) => event.towerId)
   );
-  const structure = snapshot.players.map((player) => `${player.id}:${towersByPlayer.has(player.id) ? 1 : 0}`).join("|");
+  const structure = snapshot.players.map((player) => `${player.id}:${towersByPlayer.has(player.id) ? 1 : 0}:${player.ai ?? ""}`).join("|");
   if (structure !== store.chipStructureSignature) {
     store.chipStructureSignature = structure;
     store.playerChips = new Map();
@@ -147,7 +156,7 @@ export function renderPlayerCards(snapshot: MatchSnapshot | null, newEvents: Mat
     } else {
       refs.name.removeAttribute("aria-current");
     }
-    refs.root.title = `Switch to ${player.name} (${playerNumber(player.id)})`;
+    refs.root.title = player.ai ? `View ${player.name} (${playerNumber(player.id)}), a ${player.ai} bot` : `Switch to ${player.name} (${playerNumber(player.id)})`;
     if (refs.root.className !== className) {
       refs.root.className = className;
     }

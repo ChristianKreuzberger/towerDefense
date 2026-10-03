@@ -43,3 +43,10 @@ test("firstPendingPlayerId returns null when nobody is pending", () => {
   assert.equal(firstPendingPlayerId([player("p1", true), player("p2", false, true)]), null);
   assert.equal(firstPendingPlayerId([]), null);
 });
+
+test("bots never get a hot-seat turn", () => {
+  const players: TurnPlayer[] = [{ ...player("p1", true) }, { ...player("p2", false), ai: "easy" }, { ...player("p3", false) }];
+  assert.equal(nextPendingPlayerId(players, "p1"), "p3");
+  assert.equal(firstPendingPlayerId([{ ...player("p1", false), ai: "hard" }, player("p2", false)]), "p2");
+  assert.equal(firstPendingPlayerId([{ ...player("p1", false), ai: "hard" }]), null);
+});

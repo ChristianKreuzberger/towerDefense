@@ -2,9 +2,18 @@ import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
 import type { DamageType, Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
 
+export const AI_DIFFICULTIES = ["easy", "medium", "hard"] as const;
+export type AiDifficulty = (typeof AI_DIFFICULTIES)[number];
+
+export function isValidAiDifficulty(value: unknown): value is AiDifficulty {
+  return typeof value === "string" && (AI_DIFFICULTIES as readonly string[]).includes(value);
+}
+
 export interface PlayerSetup {
   id: string;
   name: string;
+  // Present for a bot: its decisions come from the AI planner, not from a human at the table.
+  ai?: AiDifficulty;
 }
 
 export interface MatchSetup {
@@ -326,6 +335,8 @@ export interface PlayerState {
   id: string;
   name: string;
   points: number;
+  // Same as PlayerSetup.ai; absent for humans.
+  ai?: AiDifficulty;
   hasPlacedTower: boolean;
   readyForWave: boolean;
   eliminated: boolean;

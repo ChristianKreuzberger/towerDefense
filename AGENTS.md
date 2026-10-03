@@ -84,7 +84,7 @@ Primary planning documents:
 
 ## Notes
 
-- AI player option should exist in UI but stay disabled for MVP.
+- AI players (bots, easy/medium/hard) are implemented: pure planner in packages/simulation/src/ai-player.ts, driven one step at a time through `/api/ai-step` by the client.
 - Procedural maps are required from the start.
 - Towers must never target other towers.
 - Towers are placed only on dedicated tower spots next to the road, never on the 2-cell-wide path creatures walk.

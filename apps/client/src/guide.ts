@@ -49,6 +49,19 @@ export function computeGuideState(snapshot: MatchSnapshot | null): GuideState | 
   }
 
   if (snapshot.phase === "placement") {
+    if (activePlayer.ai) {
+      return {
+        key: `bot-${activePlayer.id}-${snapshot.wave}`,
+        tone: "hint",
+        title: `${activePlayer.name} is a bot`,
+        body: snapshot.players.some((player) => !player.ai)
+          ? "Bots place, upgrade and ready up on their own. Pick a human player to act."
+          : "Bots place, upgrade and ready up on their own. Watch the match.",
+        actionLabel: "Refresh Snapshot",
+        action: "focus-place"
+      };
+    }
+
     if (!activePlayer.hasPlacedTower) {
       return {
         key: `place-${activePlayer.id}`,

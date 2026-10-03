@@ -1,6 +1,7 @@
 import { paintHero } from "./art/hero";
 import { applyPaletteCssVars } from "./art/palette";
 import { DEBUG } from "./constants";
+import { installBotPacing } from "./bots";
 import { installControls } from "./controls";
 import { app, must } from "./dom";
 import { setMenuMessage, setStatus } from "./feedback";
@@ -17,6 +18,7 @@ import "./style.css";
 applyPaletteCssVars();
 
 installControls();
+installBotPacing();
 installHotkeys();
 
 for (const element of document.querySelectorAll(".debug-only")) {

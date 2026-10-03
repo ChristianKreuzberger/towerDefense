@@ -4,9 +4,9 @@
 
 1. Open main menu
 2. Select Play
-3. Choose number of human players (1 to 8)
-4. Show AI players entry with disabled state and offline note
-5. Enter a name for each human player
+3. Choose number of human players (0 to 8)
+4. Choose number of AI players (0 to 8; total 1 to 8) and a difficulty (Easy, Medium, Hard) for each
+5. Enter a name for each human player (bot rows show "Bot N", not editable)
 6. Start match
 
 ## Match initialization flow
@@ -235,5 +235,10 @@ Event to sound table
 ## Offline-first messaging
 
 - Main menu includes "Offline Mode" label
-- AI option shows "Coming later"
+- The AI Players field is enabled; there is no "Coming later" note
+
+AI players in the match
+- Bots are marked with a "BOT" badge on their scoreboard chip and in the player list; their controls are never available to the table
+- After the last human placed a tower, the client asks the host for one bot action at a time (`POST /api/ai-step`), about 600 ms apart, and shows a toast per action such as "Bot 1 upgraded damage". The pause is client pacing only (zero in tests)
+- Hot-seat handover skips bots. With no human players there is no placement prompt, the match opens on the map preview and then plays on by itself; rematch keeps the bots and their difficulties
 - Online mode option is hidden or disabled for MVP

@@ -135,3 +135,51 @@ test("validation errors never end the running match", () => {
   const snapshot = api({ method: "GET", pathname: "/api/snapshot", searchParams: new URLSearchParams(), body: {} });
   assert.equal(snapshot.status, 200);
 });
+
+test("start accepts bots, rejects unknown difficulties and allows a bots-only match", () => {
+  const api = createGameApi();
+  assertRejected(
+    post(api, "/api/start", { seed: 1, players: [{ id: "p1", name: "Bot", ai: "godlike" }] }),
+    "invalid-ai-difficulty"
+  );
+
+  const started = post(api, "/api/start", {
+    seed: 1,
+    players: [{ id: "p1", name: "Bot 1", ai: "easy" }, { id: "p2", name: "Bot 2", ai: "hard" }]
+  });
+  assert.equal(started.status, 200);
+  const payload = started.payload as { snapshot: { players: Array<{ ai?: string }> } };
+  assert.deepEqual(payload.snapshot.players.map((player) => player.ai), ["easy", "hard"]);
+
+  assertRejected(post(api, "/api/start", { seed: 1, players: [] }), "invalid-setup");
+});
+
+test("ai-step plays one bot command per call and waits for humans to place", () => {
+  const api = createGameApi();
+  assertRejected(post(api, "/api/ai-step", {}), "match-not-started");
+  post(api, "/api/start", {
+    seed: 4,
+    players: [{ id: "p1", name: "Human" }, { id: "p2", name: "Bot 1", ai: "medium" }]
+  });
+
+  type Step = { action: { playerId: string; command: { type: string }; accepted: boolean } | null; pending: boolean; snapshot: { phase: string } };
+  const step = (): Step => post(api, "/api/ai-step", {}).payload as Step;
+  assert.deepEqual({ action: step().action, pending: step().pending }, { action: null, pending: false });
+
+  const spot = ((api({ method: "GET", pathname: "/api/snapshot", searchParams: new URLSearchParams(), body: {} }).payload) as {
+    snapshot: { map: { towerSpots: Array<{ x: number; y: number }> } };
+  }).snapshot.map.towerSpots[0];
+  assert.equal(command(api, { type: "place-tower", playerId: "p1", ...spot }).status, 200);
+
+  const first = step();
+  assert.equal(first.action?.playerId, "p2");
+  assert.equal(first.action?.command.type, "place-tower");
+  let last = first;
+  for (let guard = 0; guard < 50 && last.pending; guard += 1) {
+    last = step();
+  }
+  assert.equal(last.pending, false);
+  assert.equal(last.action?.command.type, "ready-for-wave");
+  // The human has not readied yet, so the wave is still in prep.
+  assert.equal(last.snapshot.phase, "placement");
+});

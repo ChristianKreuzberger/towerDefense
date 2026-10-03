@@ -156,6 +156,7 @@ export class MatchSimulation {
       players: setup.players.map((player) => ({
         id: player.id,
         name: player.name,
+        ...(player.ai ? { ai: player.ai } : {}),
         points: STARTING_POINTS,
         hasPlacedTower: false,
         readyForWave: false,

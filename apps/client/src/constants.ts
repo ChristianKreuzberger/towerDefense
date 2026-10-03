@@ -27,4 +27,11 @@ export const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]> = new Set([
 export const EVENT_LOG_CAPACITY = 200;
 export const MAX_FX_EVENT_BACKLOG = 300;
 
+// Pause between two bot actions in prep so the table can follow them. Pacing only: it never touches the simulation.
+// `?botDelay=0` (used by tests) removes it.
+const botDelayParam = new URLSearchParams(window.location.search).get("botDelay");
+export const BOT_STEP_DELAY_MS = botDelayParam !== null && Number.isFinite(Number(botDelayParam)) && Number(botDelayParam) >= 0
+  ? Number(botDelayParam)
+  : 600;
+
 export const DEBUG = new URLSearchParams(window.location.search).get("debug") === "1";

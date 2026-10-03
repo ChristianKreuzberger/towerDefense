@@ -2,6 +2,8 @@ export interface TurnPlayer {
   id: string;
   readyForWave: boolean;
   eliminated: boolean;
+  // Bots play on their own, so they never get the screen.
+  ai?: unknown;
 }
 
 // Hot-seat order: the next player after `afterId` (wrapping around) who still has to ready up.
@@ -9,7 +11,7 @@ export function nextPendingPlayerId(players: readonly TurnPlayer[], afterId: str
   const start = players.findIndex((player) => player.id === afterId);
   for (let offset = 1; offset <= players.length; offset += 1) {
     const candidate = players[(start + offset + players.length) % players.length];
-    if (candidate && !candidate.readyForWave && !candidate.eliminated) {
+    if (candidate && !candidate.ai && !candidate.readyForWave && !candidate.eliminated) {
       return candidate.id;
     }
   }
@@ -18,5 +20,5 @@ export function nextPendingPlayerId(players: readonly TurnPlayer[], afterId: str
 
 // After a wave every ready flag is cleared, so the round restarts with the first seat that can still act.
 export function firstPendingPlayerId(players: readonly TurnPlayer[]): string | null {
-  return players.find((player) => !player.readyForWave && !player.eliminated)?.id ?? null;
+  return players.find((player) => !player.ai && !player.readyForWave && !player.eliminated)?.id ?? null;
 }

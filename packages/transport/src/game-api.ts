@@ -1,12 +1,15 @@
 // Transport-agnostic game API: the Node server and the in-browser (GitHub Pages) host both route through this.
+import { stepAiPlayers } from "@tower-defense/simulation/ai-player";
 import { createMatch, type MatchSimulation } from "@tower-defense/simulation/match";
 import {
+  AI_DIFFICULTIES,
   MAX_PLAYER_NAME_LENGTH,
   MAX_PLAYERS,
   MIN_PLAYERS,
   PROJECT_NAME,
   DAMAGE_TYPES,
   UPGRADE_TRACKS,
+  isValidAiDifficulty,
   isValidDamageType,
   isValidUpgradeTrack,
   type MatchSetup,
@@ -73,7 +76,11 @@ function normalizeSetup(body: unknown): MatchSetup {
       throw new GameApiError("invalid-setup", `player names are limited to ${MAX_PLAYER_NAME_LENGTH} characters`);
     }
 
-    return { id, name };
+    if (mapped.ai !== undefined && !isValidAiDifficulty(mapped.ai)) {
+      throw new GameApiError("invalid-ai-difficulty", `ai must be one of ${AI_DIFFICULTIES.join(", ")}`);
+    }
+
+    return mapped.ai === undefined ? { id, name } : { id, name, ai: mapped.ai };
   });
 
   if (new Set(players.map((player) => player.id)).size !== players.length) {
@@ -250,6 +257,26 @@ export function createGameApi(log: GameApiLogger = { info: () => undefined }): (
       return {
         status: 200,
         payload: { ok: true, result, snapshot: toWireSnapshot(nextSnapshot, snapshotOptionsFromBody(body)) }
+      };
+    }
+
+    // One bot command per call: the client paces the calls so bot moves are visible (spec/02, AI players).
+    if (method === "POST" && pathname === "/api/ai-step") {
+      if (!simulation) {
+        return NOT_STARTED;
+      }
+      const previousSnapshot = simulation.getSnapshot();
+      const step = stepAiPlayers(simulation);
+      const nextSnapshot = simulation.getSnapshot();
+      logPhaseTransition(previousSnapshot, nextSnapshot);
+      return {
+        status: 200,
+        payload: {
+          ok: true,
+          action: step.action,
+          pending: step.pending,
+          snapshot: toWireSnapshot(nextSnapshot, snapshotOptionsFromBody(body))
+        }
       };
     }
 

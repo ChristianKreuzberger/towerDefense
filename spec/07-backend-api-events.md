@@ -18,9 +18,10 @@ MVP transport is local in-process command dispatch. Online transport will be add
 
 The offline MVP host exposes a small JSON API used by the browser client:
 
-- POST /api/start { seed, players } -> { setup, snapshot } (always a full snapshot)
+- POST /api/start { seed, players } -> { setup, snapshot } (always a full snapshot). A player entry may carry `ai: "easy" | "medium" | "hard"` to make it a bot (anything else is a 400 `invalid-ai-difficulty`); 1 to 8 players in total, humans may be 0
 - GET /api/snapshot -> { snapshot } (full snapshot)
 - POST /api/command { command } -> { result, snapshot }
+- POST /api/ai-step { lite, eventsSince } -> { action, pending, snapshot }: applies the next command of the next bot that still has to act (one command per call, so the client can pace it). `action` is `{ playerId, command, accepted }` or null. `pending` is true while bots still have to act in this prep; it is false when all bots are ready, when humans have not all placed yet (bots wait for them), or outside prep. Bot decisions come from a pure planner in the simulation package; the host adds no randomness
 - POST /api/advance-many { ticks } -> { acceptedTicks, stoppedReason, snapshot } (ticks clamped to 1..500, stops when the phase leaves "wave")
 
 ### Lite snapshots
@@ -93,6 +94,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 Common rejection reasons:
 - PLAYER_LIMIT_REACHED
 - INVALID_PLAYER_NAME
+- INVALID_AI_DIFFICULTY (wire code `invalid-ai-difficulty`)
 - TOWER_ALREADY_PLACED
 - TOWER_MOVE_NOT_ALLOWED
 - PATH_BLOCKED
