@@ -44,7 +44,7 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   expect(guideBox && canvasBox && guideBox.y + guideBox.height <= canvasBox.y).toBe(true);
 
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
 
   await page.locator("#playerId").selectOption("p2");
   await clickCellNearSpawn(page, 1);
@@ -141,7 +141,7 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
 test("starting a match over a running one asks first, and the menu offers to resume", async ({ page }) => {
   await startMatch(page, "/");
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
 
   await page.getByRole("button", { name: "Back To Menu" }).click();
   await expect(page.locator("#menuScreen")).toBeVisible();
@@ -160,7 +160,7 @@ test("starting a match over a running one asks first, and the menu offers to res
 
   await page.locator("#menuResumeBtn").click();
   await expect(page.locator("#gameScreen")).toBeVisible();
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
 });
 
 test("after the match ended the ready and place-tower buttons are disabled and the status names the winner", async ({ page }) => {
