@@ -1,7 +1,9 @@
 /* ---------------------------------------------------------------- guide */
 
+/* Fixed height: showing, hiding or rewrapping the guide must never move the board below it. */
 .guide-overlay {
-  min-height: 46px;
+  flex: none;
+  height: 58px;
 }
 
 .guide-overlay.guide-idle {
@@ -10,6 +12,8 @@
 
 .guide-card {
   position: relative;
+  height: 100%;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -36,9 +40,17 @@
 .guide-title {
   font-size: 18px;
   font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .guide-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
   font-size: 12px;
   line-height: 1.35;
   color: var(--muted);

@@ -2,7 +2,7 @@ import { UPGRADE_TRACKS } from "@tower-defense/shared";
 import type { TowerTargetMode } from "@tower-defense/shared";
 import { handleCellSelected, placeTowerForSelectedPlayer, runGuideAction } from "./actions";
 import type { SoundId } from "./audio/index";
-import { setCellClickHandler, setMoveMode } from "./board";
+import { setCellClickHandler, setMoveMode, setViewChangeHandler } from "./board";
 import { DAMAGE_TYPE_OPTIONS, PLAYBACK_SPEEDS, TARGET_MODES } from "./constants";
 import { demo } from "./demo-instance";
 import { app, el, must } from "./dom";
@@ -11,13 +11,16 @@ import { addFeedback } from "./feedback";
 import { hideGuideOverlay } from "./guide";
 import type { GuideAction } from "./guide";
 import { renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
+import { installMobileMenu } from "./mobile-menu";
 import { configurePlayback, setPlaybackSpeed, setPlaying } from "./playback";
 import { playerTowerId, selectedPlayerId } from "./player-util";
 import { setChipSelectHandler } from "./scoreboard";
 import { settingsDialog, soundEngine, tour } from "./services";
 import { advanceMany, advanceTicks, fetchSnapshot, rematchWithSamePlayers, sendCommand, startMatchFromMenu } from "./session";
 import { store } from "./state";
+import { installTowerMenu, positionTowerMenu } from "./tower-menu";
 import { applyActivePlayerChange, setActivePlayer } from "./turns";
+import { installZoomControls, syncZoomButtons } from "./zoom-controls";
 
 // Connects the static markup to the game logic and plugs the upward callbacks (tile clicks, chip clicks,
 // playback ticks) into the lower modules. Called once at startup; the elements live as long as the page.
@@ -27,6 +30,14 @@ export function installControls(): void {
   setCellClickHandler(handleCellSelected);
 
   setChipSelectHandler(setActivePlayer);
+
+  setViewChangeHandler(() => {
+    syncZoomButtons();
+    positionTowerMenu();
+  });
+  installZoomControls();
+  installTowerMenu();
+  installMobileMenu();
 
   el.demoBtn.addEventListener("click", () => {
     if (demo.running()) {

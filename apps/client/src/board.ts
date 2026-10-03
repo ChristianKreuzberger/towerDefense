@@ -16,9 +16,16 @@ export function setCellClickHandler(handler: (x: number, y: number) => void): vo
   cellClickHandler = handler;
 }
 
+let viewChangeHandler: () => void = () => {};
+
+export function setViewChangeHandler(handler: () => void): void {
+  viewChangeHandler = handler;
+}
+
 function mountBattlefield(): BattlefieldMount {
   return createBattlefieldMount(el.board, {
-    onCellClick: (x, y) => cellClickHandler(x, y)
+    onCellClick: (x, y) => cellClickHandler(x, y),
+    onViewChange: () => viewChangeHandler()
   });
 }
 
@@ -32,6 +39,9 @@ export const battlefieldMount: BattlefieldMount = {
   cellSize: () => mount.cellSize(),
   setCursor: (x, y) => mount.setCursor(x, y),
   setPlacementContext: (context) => mount.setPlacementContext(context),
+  zoomStep: (direction) => mount.zoomStep(direction),
+  resetView: () => mount.resetView(),
+  zoom: () => mount.zoom(),
   destroy: () => mount.destroy()
 };
 

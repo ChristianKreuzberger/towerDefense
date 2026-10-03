@@ -7,6 +7,7 @@ import { CREAM, UI_COLORS, playerIndex } from "../art/palette";
 import { KEY } from "../art/textures";
 import { describeRuin } from "../ruins";
 import { cellCenter } from "./geometry";
+import type { View } from "../viewport";
 import type { PlacementContext, RuinVisual, TowerVisual } from "./types";
 
 // Mutable hover/placement state; the scene owns the instance and the pointer handlers write to it.
@@ -31,6 +32,7 @@ export interface OverlayEnv {
   towerVisuals: Map<string, TowerVisual>;
   ruinVisuals: Map<string, RuinVisual>;
   getCanvas(): HTMLCanvasElement;
+  getView(): View;
   cellSize: number;
 }
 
@@ -163,8 +165,16 @@ function positionTooltip(env: OverlayEnv, tooltip: HTMLElement, worldX: number, 
   const canvas = env.getCanvas();
   const rect = canvas.getBoundingClientRect();
   const scale = canvas.width > 0 ? rect.width / canvas.width : 1;
-  tooltip.style.left = `${canvas.offsetLeft + worldX * scale}px`;
-  tooltip.style.top = `${canvas.offsetTop + worldY * scale - env.cellSize * scale * 0.9}px`;
+  const view = env.getView();
+  const screenX = (worldX - view.x) * view.zoom;
+  const screenY = (worldY - view.y) * view.zoom;
+  // Panned out of sight: no tooltip floating over empty space.
+  if (screenX < 0 || screenY < 0 || screenX > canvas.width || screenY > canvas.height) {
+    tooltip.hidden = true;
+    return;
+  }
+  tooltip.style.left = `${canvas.offsetLeft + screenX * scale}px`;
+  tooltip.style.top = `${canvas.offsetTop + screenY * scale - env.cellSize * view.zoom * scale * 0.9}px`;
   tooltip.hidden = false;
 }
 

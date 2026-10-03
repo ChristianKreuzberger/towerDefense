@@ -1,16 +1,175 @@
 /* ---------------------------------------------------------------- responsive */
 
+/* Compact layout (width only): slim top bar, scoreboard strip, board, bottom action bar. */
 @media (max-width: 1040px) {
+  .shortcuts-bar {
+    /* The footer's display is also set inline by phase.ts, so this must win over it. */
+    display: none !important;
+  }
+
   .game-screen {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
   }
 
-  .board-grid canvas {
-    max-height: none;
+  .stage {
+    flex: 1 1 0;
+    gap: 4px;
   }
 
-  .phase-sub {
+  .brand,
+  .phase-sub,
+  .desktop-only {
     display: none;
+  }
+
+  .mobile-only {
+    display: grid !important;
+  }
+
+  .topbar {
+    height: 42px;
+    gap: 8px;
+    padding: 4px 8px;
+  }
+
+  .phase-banner {
+    padding-left: 8px;
+  }
+
+  .phase-label {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .playback-controls button {
+    padding: 5px 7px;
+  }
+
+  .stage .wave-preview {
+    height: 20px;
+    line-height: 20px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .guide-overlay {
+    height: 62px;
+  }
+
+  .guide-title {
+    font-size: 14px;
+  }
+
+  .guide-body {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .board-frame {
+    padding: 4px;
+  }
+
+  .board-grid {
+    inset: 4px;
+  }
+
+  .control-panel {
+    position: relative;
+    flex: none;
+    gap: 6px;
+    padding: 6px;
+    overflow: visible;
+  }
+
+  .hud-chip-row {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .hud-chip-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Fixed height: the tower HP bar appears once a tower is placed and must not resize the strip (and the board). */
+  .hud-chip-row {
+    height: 56px;
+  }
+
+  .player-chip {
+    flex: 0 0 150px;
+    height: 100%;
+    scroll-snap-align: start;
+    padding: 5px 8px 5px 8px;
+  }
+
+  .player-chip-meta {
+    display: none;
+  }
+
+  .toolbar {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .upgrade-btn,
+  .tool kbd {
+    display: none;
+  }
+
+  .tool {
+    justify-items: center;
+    padding: 6px 4px;
+  }
+
+  .tool-label {
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .panel-more {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+    z-index: 30;
+    max-height: 60dvh;
+    overflow-y: auto;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel);
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  .control-panel.more-open .panel-more {
+    display: grid;
+  }
+
+  .toasts {
+    top: 12px;
+    bottom: auto;
+    right: 50%;
+    transform: translateX(50%);
+  }
+
+  /* Docked to the bottom of the board so a finger on the tower does not cover it. */
+  .tower-menu {
+    left: 6px !important;
+    right: 6px;
+    top: auto !important;
+    bottom: 6px;
+    transform: none !important;
+    width: auto;
   }
 }
 
@@ -21,9 +180,6 @@
     grid-template-columns: 1fr;
   }
 
-  .topbar {
-    flex-wrap: wrap;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

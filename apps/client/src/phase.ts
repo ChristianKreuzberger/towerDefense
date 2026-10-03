@@ -114,6 +114,8 @@ export function renderPhase(snapshot: MatchSnapshot | null): void {
   const preview = snapshot.phase === "placement" ? formatWavePreview(snapshot.wave) : "";
   if (el.wavePreview.textContent !== preview) {
     el.wavePreview.textContent = preview;
+    // The row is one line with an ellipsis (fixed height, so the board never moves); the tooltip has the full text.
+    el.wavePreview.title = preview;
   }
   el.shortcutBar.style.display = snapshot.phase === "ended" ? "none" : "flex";
 

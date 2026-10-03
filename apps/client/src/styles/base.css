@@ -21,9 +21,20 @@
   box-sizing: border-box;
 }
 
+/* The app is a fixed-viewport shell: the page itself never scrolls, so scrollbars cannot appear and shift the layout. */
 html,
 body {
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 body {
@@ -44,6 +55,11 @@ h3 {
 }
 
 .hidden {
+  display: none !important;
+}
+
+/* !important: later component rules (.tool is a grid) would otherwise win on equal specificity. */
+.mobile-only {
   display: none !important;
 }
 

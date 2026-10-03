@@ -8,6 +8,9 @@ import { resolvePlacementCell } from "./placement";
 import { setPlaying } from "./playback";
 import { playerTowerId, selectedPlayerId } from "./player-util";
 import { fetchSnapshot, sendCommand } from "./session";
+import { closeTowerMenu, openTowerMenu } from "./tower-menu";
+import { renderToolbar } from "./toolbar";
+import { setActivePlayer } from "./turns";
 import { store } from "./state";
 
 // User intents that become host commands: tile clicks, the tower placement shortcut and guide buttons.
@@ -16,6 +19,19 @@ export function handleCellSelected(x: number, y: number): void {
   if (!store.current) {
     return;
   }
+
+  // Tapping a tower opens its upgrade popover instead of touching the placement cursor. Move mode keeps priority:
+  // there an occupied tile is simply not a valid target (handled below).
+  const tappedTower = store.moveMode ? undefined : store.current.towers.find((tower) => tower.x === x && tower.y === y);
+  if (tappedTower) {
+    // Hot-seat: the owner becomes the active player so the popover and the toolbar show and spend their points.
+    setActivePlayer(tappedTower.playerId);
+    openTowerMenu(tappedTower, store.current.phase);
+    renderToolbar(store.current);
+    return;
+  }
+  closeTowerMenu();
+
   store.cursorChosen = true;
 
   el.x.value = String(x);

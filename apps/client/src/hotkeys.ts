@@ -1,13 +1,15 @@
 import { placeTowerForSelectedPlayer } from "./actions";
-import { adjustCoord, setMoveMode } from "./board";
+import { adjustCoord, battlefieldMount, setMoveMode } from "./board";
 import { DEBUG } from "./constants";
 import { el, must } from "./dom";
 import { closeOverlay, isEndOverlayOpen } from "./end-overlay";
 import { hideGuideOverlay } from "./guide";
+import { isMoreOpen, setMoreOpen } from "./mobile-menu";
 import { playerNumber } from "./player-util";
 import { mapPreview, settingsDialog, settingsStore, tour } from "./services";
 import { store } from "./state";
 import { isActionAvailable } from "./toolbar";
+import { closeTowerMenu, isTowerMenuOpen } from "./tower-menu";
 import { setActivePlayer } from "./turns";
 
 function isFormField(target: EventTarget | null): boolean {
@@ -94,6 +96,24 @@ export function installHotkeys(): () => void {
       return;
     }
 
+    if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        battlefieldMount.zoomStep(1);
+        return;
+      }
+      if (event.key === "-" || event.key === "_") {
+        event.preventDefault();
+        battlefieldMount.zoomStep(-1);
+        return;
+      }
+      if (event.key === "0") {
+        event.preventDefault();
+        battlefieldMount.resetView();
+        return;
+      }
+    }
+
     const key = event.key.toLowerCase();
     if (key === "r") {
       event.preventDefault();
@@ -122,6 +142,16 @@ export function installHotkeys(): () => void {
     if (key === "p") {
       event.preventDefault();
       el.playPauseBtn.click();
+      return;
+    }
+
+    if (event.key === "Escape" && isMoreOpen()) {
+      setMoreOpen(false);
+      return;
+    }
+
+    if (event.key === "Escape" && isTowerMenuOpen()) {
+      closeTowerMenu();
       return;
     }
 
