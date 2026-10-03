@@ -51,13 +51,11 @@ test("a valid set-damage-type reaches the simulation and its rejection comes bac
   assert.equal(payload.result.reason, "invalid-damage-type-target");
 });
 
-test("place-tower and place-wall reject non-integer or non-finite coordinates", () => {
+test("place-tower rejects non-integer or non-finite coordinates", () => {
   const api = startedApi();
-  for (const type of ["place-tower", "place-wall"]) {
-    for (const bad of [Number.NaN, Infinity, 1.5, "3", null, undefined]) {
-      assertRejected(command(api, { type, playerId: "p1", x: bad, y: 3 }), "invalid-coordinates");
-      assertRejected(command(api, { type, playerId: "p1", x: 3, y: bad }), "invalid-coordinates");
-    }
+  for (const bad of [Number.NaN, Infinity, 1.5, "3", null, undefined]) {
+    assertRejected(command(api, { type: "place-tower", playerId: "p1", x: bad, y: 3 }), "invalid-coordinates");
+    assertRejected(command(api, { type: "place-tower", playerId: "p1", x: 3, y: bad }), "invalid-coordinates");
   }
 });
 

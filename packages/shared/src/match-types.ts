@@ -1,7 +1,6 @@
 import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
 import type { DamageType, Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
-import type { Wall } from "./wall-types.js";
 
 export interface PlayerSetup {
   id: string;
@@ -27,11 +26,6 @@ export interface TowerTargetAssignment {
 export interface CreatureTargetAssignment {
   creatureId: string;
   targetTowerId: string | null;
-}
-
-export interface CreatureWallTargetAssignment {
-  creatureId: string;
-  targetWallId: string | null;
 }
 
 export interface MovementResolutionStep {
@@ -68,9 +62,7 @@ export interface WaveTelemetrySnapshot {
   killsByArchetype: TelemetryKillsByArchetype;
   towerDamageDealt: number;
   towerDamageIntake: number;
-  wallDamageIntake: number;
   towerRepairApplied: number;
-  wallRepairApplied: number;
   waveClearBonusAwarded: number;
   catchUpBonusAwarded: number;
   swarmIncomeCapped: number;
@@ -91,9 +83,7 @@ export interface CumulativeTelemetrySnapshot {
   killsByArchetype: TelemetryKillsByArchetype;
   towerDamageDealt: number;
   towerDamageIntake: number;
-  wallDamageIntake: number;
   towerRepairApplied: number;
-  wallRepairApplied: number;
   waveClearBonusAwarded: number;
   catchUpBonusAwarded: number;
   swarmIncomeCapped: number;
@@ -104,11 +94,9 @@ export interface BalanceAnalysisPlayerSnapshot {
   playerName: string;
   eliminated: boolean;
   awardedPointsThisWave: number;
-  spentOnWallsThisWave: number;
   spentOnUpgradesThisWave: number;
   netPointsDeltaThisWave: number;
   awardedPointsTotal: number;
-  spentOnWallsTotal: number;
   spentOnUpgradesTotal: number;
   netPointsTotal: number;
   endingPoints: number;
@@ -120,8 +108,6 @@ export interface BalanceAnalysisPlayerSnapshot {
   swarmIncomeCappedTotal: number;
   towerLevel: number;
   towerHealth: number;
-  wallCount: number;
-  wallHealthTotal: number;
 }
 
 export interface BalanceAnalysisSnapshot {
@@ -135,12 +121,10 @@ export interface BalanceAnalysisSnapshot {
   players: BalanceAnalysisPlayerSnapshot[];
   totals: {
     awardedPointsThisWave: number;
-    spentOnWallsThisWave: number;
-    spentOnUpgradesThisWave: number;
+      spentOnUpgradesThisWave: number;
     netPointsDeltaThisWave: number;
     awardedPointsTotal: number;
-    spentOnWallsTotal: number;
-    spentOnUpgradesTotal: number;
+      spentOnUpgradesTotal: number;
     netPointsTotal: number;
     endingPoints: number;
     waveClearBonusThisWave: number;
@@ -150,9 +134,7 @@ export interface BalanceAnalysisSnapshot {
     swarmIncomeCappedThisWave: number;
     swarmIncomeCappedTotal: number;
     livingTowers: number;
-    livingWalls: number;
     totalTowerHealth: number;
-    totalWallHealth: number;
     mapPathWearTotal: number;
   };
 }
@@ -239,15 +221,6 @@ export type MatchEvent =
       remainingHp: number;
     }
   | {
-      type: "wall-repaired";
-      wave: number;
-      tick: number;
-      wallId: string;
-      playerId: string;
-      repairAmount: number;
-      remainingHp: number;
-    }
-  | {
       type: "path-repaired";
       wave: number;
       tick: number;
@@ -301,29 +274,6 @@ export type MatchEvent =
       wave: number;
       tick: number;
       assignments: CreatureTargetAssignment[];
-    }
-  | {
-      type: "creature-wall-targets-selected";
-      wave: number;
-      tick: number;
-      assignments: CreatureWallTargetAssignment[];
-    }
-  | {
-      type: "wall-hit";
-      wave: number;
-      tick: number;
-      creatureId: string;
-      targetWallId: string;
-      damage: number;
-      remainingHp: number;
-    }
-  | {
-      type: "wall-destroyed";
-      wave: number;
-      tick: number;
-      wallId: string;
-      playerId: string;
-      destroyedByCreatureId: string;
     }
   | {
       type: "creature-attack";
@@ -395,7 +345,6 @@ export interface MatchSnapshot {
   balanceAnalysisExports: BalanceAnalysisSnapshot[];
   map: GameMap;
   towers: Tower[];
-  walls: Wall[];
   creatures: Creature[];
   targetAssignments: TowerTargetAssignment[];
   players: PlayerState[];
@@ -413,7 +362,6 @@ export type CommandRejectReason =
   | "player-eliminated"
   | "tower-already-placed"
   | "tower-not-placed"
-  | "wall-phase-not-active"
   | "upgrade-phase-not-active"
   | "tower-max-level"
   | "invalid-upgrade-track"
@@ -431,7 +379,6 @@ export type CommandRejectReason =
   | "out-of-bounds"
   | "cell-not-buildable"
   | "tower-overlap"
-  | "wall-overlap"
   | "path-blocked"
   | "spawn-protected"
   | "insufficient-points"
@@ -445,12 +392,6 @@ export interface CommandResult {
 export type SimulationCommand =
   | {
       type: "place-tower";
-      playerId: string;
-      x: number;
-      y: number;
-    }
-  | {
-      type: "place-wall";
       playerId: string;
       x: number;
       y: number;

@@ -37,11 +37,6 @@ export function handleCellSelected(x: number, y: number): void {
     return;
   }
 
-  if (store.wallMode) {
-    void sendCommand({ type: "place-wall", playerId, x, y });
-    return;
-  }
-
   const alreadyHasTower = store.current.towers.some((tower) => tower.playerId === playerId);
   if (store.current.phase === "placement" && !alreadyHasTower) {
     void sendCommand({ type: "place-tower", playerId, x, y });

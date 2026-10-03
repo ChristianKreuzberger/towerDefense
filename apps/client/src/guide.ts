@@ -99,7 +99,7 @@ export function computeGuideState(snapshot: MatchSnapshot | null): GuideState | 
       key: `wave-${snapshot.wave}`,
       tone: "hint",
       title: "Wave in progress",
-      body: "The battle runs on its own. Use Place Wall and target modes to hold the lane, or pause to think. Upgrades (range, damage, accuracy) are bought in prep, before you ready.",
+      body: "The battle runs on its own. Use target modes to hold the lane, or pause to think. Upgrades (range, damage, accuracy) are bought in prep, before you ready.",
       actionLabel: store.playing ? "Pause" : "Resume",
       action: "toggle-playback"
     };

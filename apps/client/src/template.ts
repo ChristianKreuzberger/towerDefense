@@ -89,11 +89,11 @@ export const APP_TEMPLATE = `
 
       <div class="grid2 debug-only">
         <div>
-          <label for="x">Wall X</label>
+          <label for="x">Tile X</label>
           <input id="x" type="number" value="0" />
         </div>
         <div>
-          <label for="y">Wall Y</label>
+          <label for="y">Tile Y</label>
           <input id="y" type="number" value="1" />
         </div>
       </div>
@@ -101,9 +101,6 @@ export const APP_TEMPLATE = `
       <div class="toolbar" role="group" aria-label="Actions">
         <button id="placeTowerBtn" data-sfx="none" class="tool" title="Place your tower on the highlighted tile (T)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 12h9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span class="tool-label">Place Tower</span><span class="tool-cost">free</span><kbd>T</kbd>
-        </button>
-        <button id="placeWallBtn" class="tool" aria-pressed="false" title="Toggle wall mode, then click tiles (W)">
-          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M9 5v7M15 12v7" stroke="currentColor" stroke-width="2"/></svg><span class="tool-label">Place Wall</span><span class="tool-cost" id="wallCost">25</span><kbd>W</kbd>
         </button>
 <button id="moveTowerBtn" data-sfx="none" class="tool" aria-pressed="false" title="Move your tower once, free, after round 5 (V)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tool-label">Move Tower</span><span class="tool-cost" id="moveTowerCost">-</span><kbd>V</kbd>
@@ -163,7 +160,7 @@ export const APP_TEMPLATE = `
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>W</kbd> wall mode <kbd>V</kbd> move tower <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>V</kbd> move tower <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
   </footer>
 
   <div id="settingsRoot"></div>

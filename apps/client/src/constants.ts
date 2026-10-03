@@ -20,7 +20,6 @@ export const MANUAL_TRANSITION_MS = 120;
 // Only these events drive presentation; the rest (movement, targeting, telemetry) would bloat the retained log.
 export const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]> = new Set([
   "tower-repaired",
-  "wall-repaired",
   "path-repaired",
   "wave-clear-bonus",
   "catch-up-bonus"

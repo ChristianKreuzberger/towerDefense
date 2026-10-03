@@ -12,8 +12,7 @@ A multiplayer tower-defense game for the browser, designed for local offline pla
 - Each player places one tower at the start
 - Towers defend against invading creatures
 - Creature kills grant points
-- Points buy tower upgrades and walls
-- Walls affect pathing and must not create invalid maps
+- Every player starts with 100 points; points buy tower upgrades
 - First player to 1000 points wins
 
 ## Project Status
@@ -133,11 +132,11 @@ Quick play loop in browser:
 2. Pick a player and place each tower on buildable cells shown as . in the board.
 3. Buy Upgrade Tower now if wanted (upgrades are prep-only), then click Ready For Wave for each player.
 4. Combat starts and advances automatically (Pause/Play and 1x/2x/4x appear during combat; press P to toggle).
-5. Use Place Wall (then click a tile) and Set Target Mode during wave phase.
+5. Use Set Target Mode during wave phase.
 
 Notes:
 - If a command is rejected, Last Action shows the reason (for example path-blocked or insufficient-points).
-- Add `?debug=1` to the URL for the snapshot JSON panel, wall X/Y inputs, and manual tick buttons; add `?perf=1` for the performance overlay (`window.__perf`).
+- Add `?debug=1` to the URL for the snapshot JSON panel, tile X/Y inputs, and manual tick buttons; add `?perf=1` for the performance overlay (`window.__perf`).
 
 ## Balance Analysis Workflow (Offline)
 
@@ -228,8 +227,8 @@ Expected output sections:
 
 Deterministic reproducibility and tuning notes:
 - Keep `seed`, player order, and command sequence identical when comparing tuning changes.
-- Treat each report as a baseline artifact and compare only one tuning dimension at a time (for example wall cost growth or repair amount).
-- Compare by section: wave pacing (`tick`), survivability (`towerDamageIntake`/`wallDamageIntake`), economy (`net` and ending points), and structure stability (`livingTowers`, `livingWalls`, `pathWearTotal`).
+- Treat each report as a baseline artifact and compare only one tuning dimension at a time (for example upgrade cost growth or repair amount).
+- Compare by section: wave pacing (`tick`), survivability (`towerDamageIntake`), economy (`net` and ending points), and structure stability (`livingTowers`, `pathWearTotal`).
 - For MVP balance reviews, keep interpretation anchored to current constraints: offline-first flow, fixed initial tower placement, no tower-vs-tower targeting, and win threshold at 1000 points.
 
 Diff interpretation guidance:

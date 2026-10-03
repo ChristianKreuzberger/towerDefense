@@ -33,8 +33,6 @@ const THROTTLES: Partial<Record<SoundId, Throttle>> = {
   "tower-shot": { minIntervalMs: 60, maxVoices: 4 },
   "creature-kill": { minIntervalMs: 80, maxVoices: 3 },
   "tower-damaged": { minIntervalMs: 120, maxVoices: 3 },
-  "wall-hit": { minIntervalMs: 90, maxVoices: 3 },
-  "wall-destroyed": { minIntervalMs: 150, maxVoices: 2 },
   repair: { minIntervalMs: 200, maxVoices: 1 },
   "wave-clear-bonus": { minIntervalMs: 200, maxVoices: 1 }
 };
@@ -139,14 +137,6 @@ const RECIPES: Record<SoundId, (kit: RecipeKit) => number> = {
     tone(ctx, out, { type: "sawtooth", freq: 140 * k, freqEnd: 40, at: t, dur: 0.6, gain: 0.3 * g });
     return 0.62;
   },
-  "wall-hit": ({ ctx, out, noiseBuffer, t, g }) => {
-    noise(ctx, out, noiseBuffer, { at: t, dur: 0.07, gain: 0.3 * g, filter: "bandpass", freq: 1400 });
-    return 0.09;
-  },
-  "wall-destroyed": ({ ctx, out, noiseBuffer, t, g }) => {
-    noise(ctx, out, noiseBuffer, { at: t, dur: 0.3, gain: 0.4 * g, filter: "lowpass", freq: 700 });
-    return 0.32;
-  },
   "wave-start": ({ ctx, out, t, g }) => {
     tone(ctx, out, { type: "sawtooth", freq: 196, at: t, dur: 0.25, gain: 0.2 * g });
     tone(ctx, out, { type: "sawtooth", freq: 294, at: t + 0.18, dur: 0.35, gain: 0.2 * g });
@@ -176,11 +166,6 @@ const RECIPES: Record<SoundId, (kit: RecipeKit) => number> = {
   "place-tower": ({ ctx, out, t, g }) => {
     tone(ctx, out, { type: "square", freq: 220, freqEnd: 440, at: t, dur: 0.12, gain: 0.18 * g });
     return 0.14;
-  },
-  "place-wall": ({ ctx, out, noiseBuffer, t, g }) => {
-    noise(ctx, out, noiseBuffer, { at: t, dur: 0.08, gain: 0.3 * g, filter: "lowpass", freq: 1200 });
-    tone(ctx, out, { type: "square", freq: 150, at: t, dur: 0.08, gain: 0.15 * g });
-    return 0.1;
   },
   upgrade: ({ ctx, out, t, g }) => {
     tone(ctx, out, { type: "triangle", freq: 440, at: t, dur: 0.1, gain: 0.22 * g });

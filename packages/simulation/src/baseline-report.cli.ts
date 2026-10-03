@@ -3,8 +3,6 @@ import { resolve } from "node:path";
 
 import {
   getTowerUpgradeCost,
-  getWallCost,
-  isValidWallPlacement,
   type SimulationCommand,
   type TowerTargetMode,
   type UpgradeTrack
@@ -26,7 +24,6 @@ interface BaselineScenario {
 }
 
 type WaveStartAction =
-  | { type: "place-wall"; playerId: string }
   | { type: "upgrade-tower"; playerId: string; track: UpgradeTrack }
   | { type: "set-target-mode"; playerId: string; mode: TowerTargetMode };
 
@@ -57,7 +54,7 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
   },
   {
     id: "duo_seed-19_wave2",
-    description: "Two players, deterministic wall/upgrade commands between waves",
+    description: "Two players, deterministic upgrade commands between waves",
     seed: 19,
     players: [
       { id: "p1", name: "Alpha" },
@@ -69,7 +66,6 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
     },
     waveStartActions: {
       2: [
-        { type: "place-wall", playerId: "p1" },
         { type: "upgrade-tower", playerId: "p2", track: "range" },
         { type: "upgrade-tower", playerId: "p1", track: "accuracy" }
       ]
@@ -77,7 +73,7 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
   },
   {
     id: "trio_seed-2024_wave3",
-    description: "Three players, three waves with target-mode and wall placements",
+    description: "Three players, three waves with target-mode and upgrade commands",
     seed: 2024,
     players: [
       { id: "p1", name: "Alpha" },
@@ -90,11 +86,9 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
     },
     waveStartActions: {
       2: [
-        { type: "place-wall", playerId: "p1" },
         { type: "set-target-mode", playerId: "p2", mode: "strongest" }
       ],
       3: [
-        { type: "place-wall", playerId: "p3" },
         { type: "upgrade-tower", playerId: "p1", track: "damage" }
       ]
     }
@@ -243,53 +237,6 @@ function placeTowersDeterministically(
   }
 }
 
-function placeWallDeterministically(
-  simulation: ReturnType<typeof createMatch>,
-  playerId: string,
-  scenarioId: string,
-  wave: number
-): void {
-  const snapshot = simulation.getSnapshot();
-  const player = snapshot.players.find((entry) => entry.id === playerId);
-  if (!player) {
-    throw new Error(`unknown player ${playerId} in scenario ${scenarioId}`);
-  }
-
-  const wallCost = getWallCost(snapshot.walls.length);
-  if (player.points < wallCost) {
-    simulation.awardPoints(playerId, wallCost - player.points);
-  }
-
-  const afterTopUp = simulation.getSnapshot();
-  const available = afterTopUp.map.cells
-    .filter((cell) => cell.buildable)
-    .sort((a, b) => (a.y - b.y) || (a.x - b.x));
-
-  for (const cell of available) {
-    const validation = isValidWallPlacement(
-      { playerId, x: cell.x, y: cell.y },
-      afterTopUp.walls,
-      afterTopUp.towers,
-      afterTopUp.map
-    );
-    if (!validation.valid) {
-      continue;
-    }
-
-    const result = simulation.applyCommand({
-      type: "place-wall",
-      playerId,
-      x: cell.x,
-      y: cell.y
-    });
-    if (result.accepted) {
-      return;
-    }
-  }
-
-  throw new Error(`could not place wall for ${playerId} in scenario ${scenarioId} wave ${wave}`);
-}
-
 function readyAllPlacedPlayers(simulation: ReturnType<typeof createMatch>, scenarioId: string, wave: number): void {
   const snapshot = simulation.getSnapshot();
   for (const player of snapshot.players
@@ -309,11 +256,6 @@ function applyWaveStartAction(
   scenarioId: string,
   wave: number
 ): void {
-  if (action.type === "place-wall") {
-    placeWallDeterministically(simulation, action.playerId, scenarioId, wave);
-    return;
-  }
-
   if (action.type === "upgrade-tower") {
     const snapshot = simulation.getSnapshot();
     const player = snapshot.players.find((entry) => entry.id === action.playerId);
@@ -380,7 +322,7 @@ function runScenario(scenario: BaselineScenario, outputDir: string): ScenarioRes
   for (let wave = 1; wave <= maxWave; wave += 1) {
     const waveActions = scenario.waveStartActions?.[wave] ?? [];
     if (simulation.getSnapshot().phase !== "wave") {
-      // Upgrades are only allowed in prep, before players ready; walls and target modes are wave-only.
+      // Upgrades are only allowed in prep, before players ready; target modes are wave-only.
       for (const action of waveActions) {
         if (action.type === "upgrade-tower") {
           applyWaveStartAction(simulation, action, scenario.id, wave);

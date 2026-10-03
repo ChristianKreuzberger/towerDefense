@@ -2,12 +2,12 @@ import { UPGRADE_TRACKS } from "@tower-defense/shared";
 import type { TowerTargetMode } from "@tower-defense/shared";
 import { handleCellSelected, placeTowerForSelectedPlayer, runGuideAction } from "./actions";
 import type { SoundId } from "./audio/index";
-import { setCellClickHandler, setMoveMode, setWallMode } from "./board";
+import { setCellClickHandler, setMoveMode } from "./board";
 import { DAMAGE_TYPE_OPTIONS, PLAYBACK_SPEEDS, TARGET_MODES } from "./constants";
 import { demo } from "./demo-instance";
 import { app, el, must } from "./dom";
 import { closeOverlay } from "./end-overlay";
-import { REJECT_REASON_TEXT, addFeedback } from "./feedback";
+import { addFeedback } from "./feedback";
 import { hideGuideOverlay } from "./guide";
 import type { GuideAction } from "./guide";
 import { renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
@@ -94,15 +94,6 @@ export function installControls(): void {
 
   el.readyBtn.addEventListener("click", () => {
     void sendCommand({ type: "ready-for-wave", playerId: selectedPlayerId() });
-  });
-
-  // Walls are placed by clicking tiles while this mode is on (the sim accepts walls during combat only).
-  el.placeWallBtn.addEventListener("click", () => {
-    if (el.placeWallBtn.getAttribute("aria-disabled") === "true") {
-      addFeedback("info", REJECT_REASON_TEXT["wall-phase-not-active"] ?? "walls are not available right now");
-      return;
-    }
-    setWallMode(!store.wallMode);
   });
 
   el.moveTowerBtn.addEventListener("click", () => {

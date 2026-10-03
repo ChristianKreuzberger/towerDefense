@@ -35,7 +35,7 @@ Map preview step
 - Turn banner: a big, centered banner (separate from the wave banner so both can show after a wave ends) with the player's name and "it's your turn". The text uses the player's colour, at least 40px on desktop (scaled down with the viewport on phones, never below 28px, wrapping instead of overflowing), and stays visible for about 3.5 seconds. It is `aria-live="polite"`, does not take pointer events, and under `prefers-reduced-motion` it appears without animation. It is only shown when more than one player is in the match. Generic action toasts are unchanged
 - The guide card title is larger (18px) so the turn message is readable from across the table
 - Show active wave and remaining creatures
-- Action toolbar (tower, wall, move, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
+- Action toolbar (tower, move, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
 ## Real-time playback
@@ -44,7 +44,7 @@ Map preview step
 - Default is playing at 1x whenever the match is in the combat phase
 - Base rate is 5 simulation ticks per second at 1x; 2x and 4x run 10 and 20 ticks per second
 - Controls: Play/Pause toggle and 1x / 2x / 4x speed buttons, visible during combat
-- Pausing stops tick requests only; placing walls and target modes stay available while paused. Target modes also stay available in prep
+- Pausing stops tick requests only; target modes stay available while paused and also in prep
 - Player names are always rendered as text (never as HTML) and are limited to 24 characters
 - Ticks are requested in small batches (at most 4 per request, one request in flight) so a slow response never queues work
 - Playback never runs while the browser tab is hidden and does not catch up on return
@@ -72,11 +72,11 @@ Board scaling
 - Pointer to cell conversion measures the canvas rectangle at event time, so any CSS scaling stays correct
 
 Terrain
-- The map only distinguishes buildable cells from non-buildable ones. Buildable cells are the walkable layer: they are drawn as the road, creatures walk on them and towers and walls are placed on them (see spec/05, Creature lane). Non-buildable cells are raised grass pads that creatures never enter. There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
+- The map only distinguishes buildable cells from non-buildable ones. Buildable cells are the walkable layer: they are drawn as the road, creatures walk on them and towers are placed on them (see spec/05, Creature lane). Non-buildable cells are raised grass pads that creatures never enter. There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
 - Grass cells pick one of several variants from a seeded hash of (map seed, x, y), so a map always looks the same
 - The road is drawn as one continuous surface: edges against grass pads are chosen from the four-neighbour mask (rounded edge, shadow), interior cells are plain road
 - Path wear draws darker ruts over the road and scales with the wear value
-- The monster cave (spawn) is drawn as a dark cave mouth on the left edge at the lane start, with a faint red tint over its protected area (no towers or walls, see spec/05). The right edge is marked as the goal; creatures leave at the last column
+- The monster cave (spawn) is drawn as a dark cave mouth on the left edge at the lane start, with a faint red tint over its protected area (no towers, see spec/05). The right edge is marked as the goal; creatures leave at the last column
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
@@ -93,15 +93,11 @@ Creatures
 - Four silhouettes, readable without text: runner (slim, pointed), swarm (small round bug), armored (plated hex), tank (large square with tracks and cannon)
 - Creatures face their heading, bob while walking, show an HP bar only when damaged, and leave a puff when they die
 
-Walls
-- Solid blocks filling the cell, a crack overlay at 66 percent HP and a heavier one at 33 percent
-
 Effects (driven by snapshot events, presentation only)
 - `tower-hit`: projectile from tower to creature, hit spark, turret recoil
 - `creature-defeated`: particle burst and a floating "+points" in the scoring player's colour
 - `creature-attack`: tower flash and shake
 - `tower-destroyed`: explosion (flash, fireball, debris, smoke) played on the tower; the tower vanishes only once the explosion has peaked and leaves ruins behind (see Ruins). With `prefers-reduced-motion` the explosion is a single short static flash
-- `wall-hit`: spark
 - `wave-end`: wave-clear banner
 - `tower-hit` and `creature-defeated` carry the cell the creature was in. Strong towers can kill a creature within the same batched response that spawned it, so it never appears in a snapshot; the client falls back to that cell so shots and kills are still shown
 - Events of one batched response are spread across the glide time of that response so they do not all fire at once; the number of effects per snapshot is capped
@@ -130,7 +126,7 @@ Damage type selector
 
 Move tower
 - A "Move Tower" button (hotkey `V`, cost shown as "free") appears in the toolbar. It is available only when the simulation would accept a move (`towerMoveAvailable` for the player, prep phase, not ready); before the unlock it is dimmed and a press explains "unlocks after round 5"
-- Pressing it enters move mode (like wall mode: the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted, the phase changes or the active player changes
+- Pressing it enters move mode (the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted, the phase changes or the active player changes
 - The tower glides to its new tile with a short pop
 - Cost-slot label (from state, never from DOM text): `free` (move available), `after R5` (locked, wave 5 or earlier), `used` (unlocked, not ready, token spent), `ready` (unlocked and the player is ready; the snapshot cannot tell a spent token from an unspent one, so the hint is hedged: "You can only move your tower before you ready up (if you have not used your free move yet)"), and `-` outside prep, with no living tower or when eliminated. The `ready` check comes before the token check because the simulation reports `towerMoveAvailable: false` for a ready player
 
@@ -166,19 +162,16 @@ Event to sound table
 | `creature-defeated` | `creature-kill` | at most 3 per snapshot |
 | `creature-attack` | `tower-damaged` | |
 | `tower-destroyed` | `tower-destroyed` | priority |
-| `wall-hit` | `wall-hit` | |
-| `wall-destroyed` | `wall-destroyed` | |
 | `wave-start` event or phase change into `wave` | `wave-start` | once per snapshot |
 | `wave-end` | `wave-clear`, plus `wave-clear-bonus` sparkle | |
 | `tower-repaired` | `repair` | at most one per snapshot |
 | phase change into `ended` from another phase | `win` (score-win) or `lose` (all-towers-destroyed) | priority |
-| command accepted: place-tower, place-wall, upgrade-tower, ready-for-wave | `place-tower`, `place-wall`, `upgrade`, `ready` | |
+| command accepted: place-tower, upgrade-tower, ready-for-wave | `place-tower`, `upgrade`, `ready` | |
 | command rejected | `rejected` | debug commands are silent; a rejected set-target-mode shows a toast but plays no sound |
 | enabled button click | `ui-click` | `data-sfx` on a button overrides or disables (`none`) it |
 
-## Wall placement
+## Tile entry
 
-- Walls are placed from the battlefield: toggle "Place Wall" (or press W), then click a buildable free tile; the mode stays active until toggled off
 - Coordinate entry fields are not part of the normal UI
 
 ## Guidance overlay
@@ -189,7 +182,7 @@ Event to sound table
 ## Diagnostics and debug
 
 - Query `?perf=1` shows an overlay and exposes `window.__perf` (snapshot apply time, fps, snapshot size)
-- Query `?debug=1` reveals developer controls: snapshot JSON, wall X/Y inputs, manual tick and advance-many buttons, and a "Demo combat" button that feeds synthetic creatures and events to the board (client only, no simulation involved) to exercise creature and effect visuals
+- Query `?debug=1` reveals developer controls: snapshot JSON, tile X/Y inputs, manual tick and advance-many buttons, and a "Demo combat" button that feeds synthetic creatures and events to the board (client only, no simulation involved) to exercise creature and effect visuals
 - None of these appear in the default view
 
 ## Between-round UX requirements
@@ -197,7 +190,7 @@ Event to sound table
 - Announce round completion
 - Trigger automatic repair for all surviving towers
 - Show repair results clearly (text and HP bar refill animation)
-- Return to short prep phase for upgrades (walls stay combat-only)
+- Return to short prep phase for upgrades
 
 ## Combat communication rules
 

@@ -19,7 +19,6 @@ MVP runs offline in a single local process with an authoritative simulation core
 ## Client commands
 
 - placeTower
-- placeWall
 - upgradeTower
 - setTargetMode
 - setDamageType

@@ -6,7 +6,7 @@ export interface CreatureArchetypeStats {
   hp: number;
   rewardPoints: number;
   attackDamage: number;
-  // Cells; short on purpose so only towers/walls beside the lane get attacked.
+  // Cells; short on purpose so only towers beside the lane get attacked.
   attackRange: number;
 }
 

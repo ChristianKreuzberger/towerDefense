@@ -6,6 +6,7 @@ import {
   CATCH_UP_GAP_FRACTION,
   CATCH_UP_GAP_THRESHOLD,
   CATCH_UP_MAX_BONUS,
+  STARTING_POINTS,
   SWARM_KILL_INCOME_CAP_PER_WAVE,
   WIN_SCORE,
   getCatchUpBonus,
@@ -182,7 +183,7 @@ test("swarm income cap pays up to the cap, then forfeits points and reports them
   const forfeitedAtBoundary = reward - remaining;
   assert.equal(internals.awardCreatureKillIncome("p1", "swarm", "over"), 0);
 
-  assert.equal(sim.getSnapshot().players.find((p) => p.id === "p1")!.points, SWARM_KILL_INCOME_CAP_PER_WAVE);
+  assert.equal(sim.getSnapshot().players.find((p) => p.id === "p1")!.points, STARTING_POINTS + SWARM_KILL_INCOME_CAP_PER_WAVE);
   const capped = sim
     .getSnapshot()
     .events.filter((e): e is Extract<MatchEvent, { type: "swarm-income-capped" }> => e.type === "swarm-income-capped");

@@ -7,17 +7,14 @@ export const MIN_TOWER_SITES = MAX_PLAYERS;
 // Names are shown in the HUD and the end screen; the cap keeps those layouts intact.
 export const MAX_PLAYER_NAME_LENGTH = 24;
 export const WIN_SCORE = 1000;
+// Every player starts with these points so late placers can offset a worse tower spot with an upgrade (spec/06).
+export const STARTING_POINTS = 100;
 export const DEFAULT_MAP_WIDTH = 50;
 export const DEFAULT_MAP_HEIGHT = 50;
 export const DEFAULT_TOWER_HEALTH = 100;
 export const BUILDABLE_CELL_THRESHOLD = 0.3;
-export const BASE_WALL_COST = 25;
-export const WALL_COST_GROWTH = 1.2;
 export const BETWEEN_WAVE_TOWER_REPAIR_PERCENT = 0.2;
 export const BETWEEN_WAVE_TOWER_REPAIR_MIN = 5;
-export const DEFAULT_WALL_HEALTH = 60;
-export const BETWEEN_WAVE_WALL_REPAIR_PERCENT = 0.25;
-export const BETWEEN_WAVE_WALL_REPAIR_MIN = 4;
 export const PATH_CELL_MAX_WEAR = 8;
 // Wear a lane cell gains each time a creature moves onto it during a wave.
 export const PATH_WEAR_PER_TRAVERSAL = 1;
@@ -34,8 +31,8 @@ export const CATCH_UP_GAP_FRACTION = 0.1;
 export const CATCH_UP_MAX_BONUS = 30;
 // Most points one player can earn from swarm kills in a single wave.
 export const SWARM_KILL_INCOME_CAP_PER_WAVE = 80;
-// Cells (Euclidean) around the monster cave where towers and walls are forbidden. Slightly smaller than the base
-// tower range (6), so towers just outside barely reach the cave exit, and nobody can wall in or point-blank the spawn.
+// Cells (Euclidean) around the monster cave where towers are forbidden. Slightly smaller than the base
+// tower range (6), so towers just outside barely reach the cave exit, and nobody can point-blank the spawn.
 export const SPAWN_PROTECTION_RADIUS = 5;
 // Creatures cannot be targeted or damaged for this long after spawning, so nobody camps the cave exit.
 export const CREATURE_SPAWN_PROTECTION_SECONDS = 1;
@@ -61,19 +58,15 @@ export const GAME_RULES = {
   maxPlayers: MAX_PLAYERS,
   maxPlayerNameLength: MAX_PLAYER_NAME_LENGTH,
   winScore: WIN_SCORE,
+  startingPoints: STARTING_POINTS,
   towersPerPlayer: 1,
   mapWidth: DEFAULT_MAP_WIDTH,
   mapHeight: DEFAULT_MAP_HEIGHT,
   defaultTowerHealth: DEFAULT_TOWER_HEALTH,
   buildableCellThreshold: BUILDABLE_CELL_THRESHOLD,
-  baseWallCost: BASE_WALL_COST,
-  wallCostGrowth: WALL_COST_GROWTH,
   upgradeTrackCosts: UPGRADE_TRACK_COSTS,
   betweenWaveTowerRepairPercent: BETWEEN_WAVE_TOWER_REPAIR_PERCENT,
   betweenWaveTowerRepairMin: BETWEEN_WAVE_TOWER_REPAIR_MIN,
-  defaultWallHealth: DEFAULT_WALL_HEALTH,
-  betweenWaveWallRepairPercent: BETWEEN_WAVE_WALL_REPAIR_PERCENT,
-  betweenWaveWallRepairMin: BETWEEN_WAVE_WALL_REPAIR_MIN,
   pathCellMaxWear: PATH_CELL_MAX_WEAR,
   pathWearPerTraversal: PATH_WEAR_PER_TRAVERSAL,
   betweenWavePathWearRepair: BETWEEN_WAVE_PATH_WEAR_REPAIR,
@@ -101,13 +94,6 @@ export function getBetweenWaveTowerRepairAmount(maxHealth: number): number {
   return Math.max(
     BETWEEN_WAVE_TOWER_REPAIR_MIN,
     Math.floor(maxHealth * BETWEEN_WAVE_TOWER_REPAIR_PERCENT)
-  );
-}
-
-export function getBetweenWaveWallRepairAmount(maxHealth: number): number {
-  return Math.max(
-    BETWEEN_WAVE_WALL_REPAIR_MIN,
-    Math.floor(maxHealth * BETWEEN_WAVE_WALL_REPAIR_PERCENT)
   );
 }
 

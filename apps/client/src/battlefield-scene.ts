@@ -12,7 +12,7 @@ import {
   TOWER_STYLE_TIERS,
   isInSpawnProtection
 } from "@tower-defense/shared";
-import type { Creature, CreatureArchetype, DamageType, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades, Wall } from "@tower-defense/shared";
+import type { Creature, CreatureArchetype, DamageType, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades } from "@tower-defense/shared";
 
 import { Effects } from "./art/fx";
 import { CREAM, INK, UI_COLORS, colorForPlayer, playerIndex } from "./art/palette";
@@ -23,7 +23,6 @@ import { KEY, SS, TOWER_SCALE, ensureTextures } from "./art/textures";
 const DEPTH_TERRAIN = 0;
 const DEPTH_WEAR = 0.5;
 const DEPTH_RUINS = 0.8;
-const DEPTH_WALLS = 1;
 const DEPTH_TOWERS = 2;
 const DEPTH_CREATURES = 3;
 const DEPTH_FX = 4;
@@ -69,7 +68,6 @@ export interface PlacementContext {
   phase: MatchPhase;
   playerId: string;
   hasTowerAlready: boolean;
-  wallMode?: boolean;
   // Moving the tower: the ghost tower is shown even though the player already has one.
   moveMode?: boolean;
 }
@@ -131,20 +129,6 @@ interface PendingDeath {
   info: RuinInfo;
 }
 
-interface WallVisual {
-  image: Phaser.GameObjects.Image;
-  player: number;
-  crack: number;
-}
-
-function crackLevel(wall: Wall): number {
-  const ratio = wall.maxHealth > 0 ? wall.health / wall.maxHealth : 1;
-  if (ratio <= 0.33) {
-    return 2;
-  }
-  return ratio <= 0.66 ? 1 : 0;
-}
-
 function hpColor(ratio: number): number {
   if (ratio > 0.6) {
     return 0x7fd08a;
@@ -157,7 +141,6 @@ class BattlefieldScene extends Phaser.Scene {
   private wearImages = new Map<number, Phaser.GameObjects.Image>();
   private mapKey: string | null = null;
   private wearSignature = -1;
-  private wallVisuals = new Map<string, WallVisual>();
   private creatureVisuals = new Map<string, CreatureVisual>();
   private creaturePool: CreatureVisual[] = [];
   private cursorGraphics?: Phaser.GameObjects.Graphics;
@@ -165,7 +148,6 @@ class BattlefieldScene extends Phaser.Scene {
   private linkGraphics?: Phaser.GameObjects.Graphics;
   private ghostBase?: Phaser.GameObjects.Image;
   private ghostTurret?: Phaser.GameObjects.Image;
-  private ghostWall?: Phaser.GameObjects.Image;
   private fx?: Effects;
   private towerVisuals = new Map<string, TowerVisual>();
   private towerAtCell = new Map<string, string>();
@@ -213,7 +195,6 @@ class BattlefieldScene extends Phaser.Scene {
     this.linkGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
     this.ghostBase = this.add.image(0, 0, KEY.towerBase(0)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
     this.ghostTurret = this.add.image(0, 0, KEY.turret(0, 1)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
-    this.ghostWall = this.add.image(0, 0, KEY.wall(0, 0)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.6);
     this.input.on("pointerdown", this.handlePointerDown, this);
     this.input.on("pointermove", this.handlePointerMove, this);
     this.game.canvas.addEventListener("pointerleave", this.handlePointerLeave);
@@ -390,8 +371,7 @@ class BattlefieldScene extends Phaser.Scene {
     if (!context) {
       return false;
     }
-    const allowedPhase = context.wallMode ? context.phase !== "ended" : context.phase === "placement";
-    if (!allowedPhase) {
+    if (context.phase !== "placement") {
       return false;
     }
     const cell = this.cellsByKey.get(`${x},${y}`);
@@ -405,7 +385,7 @@ class BattlefieldScene extends Phaser.Scene {
     if (!this.placementContext) {
       return false;
     }
-    if (!this.placementContext.wallMode && !this.placementContext.moveMode && this.placementContext.hasTowerAlready) {
+    if (!this.placementContext.moveMode && this.placementContext.hasTowerAlready) {
       return false;
     }
     return this.isHoverValid(x, y);
@@ -415,14 +395,12 @@ class BattlefieldScene extends Phaser.Scene {
     const hover = this.hoverGraphics;
     const ghostBase = this.ghostBase;
     const ghostTurret = this.ghostTurret;
-    const ghostWall = this.ghostWall;
-    if (!hover || !ghostBase || !ghostTurret || !ghostWall) {
+    if (!hover || !ghostBase || !ghostTurret) {
       return;
     }
     hover.clear();
     ghostBase.setVisible(false);
     ghostTurret.setVisible(false);
-    ghostWall.setVisible(false);
 
     const cellSize = this.cellSize;
     // The active player's tower gets a steady ring so it is easy to find on a busy board.
@@ -460,14 +438,10 @@ class BattlefieldScene extends Phaser.Scene {
     if (this.isGhostValid(x, y) && this.placementContext) {
       const { cx, cy } = cellCenter(x, y, cellSize);
       const index = playerIndex(this.placementContext.playerId);
-      if (this.placementContext.wallMode) {
-        ghostWall.setTexture(KEY.wall(index, 0)).setPosition(cx, cy).setVisible(true);
-      } else {
-        ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
-        ghostTurret.setTexture(KEY.turret(index, 0)).setPosition(cx, cy).setVisible(true);
-        // Placement is one-shot, so show the coverage before the player commits.
-        this.drawRangeCircle(hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
-      }
+      ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
+      ghostTurret.setTexture(KEY.turret(index, 0)).setPosition(cx, cy).setVisible(true);
+      // Placement is one-shot, so show the coverage before the player commits.
+      this.drawRangeCircle(hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
     }
   }
 
@@ -638,7 +612,6 @@ class BattlefieldScene extends Phaser.Scene {
       }
       this.wearSignature = -1;
       this.resetVisuals();
-      this.syncWalls([], this.cellSize);
       this.syncCreatures([], this.cellSize, 0);
       this.drawCursor();
       this.drawHoverAndGhost();
@@ -658,9 +631,6 @@ class BattlefieldScene extends Phaser.Scene {
     for (const tower of snapshot.towers) {
       occupiedCells.add(`${tower.x},${tower.y}`);
     }
-    for (const wall of snapshot.walls) {
-      occupiedCells.add(`${wall.x},${wall.y}`);
-    }
     this.occupiedCells = occupiedCells;
 
     // Effects read the pooled visuals of the previous snapshot, so they must run before the sync calls retire them.
@@ -671,7 +641,6 @@ class BattlefieldScene extends Phaser.Scene {
     this.lastWave = snapshot.wave;
     this.lastWaveTick = snapshot.waveTick;
 
-    this.syncWalls(snapshot.walls, cellSize);
     this.syncTowers(snapshot, cellSize);
     this.syncCreatures(snapshot.creatures, cellSize, transitionMs);
     this.drawHoverAndGhost();
@@ -708,10 +677,6 @@ class BattlefieldScene extends Phaser.Scene {
 
     // Entity ids repeat across matches (e.g. "tower-p1"), so never carry visuals over to a different map.
     this.resetVisuals();
-    for (const visual of this.wallVisuals.values()) {
-      visual.image.destroy();
-    }
-    this.wallVisuals.clear();
     for (const image of this.wearImages.values()) {
       image.destroy();
     }
@@ -765,34 +730,6 @@ class BattlefieldScene extends Phaser.Scene {
     for (const [index, image] of this.wearImages) {
       if (!used.has(index)) {
         image.setVisible(false);
-      }
-    }
-  }
-
-  private syncWalls(walls: Wall[], cellSize: number): void {
-    const seen = new Set<string>();
-    for (const wall of walls) {
-      seen.add(wall.id);
-      const player = playerIndex(wall.playerId);
-      const crack = crackLevel(wall);
-      let visual = this.wallVisuals.get(wall.id);
-      if (!visual) {
-        const image = this.add
-          .image(wall.x * cellSize + cellSize / 2, wall.y * cellSize + cellSize / 2, KEY.wall(player, crack))
-          .setScale(INV)
-          .setDepth(DEPTH_WALLS);
-        visual = { image, player, crack };
-        this.wallVisuals.set(wall.id, visual);
-      } else if (visual.crack !== crack || visual.player !== player) {
-        visual.image.setTexture(KEY.wall(player, crack));
-        visual.crack = crack;
-        visual.player = player;
-      }
-    }
-    for (const [id, visual] of this.wallVisuals) {
-      if (!seen.has(id)) {
-        visual.image.destroy();
-        this.wallVisuals.delete(id);
       }
     }
   }
@@ -1173,22 +1110,6 @@ class BattlefieldScene extends Phaser.Scene {
               delayMs: delay,
               info: { ownerName: ownerNameFor(snapshot.players, event.playerId), wave: event.wave }
             });
-            budget -= 1;
-          }
-          break;
-        }
-        case "wall-hit": {
-          const wall = this.wallVisuals.get(event.targetWallId);
-          if (wall) {
-            fx.spark(wall.image.x, wall.image.y, 0xf3ead6, delay);
-            budget -= 1;
-          }
-          break;
-        }
-        case "wall-destroyed": {
-          const wall = this.wallVisuals.get(event.wallId);
-          if (wall) {
-            fx.puff(wall.image.x, wall.image.y, 0xbdb5a6, delay);
             budget -= 1;
           }
           break;

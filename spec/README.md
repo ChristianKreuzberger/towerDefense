@@ -29,5 +29,4 @@ This folder contains planning documents for a multiplayer browser tower-defense 
 
 - Shared point pool vs per-player point economy
 - Round structure length and creature scaling curve
-- Wall placement limits and anti-grief constraints
 - Procedural generation seed controls and biome themes

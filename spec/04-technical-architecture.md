@@ -80,7 +80,7 @@ style later if desired.
 
 Why the DOM renderer is the actual bottleneck, not the game logic:
 - The simulation core only emits a plain `MatchSnapshot` (grid cells, tower/
-  creature/wall positions, HP, phase) and has zero rendering dependencies.
+  creature positions, HP, phase) and has zero rendering dependencies.
   Swapping the renderer does not touch `packages/simulation` or
   `packages/shared`.
 - A prior perf bug (O(n^2) cell lookup in `renderBoard`, see repo memory) was
@@ -92,8 +92,8 @@ Migration scope (client-only, non-breaking to server/simulation contracts):
    menu/HUD/overlay chrome as DOM (Phaser owns only the battlefield canvas).
 2. Introduce a `BattlefieldScene` that consumes the same polled
    `MatchSnapshot` the DOM renderer used, and maps grid cells/towers/
-   creatures/walls to Phaser sprites/tilemap layers.
-3. Reuse existing tower/wall/creature visual language (level glow, HP-based
+   creatures to Phaser sprites/tilemap layers.
+3. Reuse existing tower/creature visual language (level glow, HP-based
    fade, archetype cues) as sprite tint/scale/texture swaps instead of CSS.
 4. Keep click-to-place-tower and other board interactions working via
    Phaser input events mapped to the same `place-tower`/command calls.
@@ -120,7 +120,7 @@ Acceptance checks:
 
 - Terrain is baked once per map (seed + size) into a texture; snapshots never redraw terrain cells
 - Path wear is a small overlay redrawn only when the worn-cell set changes
-- Creatures, walls and towers are keyed by entity id and updated in place; display objects are pooled and never created per snapshot
+- Creatures and towers are keyed by entity id and updated in place; display objects are pooled and never created per snapshot
 - The canvas is resized only when map size changes
 - HUD/player chips are updated in place; select options are rewritten only when the player list changes
 - Leaving the match for the menu discards snapshot responses still in flight, so a late playback tick cannot reopen the game screen

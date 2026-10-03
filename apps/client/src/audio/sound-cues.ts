@@ -5,8 +5,6 @@ export type SoundId =
   | "creature-kill"
   | "tower-damaged"
   | "tower-destroyed"
-  | "wall-hit"
-  | "wall-destroyed"
   | "wave-start"
   | "wave-clear"
   | "wave-clear-bonus"
@@ -14,7 +12,6 @@ export type SoundId =
   | "win"
   | "lose"
   | "place-tower"
-  | "place-wall"
   | "upgrade"
   | "ready"
   | "rejected"
@@ -76,12 +73,6 @@ export function cuesForSnapshotChange({ previous, next, events, suppress }: Snap
       case "tower-destroyed":
         cues.push({ id: "tower-destroyed", playerNumber: playerNumberOf(event.playerId) });
         break;
-      case "wall-hit":
-        cues.push({ id: "wall-hit" });
-        break;
-      case "wall-destroyed":
-        cues.push({ id: "wall-destroyed" });
-        break;
       case "wave-start":
         if (!waveStartSeen) {
           waveStartSeen = true;
@@ -120,7 +111,6 @@ export function cuesForSnapshotChange({ previous, next, events, suppress }: Snap
 export function cueForCommandResult(commandType: string, accepted: boolean): SoundCue | null {
   const cues: Record<string, SoundId> = {
     "place-tower": "place-tower",
-    "place-wall": "place-wall",
     "move-tower": "place-tower",
     "upgrade-tower": "upgrade",
     "ready-for-wave": "ready"

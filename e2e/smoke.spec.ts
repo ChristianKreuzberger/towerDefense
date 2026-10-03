@@ -195,11 +195,11 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   ]);
   await expect(page.locator("#matchEndOverlay")).toBeHidden();
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
-  await expect(page.locator("#playerCards")).toContainText("0 pts");
+  await expect(page.locator("#playerCards")).toContainText("100 pts");
   await expect(page.locator("#playerCards")).not.toContainText("1000 pts");
 });
 
-test("debug mode: pause, manual ticks, wall mode, and snapshot panel", async ({ page }) => {
+test("debug mode: pause, manual ticks, and snapshot panel", async ({ page }) => {
   await startMatch(page, "/?debug=1");
   await expect(page.locator("#snapshot")).toBeVisible();
   await expect(page.locator("#advanceBtn")).toBeVisible();
@@ -223,12 +223,6 @@ test("debug mode: pause, manual ticks, wall mode, and snapshot panel", async ({ 
   await page.getByRole("button", { name: "Advance Wave Tick" }).click();
   await expect(page.locator("#snapshot")).toHaveValue(/"waveTick": 1/);
   await expect(page.locator("#battlefieldMeta")).toContainText("Tick 1");
-
-  // Wall mode sends place-wall for the clicked tile (rejected here: players start with 0 points).
-  await page.getByRole("button", { name: "Place Wall" }).click();
-  await expect(page.getByRole("button", { name: "Place Wall" })).toHaveAttribute("aria-pressed", "true");
-  await clickBuildableCell(page, 5);
-  await expect(page.locator("#feedbackQueue")).toContainText("Wall rejected: not enough points");
 
   await page.getByRole("button", { name: "Advance Wave (Auto)" }).click();
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
@@ -476,10 +470,8 @@ test("in-match settings dialog closes with Esc and blocks hotkeys while open", a
 
   await page.locator("#settingsCloseBtn").focus();
   await page.keyboard.press("2");
-  await page.keyboard.press("w");
   await page.keyboard.press("m");
   await expect(select).toHaveValue("p1");
-  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#settingsMuteBtn")).toHaveAttribute("aria-pressed", "false");
 
   await page.keyboard.press("Escape");
@@ -580,13 +572,12 @@ test("player names are shown as text on the match-end overlay, never parsed as H
   expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
 });
 
-test("wall and target-mode controls follow the phase and a disabled wall button sends no command", async ({ page }) => {
+test("changing the target mode sends a command", async ({ page }) => {
   await startMatch(page, "/");
   await clickCellNearSpawn(page, 0);
   await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
 
-  // Prep: walls are off (with an explanation), target mode is available.
-  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "true");
+  // Target mode is available in prep.
   await expect(page.locator("#mode")).toBeEnabled();
   const commands: string[] = [];
   page.on("request", (request) => {
@@ -594,26 +585,11 @@ test("wall and target-mode controls follow the phase and a disabled wall button 
       commands.push(request.postData() ?? "");
     }
   });
-  // Playwright treats aria-disabled as not actionable; the button stays clickable on purpose so it can explain itself.
-  await page.locator("#placeWallBtn").click({ force: true });
-  await expect(page.locator("#feedbackQueue")).toContainText("walls can only be placed during combat");
-  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-pressed", "false");
-  expect(commands).toEqual([]);
-
   await page.locator("#mode").selectOption("nearest");
   await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toContain("set-target-mode");
   await expect(page.locator("#feedbackQueue")).not.toContainText("rejected");
   await expect(page.locator("#mode")).toHaveValue("nearest");
-
-  // Combat: walls become available once everyone is ready.
-  await page.locator("#playerId").selectOption("p2");
-  await clickCellNearSpawn(page, 1);
-  await page.locator("#readyBtn").click();
-  await page.locator("#playerId").selectOption("p1");
-  await page.locator("#readyBtn").click();
-  await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
-  await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
 });
 
 test("the damage type selector follows the tower, is sent as a command and locks once the player is ready", async ({ page }) => {
@@ -696,7 +672,7 @@ test("the guide close button has an accessible name and the shortcut bar matches
   await expect(page.locator("#guideCloseBtn")).toHaveAttribute("aria-label", "Dismiss guidance");
   await expect(page.locator("#guideCloseBtn")).toHaveAttribute("title", "Dismiss guidance");
   const bar = page.locator("#shortcutBar");
-  for (const text of ["ready", "tower", "wall mode", "upgrade", "switch player", "pause", "mute", "move cursor"]) {
+  for (const text of ["ready", "tower", "upgrade", "switch player", "pause", "mute", "move cursor"]) {
     await expect(bar).toContainText(text);
   }
 });
@@ -728,8 +704,8 @@ test("hotkeys do nothing when the action is not available", async ({ page }) => 
     }
   });
 
-  // No tower yet: ready, wall and upgrades are not available.
-  for (const key of ["r", "w", "u", "i", "o"]) {
+  // No tower yet: ready and upgrades are not available.
+  for (const key of ["r", "u", "i", "o"]) {
     await page.keyboard.press(key);
   }
   await page.waitForTimeout(300);

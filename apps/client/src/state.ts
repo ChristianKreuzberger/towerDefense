@@ -47,7 +47,6 @@ export const store = {
   tickDebt: 0,
   playbackInFlight: false,
   playbackErrors: 0,
-  wallMode: false,
   // While on, the next tile click moves the player's tower (the one free move, spec/02).
   moveMode: false,
   // Whether the player picked a tile (click or arrows) since this match began; see resolvePlacementCell.

@@ -41,7 +41,6 @@ export const el = {
   phaseSub: must<HTMLElement>("phaseSub"),
   playbackControls: must<HTMLElement>("playbackControls"),
   playPauseBtn: must<HTMLButtonElement>("playPauseBtn"),
-  placeWallBtn: must<HTMLButtonElement>("placeWallBtn"),
   shortcutBar: must<HTMLElement>("shortcutBar"),
   overlay: must<HTMLElement>("matchEndOverlay"),
   overlaySummary: must<HTMLElement>("matchEndSummary"),
@@ -63,7 +62,6 @@ export const el = {
     damage: must<HTMLButtonElement>("upgradeDamageBtn"),
     accuracy: must<HTMLButtonElement>("upgradeAccuracyBtn")
   } as Record<UpgradeTrack, HTMLButtonElement>,
-  wallCost: must<HTMLElement>("wallCost"),
   upgradeCosts: {
     range: must<HTMLElement>("upgradeRangeCost"),
     damage: must<HTMLElement>("upgradeDamageCost"),
