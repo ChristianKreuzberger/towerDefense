@@ -47,6 +47,10 @@ for (const size of [
 
       // Placement rewrites the guide, the next-wave line, the meta line and shows toasts and the turn banner.
       await clickTowerSpot(page);
+      if (size.name === "phone") {
+        // Compact layout: the first tap only selects the spot, the second confirms.
+        await clickTowerSpot(page);
+      }
       await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
       expect(await boardBox(page)).toEqual(before);
       await page.locator("#readyBtn").click();
@@ -88,8 +92,69 @@ test.describe("compact layout", () => {
     await expect(page.locator("#mode")).toBeHidden();
   });
 
+  test("placing a tower is select, then confirm; a near miss snaps to the spot", async ({ page }) => {
+    await startMatch(page, "/");
+    const canvas = page.locator("#board canvas");
+    const spot = await page.evaluate(() => window.__testBoard!.findTowerSpot(0)!);
+    const exact = await cellPixel(page);
+    const cell = await page.evaluate(() => window.__testBoard!.cellToPixel(1, 0).x - window.__testBoard!.cellToPixel(0, 0).x);
+
+    // First tap, one cell beside the spot: snaps to it and only selects it.
+    await canvas.tap({ position: { x: exact.x + cell, y: exact.y } });
+    await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place here");
+    expect(await towers(page)).toHaveLength(0);
+
+    const box = (await page.locator("#placeTowerBtn").boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+
+    // A second tap on the selected spot (not on the near miss) places the tower there.
+    await canvas.tap({ position: exact });
+    await expect.poll(async () => (await towers(page)).length).toBe(1);
+    expect((await towers(page))[0]).toMatchObject({ x: spot.x, y: spot.y });
+    await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place Tower");
+  });
+
+  test("a new match drops the touch selection", async ({ page }) => {
+    await startMatch(page, "/");
+    await page.locator("#board canvas").tap({ position: await cellPixel(page) });
+    await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place here");
+    await page.locator("#mobileMoreBtn").click();
+    await page.getByRole("button", { name: "Back To Menu" }).click();
+    await page.getByRole("button", { name: "Start Match" }).click();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator("#mapPreviewRoot")).toBeHidden();
+    await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place Tower");
+    // The first tap only selects again, so nothing is placed.
+    await page.locator("#board canvas").tap({ position: await cellPixel(page) });
+    expect(await towers(page)).toHaveLength(0);
+  });
+
+  test("switching the active player through the select drops the touch selection", async ({ page }) => {
+    await startMatch(page, "/");
+    await page.locator("#board canvas").tap({ position: await cellPixel(page) });
+    await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place here");
+    // The select is hidden in the compact layout, so drive it the way its change listener sees it.
+    await page.evaluate(() => {
+      const select = document.getElementById("playerId") as HTMLSelectElement;
+      select.value = select.options[1]!.value;
+      select.dispatchEvent(new Event("change"));
+    });
+    await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place Tower");
+    await page.locator("#board canvas").tap({ position: await cellPixel(page) });
+    expect(await towers(page)).toHaveLength(0);
+  });
+
+  test("the Place button confirms the selected spot", async ({ page }) => {
+    await startMatch(page, "/");
+    await page.locator("#board canvas").tap({ position: await cellPixel(page) });
+    expect(await towers(page)).toHaveLength(0);
+    await page.locator("#placeTowerBtn").tap();
+    await expect.poll(async () => (await towers(page)).length).toBe(1);
+  });
+
   test("tapping a tower opens the upgrade popover and a purchase raises its level", async ({ page }) => {
     await startMatch(page, "/");
+    await page.locator("#board canvas").tap({ position: await cellPixel(page) });
     await page.locator("#board canvas").tap({ position: await cellPixel(page) });
     await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
     const [tower] = await towers(page);

@@ -6,6 +6,7 @@ import {
   MIN_TOWER_SITES,
   PATH_WIDTH,
   TOWER_SPOT_COUNT,
+  TOWER_SPOT_TOTAL,
   TOWER_SPOT_MAX_LANE_DISTANCE,
   TOWER_SPOT_MIN_SPACING,
   isInSpawnProtection,
@@ -284,7 +285,7 @@ export function generateTowerSpots(map: GameMap, seed: number): Point[] {
   }
   candidates.sort((a, b) => a.hash - b.hash || a.y - b.y || a.x - b.x);
 
-  const chosen: Point[] = [];
+  const chosen: Candidate[] = [];
   const clear = (c: Point, spacing: number): boolean =>
     chosen.every((spot) => Math.max(Math.abs(spot.x - c.x), Math.abs(spot.y - c.y)) >= spacing);
   const pick = (pool: Candidate[], spacing: number): void => {
@@ -315,15 +316,46 @@ export function generateTowerSpots(map: GameMap, seed: number): Point[] {
     { spacing: 1, maxDistance: TOWER_SPOT_MAX_LANE_DISTANCE },
     { spacing: 1, maxDistance: scan },
   ];
+  let usedAttempt = attempts[attempts.length - 1]!;
   for (const [attempt, { spacing, maxDistance }] of attempts.entries()) {
     chosen.length = 0;
     pick(candidates.filter((c) => c.distance <= maxDistance), spacing);
     if (chosen.length >= MIN_TOWER_SITES || attempt === attempts.length - 1) {
+      usedAttempt = attempts[attempt]!;
       break;
     }
   }
 
-  return chosen
-    .map(({ x, y }) => ({ x, y }))
-    .sort((a, b) => a.y - b.y || a.x - b.x);
+  const byRow = (a: Point, b: Point): number => a.y - b.y || a.x - b.x;
+  const base = chosen.map(({ x, y }) => ({ x, y })).sort(byRow);
+
+  // Second pass: extra spots under the same rules, always in the least-populated route segment that still has a
+  // clear candidate. They are listed after the base spots so the base order, and what depends on it, never changes.
+  const perSegment = new Map<number, number>();
+  for (const spot of chosen) {
+    perSegment.set(spot.segment, (perSegment.get(spot.segment) ?? 0) + 1);
+  }
+  const extraPool = candidates.filter((c) => c.distance <= usedAttempt.maxDistance && !chosen.includes(c));
+  const extras: Point[] = [];
+  while (base.length + extras.length < TOWER_SPOT_TOTAL) {
+    let best: Candidate | undefined;
+    for (const c of extraPool) {
+      if (chosen.includes(c) || !clear(c, usedAttempt.spacing)) {
+        continue;
+      }
+      const load = perSegment.get(c.segment) ?? 0;
+      // The pool is in hash order, so the first candidate wins ties.
+      if (!best || load < (perSegment.get(best.segment) ?? 0)) {
+        best = c;
+      }
+    }
+    if (!best) {
+      break;
+    }
+    chosen.push(best);
+    extras.push({ x: best.x, y: best.y });
+    perSegment.set(best.segment, (perSegment.get(best.segment) ?? 0) + 1);
+  }
+
+  return [...base, ...extras.sort(byRow)];
 }

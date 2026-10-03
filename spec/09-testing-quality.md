@@ -21,6 +21,8 @@
 - Upgrade cost calculations remain deterministic
 - Creature routing ignores tower list order, survives the loss of the first tower, and assigns live towers round robin
 - `validateGameMap` rejects each kind of malformed map; generated maps are valid and leave at least 8 reachable tower sites on every seed (checked across several hundred seeds by counting sites, not by placing every combination)
+- Tower spots: every default-size map has between 22 and `TOWER_SPOT_TOTAL` (32) spots over 300 seeds, all valid (off the road, outside spawn protection, spacing and coverage kept), the original 16 are an unchanged prefix of the list, small maps keep at least 8, and generation is deterministic per seed
+- Touch placement: snapping picks the nearest free spot within 1.5 cells; the first tap selects (ghost and range shown, no tower placed), the Place button or a second tap on the same spot places; desktop click places at once
 
 ## Client audio and settings
 

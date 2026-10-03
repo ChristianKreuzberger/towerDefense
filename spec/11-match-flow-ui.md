@@ -96,6 +96,7 @@ Terrain
 - Grass cells pick one of several variants from a seeded hash of (map seed, x, y), so a map always looks the same
 - The road is drawn as one continuous surface: edges against grass pads are chosen from the four-neighbour mask (rounded edge, shadow), interior cells are plain road
 - While placing or moving a tower, tower spots stay visible and only they accept a click; clicking the road or other grass shows the toast "Tower rejected: towers go on the marked spots, not on the road" (reject reason `not-tower-spot`)
+- On touch devices (compact layout or coarse pointer) placing and moving is two steps so a small board never causes a misplaced tower: a tap within 1.5 cells of a free tower spot selects the nearest such spot (snap), showing the highlighted pad, the ghost tower and its range circle without sending anything. The Place Tower button (at least 44px tall, labelled "Place here" once a spot is selected) or a second tap on the same selected spot confirms. Tapping elsewhere changes the selection. Move mode works the same way. On desktop one click on a spot still places at once and hover shows the preview
 - Path wear draws darker ruts over the road and scales with the wear value
 - The monster cave (spawn) is drawn as a dark cave mouth on the left edge at the lane start, with a faint red tint over its protected area (no towers, see spec/05). The right edge is marked as the goal; creatures leave at the last column
 
