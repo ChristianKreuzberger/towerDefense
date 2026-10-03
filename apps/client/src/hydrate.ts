@@ -1,5 +1,5 @@
 import type { MapCell, MatchEvent, MatchSnapshot } from "@tower-defense/shared";
-import type { WireSnapshot } from "./api";
+import type { WireSnapshot } from "@tower-defense/transport/wire-types";
 import { EVENT_LOG_CAPACITY, RETAINED_EVENT_TYPES } from "./constants";
 import { store } from "./state";
 import type { MapCache } from "./state";

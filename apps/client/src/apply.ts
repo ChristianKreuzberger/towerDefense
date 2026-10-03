@@ -1,5 +1,5 @@
 import type { MatchEvent, MatchSnapshot } from "@tower-defense/shared";
-import type { WireSnapshot } from "./api";
+import type { WireSnapshot } from "@tower-defense/transport/wire-types";
 import { cuesForSnapshotChange } from "./audio/index";
 import { renderSnapshot, syncCursorToTowerSpot, updateBattlefield } from "./board";
 import { MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG } from "./constants";

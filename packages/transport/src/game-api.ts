@@ -14,6 +14,7 @@ import {
   type TowerTargetMode,
   type SimulationCommand
 } from "@tower-defense/shared";
+import type { WireSnapshot } from "./wire-types.js";
 
 export interface GameApiRequest {
   method: string;
@@ -103,7 +104,7 @@ function snapshotOptionsFromBody(body: unknown): SnapshotOptions {
 }
 
 // Lite snapshots drop data that is static per map or only useful for analysis (see spec/07).
-function toWireSnapshot(snapshot: MatchSnapshot, options: SnapshotOptions): unknown {
+function toWireSnapshot(snapshot: MatchSnapshot, options: SnapshotOptions): WireSnapshot {
   if (!options.lite) {
     return snapshot;
   }

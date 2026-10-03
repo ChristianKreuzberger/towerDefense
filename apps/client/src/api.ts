@@ -1,4 +1,3 @@
-import type { MapCell, MatchSetup, MatchSnapshot } from "@tower-defense/shared";
 import { createFetchRequester, createGameClient } from "@tower-defense/transport/http-client";
 import type { GameRequester } from "@tower-defense/transport/http-client";
 import { perfRecordBytes } from "./perf";
@@ -26,48 +25,3 @@ const client = createGameClient(requester, { onResponseText: (text) => perfRecor
 
 export const getJson = client.get;
 export const postJson = client.post;
-
-// Snapshot as sent by the host: lite responses carry wornCells/eventsOffset instead of map.cells (see spec/07).
-export type WireSnapshot = Omit<MatchSnapshot, "map"> & {
-  map: {
-    schemaVersion: number;
-    width: number;
-    height: number;
-    seed: number;
-    spawn?: { x: number; y: number };
-    goal?: { x: number; y: number };
-    cells?: MapCell[];
-    towerSpots: Array<{ x: number; y: number }>;
-    wornCells?: Array<{ x: number; y: number; pathWear: number }>;
-  };
-  eventsOffset?: number;
-  eventsTotal?: number;
-};
-
-export type ApiStartPayload = {
-  ok: boolean;
-  snapshot?: WireSnapshot;
-  setup?: MatchSetup;
-  error?: string;
-  message?: string;
-};
-
-export type ApiCommandPayload = {
-  ok: boolean;
-  result?: {
-    accepted: boolean;
-    reason?: string;
-  };
-  snapshot?: WireSnapshot;
-  error?: string;
-  message?: string;
-};
-
-export type ApiAdvanceManyPayload = {
-  ok: boolean;
-  acceptedTicks?: number;
-  stoppedReason?: string;
-  snapshot?: WireSnapshot;
-  error?: string;
-  message?: string;
-};
