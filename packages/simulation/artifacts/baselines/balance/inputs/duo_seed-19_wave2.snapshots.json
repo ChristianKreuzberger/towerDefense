@@ -37,8 +37,8 @@
           "tank": 0
         },
         "towerDamageDealt": 11,
-        "towerDamageIntake": 0,
-        "towerRepairApplied": 0,
+        "towerDamageIntake": 6,
+        "towerRepairApplied": 6,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -57,8 +57,8 @@
           "tank": 0
         },
         "towerDamageDealt": 11,
-        "towerDamageIntake": 0,
-        "towerRepairApplied": 0,
+        "towerDamageIntake": 6,
+        "towerRepairApplied": 6,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -145,8 +145,8 @@
           "tank": 1
         },
         "towerDamageDealt": 19,
-        "towerDamageIntake": 0,
-        "towerRepairApplied": 0,
+        "towerDamageIntake": 5,
+        "towerRepairApplied": 5,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -165,8 +165,8 @@
           "tank": 1
         },
         "towerDamageDealt": 30,
-        "towerDamageIntake": 0,
-        "towerRepairApplied": 0,
+        "towerDamageIntake": 11,
+        "towerRepairApplied": 11,
         "waveClearBonusAwarded": 60,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
