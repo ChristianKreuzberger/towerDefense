@@ -19,7 +19,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     title: "Prep: place and upgrade",
     body: [
-      "Each player places exactly one tower. It can't be sold, and it must stay clear of the monster cave and the creatures' route.",
+      "Each player places exactly one tower. It can't be sold, can't go within 5 cells of the monster cave, and can't block the creatures' route.",
       `You start with ${STARTING_POINTS} points to spend on upgrades: range (U), damage (I) and accuracy (O), each up to level ${MAX_TOWER_LEVEL}. You can't afford everything, so choose a specialty.`,
       "Pick a target mode and a damage type. The banner shows the next wave and what it is weak against.",
       "Press Ready (R) when you're done. With several players, the turn passes to the next one."

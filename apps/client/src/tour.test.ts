@@ -53,3 +53,10 @@ test("the tour explains the goal with the shared rule values", () => {
     assert.ok(step.title.length > 0 && step.body.length > 0);
   }
 });
+
+test("the placement step states the real rules: no building near the cave, no blocking the route", () => {
+  const prep = TOUR_STEPS[1]?.body.join(" ") ?? "";
+  assert.ok(prep.includes("within 5 cells of the monster cave"));
+  assert.ok(prep.includes("block the creatures' route"));
+  assert.ok(!prep.includes("clear of"));
+});

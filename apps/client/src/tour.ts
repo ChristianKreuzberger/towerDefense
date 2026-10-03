@@ -17,7 +17,7 @@ export function mountTour(options: { root: HTMLElement; onDismiss(): void }): To
     <div class="settings-modal tour-modal" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
       <div id="tourProgress" class="small" aria-live="polite"></div>
       <h2 id="tourTitle"></h2>
-      <div id="tourBody" class="tour-body"></div>
+      <div id="tourBody" class="tour-body" aria-live="polite"></div>
       <div class="stack tour-actions">
         <button id="tourSkipBtn" type="button" class="ghost">Skip tour</button>
         <button id="tourBackBtn" type="button" class="ghost">Back</button>
