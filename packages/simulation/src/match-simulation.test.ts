@@ -2852,7 +2852,7 @@ test("towers beside the lane are genuinely at risk", () => {
   );
 });
 
-// Creatures only attack what is within about one cell, so tests that expect creature attacks need towers right beside
+// Creatures only attack what is within a few cells (2.5 to 3.5), so tests that expect creature attacks need towers right beside
 // the lane. The lane runs from the cave to the east edge and only detours around a tower
 // that stands on it, so a cell next to the probe lane that is not on it keeps the lane unchanged.
 // The maze keeps its tower pads out of the corridors' 4-neighbourhood, so the only pads beside the lane sit on a
