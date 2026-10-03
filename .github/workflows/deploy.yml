@@ -8,13 +8,11 @@ on:
 
 # Allow only one concurrent deployment; cancel in-progress runs.
 concurrency:
-  group: pages
+  group: gh-pages-deploy
   cancel-in-progress: true
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
   build:
@@ -44,21 +42,30 @@ jobs:
           VITE_IN_BROWSER_SERVER: "true"
         run: npm run build
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload build
+        uses: actions/upload-artifact@v4
         with:
+          name: client-dist
           path: apps/client/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: client-dist
+          path: dist
+
+      # Pages serves the gh-pages branch so PR previews can live under pr-preview/.
+      # clean-exclude keeps open PR previews when the root is replaced.
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          clean-exclude: pr-preview/
+          force: false
