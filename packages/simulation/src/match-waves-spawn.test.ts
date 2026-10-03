@@ -50,14 +50,15 @@ test("spawns creatures on deterministic wave ticks", () => {
 
   const snapshot = simulation.getSnapshot();
   const spawnEvents = snapshot.events.filter((event) => event.type === "creature-spawned");
-  assert.equal(spawnEvents.length, 3);
+  assert.equal(spawnEvents.length, 5);
+  assert.equal(spawnEvents.length, getWaveCreatureCount(1));
   assert.deepEqual(
     spawnEvents.map((event) => event.tick),
-    [1, 3, 5]
+    [1, 3, 5, 7, 9]
   );
   assert.deepEqual(
     spawnEvents.map((event) => event.creatureId),
-    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3"]
+    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3", "wave-1-creature-4", "wave-1-creature-5"]
   );
 });
 
@@ -223,10 +224,11 @@ test("ends wave only after spawn schedule completes and all creatures exit", () 
   const defeatedEvents = snapshot.events.filter((event) => event.type === "creature-defeated");
   const waveEndEvent = snapshot.events.find((event) => event.type === "wave-end");
 
-  assert.equal(spawnEvents.length, 3);
-  assert.equal(exitEvents.length + defeatedEvents.length, 3);
+  assert.equal(spawnEvents.length, 5);
+  assert.equal(spawnEvents.length, getWaveCreatureCount(1));
+  assert.equal(exitEvents.length + defeatedEvents.length, getWaveCreatureCount(1));
   assert.ok(waveEndEvent);
-  assert.ok(waveEndEvent.tick >= 5);
+  assert.ok(waveEndEvent.tick >= 9);
 });
 
 test("rejects advance-wave when wave phase is not active", () => {
@@ -316,7 +318,7 @@ test("allPlayersReadyForWave ignores eliminated players", () => {
 });
 
 test("creaturesToSpawn counts down during a wave and previews the next wave in prep", () => {
-  const simulation = createPrepMatchWithTower(31);
+  const simulation = createPrepMatchWithTower(21);
   assert.equal(simulation.getSnapshot().creaturesToSpawn, getWaveCreatureCount(1));
 
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
@@ -446,14 +448,14 @@ function startFarTowerWave(seed: number): ReturnType<typeof createMatch> {
 test("creatures alternate between the two lanes of the road in spawn order", () => {
   const simulation = startFarTowerWave(777);
   const lanes = new Map<string, number>();
-  for (let tick = 0; tick < 200 && lanes.size < 3 && simulation.applyCommand({ type: "advance-wave" }).accepted; tick += 1) {
+  for (let tick = 0; tick < 200 && lanes.size < 5 && simulation.applyCommand({ type: "advance-wave" }).accepted; tick += 1) {
     for (const creature of simulation.getSnapshot().creatures) {
       lanes.set(creature.id, creature.lane);
     }
   }
   assert.deepEqual(
-    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3"].map((id) => lanes.get(id)),
-    [0, 1, 0]
+    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3", "wave-1-creature-4", "wave-1-creature-5"].map((id) => lanes.get(id)),
+    [0, 1, 0, 1, 0]
   );
 });
 

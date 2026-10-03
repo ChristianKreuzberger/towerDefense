@@ -216,9 +216,9 @@ test("ends match with fail-state when all towers are destroyed", () => {
 });
 
 test("emits deterministic tower-repaired events between waves", () => {
-  const simulation = createSinglePlayerWaveSimulationBesideLane(EXPOSED_TOWER_SEED);
+  const simulation = createSinglePlayerWaveSimulationBesideLane(REPAIR_SEED);
 
-  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 300);
+  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 600);
 
   const snapshot = simulation.getSnapshot();
   const towerDamageInWave = snapshot.events
@@ -247,9 +247,9 @@ test("emits deterministic tower-repaired events between waves", () => {
 });
 
 test("repairs tower hp by deterministic formula with max-health cap", () => {
-  const simulation = createSinglePlayerWaveSimulationBesideLane(EXPOSED_TOWER_SEED);
+  const simulation = createSinglePlayerWaveSimulationBesideLane(REPAIR_SEED);
 
-  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 300);
+  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 600);
 
   const snapshot = simulation.getSnapshot();
   const towerDamageInWave = snapshot.events
@@ -303,7 +303,7 @@ test("does not emit repair events for towers after they are destroyed", () => {
 test("wave transition keeps readiness flow coherent after repair phase", () => {
   const simulation = createSinglePlayerWaveSimulation(41);
 
-  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 300);
+  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 600);
 
   const afterWaveOne = simulation.getSnapshot();
   assert.equal(afterWaveOne.phase, "placement");
@@ -324,10 +324,10 @@ test("wave transition keeps readiness flow coherent after repair phase", () => {
 });
 
 test("emits deterministic path-repaired event with stable ordering and values", () => {
-  const towerCoordinate = getBuildableCoordinate(43);
+  const towerCoordinate = getBuildableCoordinate(41);
   const simulation = createMatch({
     players: [{ id: "p1", name: "Alpha" }],
-    seed: 43
+    seed: 41
   });
 
   assert.equal(
@@ -342,7 +342,7 @@ test("emits deterministic path-repaired event with stable ordering and values", 
   assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" }).accepted, true);
 
 
-  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 400);
+  tickUntil(simulation, () => simulation.getSnapshot().phase === "placement" && simulation.getSnapshot().wave === 2, 800);
 
   const snapshot = simulation.getSnapshot();
   const pathRepairEvents = snapshot.events.filter(
@@ -817,6 +817,8 @@ function getTowerCellBesideLane(seed: number): { x: number; y: number } {
 // destruction path therefore start the tower with 1 hp: the first creature attack still destroys it through the
 // normal simulation flow. This seed is one where creatures do reach a tower beside the lane during wave 1.
 const EXPOSED_TOWER_SEED = 43;
+// A seed where the lone tower beside the lane is hit in wave 1 but survives it, so a between-wave repair is visible.
+const REPAIR_SEED = 2;
 
 function createExposedFragileTowerSimulation(): ReturnType<typeof createMatch> {
   const simulation = createSinglePlayerWaveSimulationBesideLane(EXPOSED_TOWER_SEED);
