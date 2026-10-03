@@ -30,6 +30,8 @@ export function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: Mat
 }
 
 export function applyActivePlayerChange(): void {
+  // Every path that switches player lands here (the select too), so a selection never carries over.
+  resetTouchSelection();
   // Move mode belongs to the player who pressed it; the next hot-seat player starts clean.
   if (store.moveMode) {
     setMoveMode(false);
@@ -64,6 +66,5 @@ export function setActivePlayer(playerId: string): void {
     return;
   }
   el.playerId.value = playerId;
-  resetTouchSelection();
   applyActivePlayerChange();
 }
