@@ -35,16 +35,16 @@ Point economy with per-player score tracking.
 - Spawn protection: `CREATURE_SPAWN_PROTECTION_SECONDS = 1`, expressed in simulation ticks as `SPAWN_PROTECTION_TICKS = 5` because the client runs 5 ticks per second at 1x. Protected creatures cannot be targeted or damaged, so every creature gets at least 5 ticks of travel before it can be shot (balance note: this slightly lowers early kill rates; separate from `SPAWN_PROTECTION_RADIUS`, which is about tower placement)
 - Creature hitpoints: swarm 2, runner 3, armored 5, tank 8 (raised from 1/2/3/5). A level 1 tower cannot one-shot a runner, armored or tank, but an explosive level 1 shot does round(1 x 1.5) = 2 to a swarm creature, which is its full HP, so it one-shots a swarm; and a damage level 2 physical shot does round(2 x 1.5) = 3 to a runner, which one-shots it. The type multipliers (spec/02) decide who one-shots what, so matching the type matters; a level 3+ tower can one-shot a swarm or runner on purpose
 - Creature attack range (reach, grid cells, Euclidean, inclusive, from the creature's current cell): runner 2.5, swarm 2.5, armored 3.5, tank 3.5 (raised from 1/1/1.5/1.5 in issue #69, because towers beside the lane were almost never in danger). A creature damages every tower within its reach each tick and keeps walking otherwise
-- Closer is stronger (`CREATURE_PROXIMITY_DAMAGE_BANDS`): damage per hit = base attack damage (runner 1, swarm 1, armored 2, tank 3) x the multiplier of the first band whose distance covers the tower: within 1.5 cells x3, within 2.5 x2, within 3.5 x1. Beyond the creature's own reach the damage is 0. Resulting damage per hit:
+- Closer is stronger (`CREATURE_PROXIMITY_DAMAGE_BANDS`): damage per hit = base attack damage (runner 1, swarm 1, armored 2, tank 3) x the multiplier of the first band whose distance covers the tower: within 1.5 cells x3, within 2.5 x2, within 3.5 x1, then x `CREATURE_ATTACK_DAMAGE_SCALE` (1.2, issue #84: play-testing found the game too easy) and rounded to a whole number. Beyond the creature's own reach the damage is 0. Resulting damage per hit:
 
   | Archetype | d <= 1.5 | d <= 2.5 | d <= 3.5 |
   | --- | --- | --- | --- |
-  | runner | 3 | 2 | 0 (out of reach) |
-  | swarm | 3 | 2 | 0 (out of reach) |
-  | armored | 6 | 4 | 2 |
-  | tank | 9 | 6 | 3 |
+  | runner | 4 | 2 | 0 (out of reach) |
+  | swarm | 4 | 2 | 0 (out of reach) |
+  | armored | 7 | 5 | 2 |
+  | tank | 11 | 7 | 4 |
 
-  The worst single hit is 9 HP (tank beside a tower). All values are integers and distance checks use squared distances, so the outcome stays deterministic
+  The worst single hit is 11 HP (tank beside a tower). All values are integers and distance checks use squared distances, so the outcome stays deterministic
 - Balance note: a tower within 3.5 cells of the lane is in real danger and can lose more HP per wave than the between-wave repair (20% of max health, 20 HP) gives back; a tower 4 to 6 cells away is safe but covers less of the lane with its range of 6, so it fires less. Every tower in reach is hit, so towers clustered on one stretch of lane all take damage. Baselines were refreshed for this change
 - The base range is short relative to the 50x50 map (it was 12 before), so a lone level 1 tower only covers a small stretch of the lane and range upgrades are a real choice
 

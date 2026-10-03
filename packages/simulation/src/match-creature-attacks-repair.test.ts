@@ -657,7 +657,7 @@ test("a creature damages every tower in reach, each with the damage of its own d
     tower.x = x;
     tower.y = y;
   };
-  // Tank at (10,10): tower-p2 at distance 1 (x3 = 9), tower-p1 at sqrt(5) = 2.24 (x2 = 6), tower-p3 at 4 (out of reach).
+  // Tank at (10,10): tower-p2 at distance 1 (x3 x1.2 = 11), tower-p1 at sqrt(5) = 2.24 (x2 x1.2 = 7), tower-p3 at 4 (out of reach).
   place("tower-p1", 12, 11);
   place("tower-p2", 11, 10);
   place("tower-p3", 14, 10);
@@ -685,13 +685,13 @@ test("a creature damages every tower in reach, each with the damage of its own d
   assert.deepEqual(
     attacks.map((event) => ({ creatureId: event.creatureId, targetTowerId: event.targetTowerId, damage: event.damage })),
     [
-      { creatureId: "c1", targetTowerId: "tower-p1", damage: 6 },
-      { creatureId: "c1", targetTowerId: "tower-p2", damage: 9 }
+      { creatureId: "c1", targetTowerId: "tower-p1", damage: 7 },
+      { creatureId: "c1", targetTowerId: "tower-p2", damage: 11 }
     ]
   );
   const health = (id: string): number | undefined => internals.state.towers.find((entry) => entry.id === id)?.health;
-  assert.equal(health("tower-p1"), DEFAULT_TOWER_HEALTH - 6);
-  assert.equal(health("tower-p2"), DEFAULT_TOWER_HEALTH - 9);
+  assert.equal(health("tower-p1"), DEFAULT_TOWER_HEALTH - 7);
+  assert.equal(health("tower-p2"), DEFAULT_TOWER_HEALTH - 11);
   assert.equal(health("tower-p3"), DEFAULT_TOWER_HEALTH);
 
   // The reported primary target is still the nearest tower in reach.
