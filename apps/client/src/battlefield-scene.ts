@@ -1,25 +1,29 @@
 import Phaser from "phaser";
 
 import {
-  BASE_TOWER_UPGRADES,
   CREATURE_ARCHETYPE_STATS,
-  MAX_TOWER_LEVEL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
   PATH_WIDTH,
-  getTowerStats,
   getTowerStyleTier,
   TOWER_STYLE_TIER_SIZE,
-  TOWER_STYLE_TIERS,
-  isInSpawnProtection
+  TOWER_STYLE_TIERS
 } from "@tower-defense/shared";
-import type { Creature, CreatureArchetype, DamageType, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades } from "@tower-defense/shared";
+import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchSnapshot, Tower } from "@tower-defense/shared";
 
 import { Effects } from "./art/fx";
-import { CREAM, INK, UI_COLORS, colorForPlayer, playerIndex } from "./art/palette";
+import { INK, UI_COLORS, playerIndex } from "./art/palette";
 import { paintTerrain } from "./art/paint";
-import { describeRuin, ownerNameFor, type RuinInfo } from "./ruins";
+import type { RuinInfo } from "./ruins";
 import { KEY, SS, TOWER_SCALE, ensureTextures } from "./art/textures";
+import { RECOIL_MS, FLASH_MS, SHAKE_MS, playEvents } from "./scene/fx-dispatch";
+import type { FxContext } from "./scene/fx-dispatch";
+import { cellCenter } from "./scene/geometry";
+import { drawHoverAndGhost, isHoverValid } from "./scene/placement-overlay";
+import type { OverlayEnv, OverlayState } from "./scene/placement-overlay";
+import type { CreatureVisual, PendingDeath, PlacementContext, RuinVisual, TowerVisual } from "./scene/types";
+
+export type { PlacementContext } from "./scene/types";
 
 const DEPTH_TERRAIN = 0;
 const DEPTH_WEAR = 0.5;
@@ -36,11 +40,6 @@ const POP_DURATION_MS = 220;
 const LANE_SPACING = 0.5;
 const TERRAIN_TEXTURE_KEY = "terrain-base";
 const INV = 1 / SS;
-// Bounds the work one snapshot can cause even if a long batch (or a reconnect) delivers hundreds of events.
-const MAX_FX_EVENTS = 40;
-const FLASH_MS = 200;
-const SHAKE_MS = 220;
-const RECOIL_MS = 140;
 // The tower stays up until the blast has peaked, then the ruins replace it.
 const EXPLOSION_PEAK_MS = 320;
 const EXPLOSION_PEAK_REDUCED_MS = 120;
@@ -56,80 +55,11 @@ export function cellSizeForWidth(width: number): number {
   return 34;
 }
 
-function cellCenter(x: number, y: number, cellSize: number): { cx: number; cy: number } {
-  return { cx: x * cellSize + cellSize / 2, cy: y * cellSize + cellSize / 2 };
-}
-
 function approachAngle(current: number, target: number, amount: number): number {
   let delta = target - current;
   while (delta > Math.PI) delta -= Math.PI * 2;
   while (delta < -Math.PI) delta += Math.PI * 2;
   return current + delta * Math.min(1, amount);
-}
-
-export interface PlacementContext {
-  phase: MatchPhase;
-  playerId: string;
-  hasTowerAlready: boolean;
-  // Moving the tower: the ghost tower is shown even though the player already has one.
-  moveMode?: boolean;
-}
-
-interface TowerVisual {
-  container: Phaser.GameObjects.Container;
-  base: Phaser.GameObjects.Image;
-  turret: Phaser.GameObjects.Image;
-  pips: Phaser.GameObjects.Image;
-  hpBg: Phaser.GameObjects.Image;
-  hpFill: Phaser.GameObjects.Image;
-  flash: Phaser.GameObjects.Image;
-  player: number;
-  level: number;
-  tier: number;
-  upgrades: TowerUpgrades;
-  damageType: DamageType;
-  hp: number;
-  maxHp: number;
-  angle: number;
-  targetId: string | null;
-  baseX: number;
-  baseY: number;
-  flashUntil: number;
-  shakeUntil: number;
-  recoilUntil: number;
-}
-
-interface CreatureVisual {
-  container: Phaser.GameObjects.Container;
-  sprite: Phaser.GameObjects.Image;
-  hpBg: Phaser.GameObjects.Image;
-  hpFill: Phaser.GameObjects.Image;
-  archetype: CreatureArchetype;
-  hp: number;
-  phase: number;
-  heading: number;
-  // Logical (cell-space) motion segment; current* is what is drawn this frame.
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
-  curX: number;
-  curY: number;
-  dirX: number;
-  dirY: number;
-  cellX: number;
-  cellY: number;
-  startedAt: number;
-  durationMs: number;
-}
-
-interface RuinVisual extends RuinInfo {
-  image: Phaser.GameObjects.Image;
-}
-
-interface PendingDeath {
-  delayMs: number;
-  info: RuinInfo;
 }
 
 function hpColor(ratio: number): number {
@@ -147,10 +77,7 @@ class BattlefieldScene extends Phaser.Scene {
   private creatureVisuals = new Map<string, CreatureVisual>();
   private creaturePool: CreatureVisual[] = [];
   private cursorGraphics?: Phaser.GameObjects.Graphics;
-  private hoverGraphics?: Phaser.GameObjects.Graphics;
   private linkGraphics?: Phaser.GameObjects.Graphics;
-  private ghostBase?: Phaser.GameObjects.Image;
-  private ghostTurret?: Phaser.GameObjects.Image;
   private fx?: Effects;
   private towerVisuals = new Map<string, TowerVisual>();
   private towerAtCell = new Map<string, string>();
@@ -168,16 +95,17 @@ class BattlefieldScene extends Phaser.Scene {
   private cursorY: number | null = null;
   private pendingCursor: { x: number; y: number } | null = null;
   private onCellClick: ((x: number, y: number) => void) | undefined;
-  private placementContext: PlacementContext | undefined;
-  private cellsByKey = new Map<string, MapCell>();
-  private spawn: MatchSnapshot["map"]["spawn"];
-  private occupiedCells = new Set<string>();
-  private towerSpotKeys = new Set<string>();
-  private hoverX: number | null = null;
-  private hoverY: number | null = null;
-  private hoverTowerId: string | null = null;
-  private hoverRuinId: string | null = null;
-  private tooltip?: HTMLElement;
+  private overlay: OverlayState = {
+    placementContext: undefined,
+    cellsByKey: new Map<string, MapCell>(),
+    spawn: undefined as unknown as MatchSnapshot["map"]["spawn"],
+    occupiedCells: new Set<string>(),
+    towerSpotKeys: new Set<string>(),
+    hoverX: null,
+    hoverY: null,
+    hoverTowerId: null,
+    hoverRuinId: null
+  };
   private reducedMotion = false;
   private lastWave = -1;
   private lastWaveTick = 0;
@@ -195,17 +123,17 @@ class BattlefieldScene extends Phaser.Scene {
     ensureTextures(this, this.cellSize);
     this.fx = new Effects(this, this.cellSize, DEPTH_FX, this.reducedMotion);
     this.cursorGraphics = this.add.graphics().setDepth(DEPTH_CURSOR);
-    this.hoverGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
+    this.overlay.hoverGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
     this.linkGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
-    this.ghostBase = this.add.image(0, 0, KEY.towerBase(0)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
-    this.ghostTurret = this.add.image(0, 0, KEY.turret(0, 1)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
+    this.overlay.ghostBase = this.add.image(0, 0, KEY.towerBase(0)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
+    this.overlay.ghostTurret = this.add.image(0, 0, KEY.turret(0, 1)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
     this.input.on("pointerdown", this.handlePointerDown, this);
     this.input.on("pointermove", this.handlePointerMove, this);
     this.game.canvas.addEventListener("pointerleave", this.handlePointerLeave);
-    this.tooltip = document.createElement("div");
-    this.tooltip.className = "tower-tooltip";
-    this.tooltip.hidden = true;
-    this.game.canvas.parentElement?.appendChild(this.tooltip);
+    this.overlay.tooltip = document.createElement("div");
+    this.overlay.tooltip.className = "tower-tooltip";
+    this.overlay.tooltip.hidden = true;
+    this.game.canvas.parentElement?.appendChild(this.overlay.tooltip);
     if (this.pendingCursor !== null) {
       this.cursorX = this.pendingCursor.x;
       this.cursorY = this.pendingCursor.y;
@@ -310,6 +238,28 @@ class BattlefieldScene extends Phaser.Scene {
     }
   }
 
+  private overlayEnv(): OverlayEnv {
+    return {
+      towerVisuals: this.towerVisuals,
+      ruinVisuals: this.ruinVisuals,
+      // Lazy: the scene can be asked to redraw before Phaser has attached `game`, and only the tooltip needs the canvas.
+      getCanvas: () => this.game.canvas,
+      cellSize: this.cellSize
+    };
+  }
+
+  private fxContext(): FxContext {
+    return {
+      fx: this.fx,
+      cellSize: this.cellSize,
+      lastWave: this.lastWave,
+      lastWaveTick: this.lastWaveTick,
+      towerVisuals: this.towerVisuals,
+      creatureVisuals: this.creatureVisuals,
+      pendingDeaths: this.pendingDeaths
+    };
+  }
+
   setOnCellClick(callback: ((x: number, y: number) => void) | undefined): void {
     this.onCellClick = callback;
   }
@@ -325,8 +275,8 @@ class BattlefieldScene extends Phaser.Scene {
   }
 
   setPlacementContext(context: PlacementContext): void {
-    this.placementContext = context;
-    this.drawHoverAndGhost();
+    this.overlay.placementContext = context;
+    drawHoverAndGhost(this.overlay, this.overlayEnv());
   }
 
   // Phaser 4 caches the canvas position, so pointer.x/y drift when the page layout shifts after setup.
@@ -345,7 +295,7 @@ class BattlefieldScene extends Phaser.Scene {
 
   private handlePointerDown(pointer: Phaser.Input.Pointer): void {
     const { x, y } = this.cellFromPointer(pointer);
-    if (!this.isHoverValid(x, y) && !this.towerAtCell.has(`${x},${y}`)) {
+    if (!isHoverValid(this.overlay, x, y) && !this.towerAtCell.has(`${x},${y}`)) {
       this.playInvalidClickFlash(x, y);
     }
     if (this.onCellClick) {
@@ -355,154 +305,20 @@ class BattlefieldScene extends Phaser.Scene {
 
   private handlePointerMove = (pointer: Phaser.Input.Pointer): void => {
     const { x, y } = this.cellFromPointer(pointer);
-    this.hoverX = x;
-    this.hoverY = y;
-    this.hoverTowerId = this.towerAtCell.get(`${x},${y}`) ?? null;
-    this.hoverRuinId = this.ruinAtCell.get(`${x},${y}`) ?? null;
-    this.drawHoverAndGhost();
+    this.overlay.hoverX = x;
+    this.overlay.hoverY = y;
+    this.overlay.hoverTowerId = this.towerAtCell.get(`${x},${y}`) ?? null;
+    this.overlay.hoverRuinId = this.ruinAtCell.get(`${x},${y}`) ?? null;
+    drawHoverAndGhost(this.overlay, this.overlayEnv());
   };
 
   private handlePointerLeave = (): void => {
-    this.hoverX = null;
-    this.hoverY = null;
-    this.hoverTowerId = null;
-    this.hoverRuinId = null;
-    this.drawHoverAndGhost();
+    this.overlay.hoverX = null;
+    this.overlay.hoverY = null;
+    this.overlay.hoverTowerId = null;
+    this.overlay.hoverRuinId = null;
+    drawHoverAndGhost(this.overlay, this.overlayEnv());
   };
-
-  private isHoverValid(x: number, y: number): boolean {
-    const context = this.placementContext;
-    if (!context) {
-      return false;
-    }
-    if (context.phase !== "placement") {
-      return false;
-    }
-    const cell = this.cellsByKey.get(`${x},${y}`);
-    if (!cell || !this.towerSpotKeys.has(`${x},${y}`) || isInSpawnProtection({ spawn: this.spawn }, x, y)) {
-      return false;
-    }
-    return !this.occupiedCells.has(`${x},${y}`);
-  }
-
-  private isGhostValid(x: number, y: number): boolean {
-    if (!this.placementContext) {
-      return false;
-    }
-    if (!this.placementContext.moveMode && this.placementContext.hasTowerAlready) {
-      return false;
-    }
-    return this.isHoverValid(x, y);
-  }
-
-  private drawHoverAndGhost(): void {
-    const hover = this.hoverGraphics;
-    const ghostBase = this.ghostBase;
-    const ghostTurret = this.ghostTurret;
-    if (!hover || !ghostBase || !ghostTurret) {
-      return;
-    }
-    hover.clear();
-    ghostBase.setVisible(false);
-    ghostTurret.setVisible(false);
-
-    const cellSize = this.cellSize;
-    // The active player's tower gets a steady ring so it is easy to find on a busy board.
-    const activeId = this.placementContext ? `tower-${this.placementContext.playerId}` : null;
-    const activeTower = activeId ? this.towerVisuals.get(activeId) : undefined;
-    if (activeTower) {
-      hover.lineStyle(Math.max(2, cellSize * 0.07), CREAM, 0.85);
-      hover.strokeCircle(activeTower.baseX, activeTower.baseY, cellSize * 1.0);
-    }
-    if (this.hoverTowerId) {
-      const hovered = this.towerVisuals.get(this.hoverTowerId);
-      if (hovered) {
-        hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
-        hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
-        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.upgrades).range);
-      }
-    }
-    this.updateTowerTooltip();
-
-    if (this.hoverX === null || this.hoverY === null) {
-      return;
-    }
-    const x = this.hoverX;
-    const y = this.hoverY;
-    if (!this.isHoverValid(x, y)) {
-      return;
-    }
-
-    const radius = cellSize * 0.14;
-    hover.fillStyle(UI_COLORS.hover, 0.22);
-    hover.fillRoundedRect(x * cellSize, y * cellSize, cellSize, cellSize, radius);
-    hover.lineStyle(2, UI_COLORS.hover, 0.9);
-    hover.strokeRoundedRect(x * cellSize + 1, y * cellSize + 1, cellSize - 2, cellSize - 2, radius);
-
-    if (this.isGhostValid(x, y) && this.placementContext) {
-      const { cx, cy } = cellCenter(x, y, cellSize);
-      const index = playerIndex(this.placementContext.playerId);
-      ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
-      ghostTurret.setTexture(KEY.turret(index, 0)).setPosition(cx, cy).setVisible(true);
-      // Placement is one-shot, so show the coverage before the player commits.
-      this.drawRangeCircle(hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
-    }
-  }
-
-  private updateTowerTooltip(): void {
-    const tooltip = this.tooltip;
-    if (!tooltip) {
-      return;
-    }
-    const tower = this.hoverTowerId ? this.towerVisuals.get(this.hoverTowerId) : undefined;
-    const ruin = !tower && this.hoverRuinId ? this.ruinVisuals.get(this.hoverRuinId) : undefined;
-    if (ruin) {
-      const { title, detail } = describeRuin(ruin);
-      const heading = document.createElement("strong");
-      heading.textContent = title;
-      const body = document.createElement("div");
-      body.textContent = detail;
-      tooltip.replaceChildren(heading, body);
-      this.positionTooltip(tooltip, ruin.image.x, ruin.image.y);
-      return;
-    }
-    if (!tower) {
-      tooltip.hidden = true;
-      return;
-    }
-    const stats = getTowerStats(tower.upgrades);
-    const trackLevel = (level: number): string => `${level}/${MAX_TOWER_LEVEL}`;
-    const rows: Array<[string, string]> = [
-      ["Level", String(stats.level)],
-      ["Health", `${tower.hp}/${tower.maxHp}`],
-      ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
-      ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
-      ["Type", tower.damageType],
-      ["DPS", String(stats.damagePerSecond)],
-      ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
-    ];
-    tooltip.replaceChildren(
-      ...rows.map(([label, value]) => {
-        const row = document.createElement("div");
-        const name = document.createElement("span");
-        name.textContent = label;
-        const val = document.createElement("strong");
-        val.textContent = value;
-        row.append(name, val);
-        return row;
-      })
-    );
-    this.positionTooltip(tooltip, tower.baseX, tower.baseY);
-  }
-
-  private positionTooltip(tooltip: HTMLElement, worldX: number, worldY: number): void {
-    const canvas = this.game.canvas;
-    const rect = canvas.getBoundingClientRect();
-    const scale = canvas.width > 0 ? rect.width / canvas.width : 1;
-    tooltip.style.left = `${canvas.offsetLeft + worldX * scale}px`;
-    tooltip.style.top = `${canvas.offsetTop + worldY * scale - this.cellSize * scale * 0.9}px`;
-    tooltip.hidden = false;
-  }
 
   // Everything the scene attached outside Phaser's own object tree: the canvas listener, the input
   // handlers and the tooltip element. Call before game.destroy(), which removes the canvas.
@@ -510,15 +326,7 @@ class BattlefieldScene extends Phaser.Scene {
     this.game?.canvas?.removeEventListener("pointerleave", this.handlePointerLeave);
     this.input?.off("pointerdown", this.handlePointerDown, this);
     this.input?.off("pointermove", this.handlePointerMove, this);
-    this.tooltip?.remove();
-  }
-
-  private drawRangeCircle(graphics: Phaser.GameObjects.Graphics, cx: number, cy: number, rangeCells: number): void {
-    const radius = rangeCells * this.cellSize;
-    graphics.fillStyle(UI_COLORS.hover, 0.08);
-    graphics.fillCircle(cx, cy, radius);
-    graphics.lineStyle(Math.max(2, this.cellSize * 0.06), UI_COLORS.hover, 0.5);
-    graphics.strokeCircle(cx, cy, radius);
+    this.overlay.tooltip?.remove();
   }
 
   // Hovering a tower links it to its current target; the range circle itself is drawn with the hover highlight.
@@ -528,10 +336,10 @@ class BattlefieldScene extends Phaser.Scene {
       return;
     }
     graphics.clear();
-    if (!this.hoverTowerId) {
+    if (!this.overlay.hoverTowerId) {
       return;
     }
-    const tower = this.towerVisuals.get(this.hoverTowerId);
+    const tower = this.towerVisuals.get(this.overlay.hoverTowerId);
     const target = tower?.targetId ? this.creatureVisuals.get(tower.targetId) : undefined;
     if (!tower || !target) {
       return;
@@ -591,7 +399,7 @@ class BattlefieldScene extends Phaser.Scene {
     }
     this.towerVisuals.clear();
     this.towerAtCell.clear();
-    this.hoverTowerId = null;
+    this.overlay.hoverTowerId = null;
     this.clearRuins();
     this.pendingDeaths.clear();
     this.clearCollapsingTowers();
@@ -606,8 +414,8 @@ class BattlefieldScene extends Phaser.Scene {
     }
 
     if (!snapshot) {
-      this.cellsByKey = new Map();
-      this.occupiedCells = new Set();
+      this.overlay.cellsByKey = new Map();
+      this.overlay.occupiedCells = new Set();
       this.mapKey = null;
       this.terrainImage?.destroy();
       this.terrainImage = undefined;
@@ -618,7 +426,7 @@ class BattlefieldScene extends Phaser.Scene {
       this.resetVisuals();
       this.syncCreatures([], this.cellSize, 0);
       this.drawCursor();
-      this.drawHoverAndGhost();
+      drawHoverAndGhost(this.overlay, this.overlayEnv());
       return;
     }
 
@@ -635,19 +443,19 @@ class BattlefieldScene extends Phaser.Scene {
     for (const tower of snapshot.towers) {
       occupiedCells.add(`${tower.x},${tower.y}`);
     }
-    this.occupiedCells = occupiedCells;
+    this.overlay.occupiedCells = occupiedCells;
 
     // Effects read the pooled visuals of the previous snapshot, so they must run before the sync calls retire them.
     if (snapshot.wave < this.lastWave) {
       this.clearRuins();
     }
-    this.playEvents(events, snapshot, transitionMs);
+    playEvents(this.fxContext(), events, snapshot, transitionMs);
     this.lastWave = snapshot.wave;
     this.lastWaveTick = snapshot.waveTick;
 
     this.syncTowers(snapshot, cellSize);
     this.syncCreatures(snapshot.creatures, cellSize, transitionMs);
-    this.drawHoverAndGhost();
+    drawHoverAndGhost(this.overlay, this.overlayEnv());
   }
 
   // Runs only when the map identity (seed + size) changes: indexes cells, bakes terrain once, resizes the canvas.
@@ -661,9 +469,9 @@ class BattlefieldScene extends Phaser.Scene {
     for (const cell of map.cells) {
       cellsByKey.set(`${cell.x},${cell.y}`, cell);
     }
-    this.cellsByKey = cellsByKey;
-    this.towerSpotKeys = new Set(map.towerSpots.map((spot) => `${spot.x},${spot.y}`));
-    this.spawn = map.spawn;
+    this.overlay.cellsByKey = cellsByKey;
+    this.overlay.towerSpotKeys = new Set(map.towerSpots.map((spot) => `${spot.x},${spot.y}`));
+    this.overlay.spawn = map.spawn;
 
     const pixelWidth = map.width * cellSize;
     const pixelHeight = map.height * cellSize;
@@ -814,7 +622,7 @@ class BattlefieldScene extends Phaser.Scene {
     }
     this.ruinVisuals.clear();
     this.ruinAtCell.clear();
-    this.hoverRuinId = null;
+    this.overlay.hoverRuinId = null;
   }
 
   private addRuin(id: string, visual: TowerVisual, info: RuinInfo): void {
@@ -823,8 +631,8 @@ class BattlefieldScene extends Phaser.Scene {
     const image = this.add.image(visual.baseX, visual.baseY, KEY.ruin(visual.player)).setScale(INV).setDepth(DEPTH_RUINS);
     this.ruinVisuals.set(id, { ...info, image });
     this.ruinAtCell.set(`${cellX},${cellY}`, id);
-    if (this.hoverX === cellX && this.hoverY === cellY) {
-      this.hoverRuinId = id;
+    if (this.overlay.hoverX === cellX && this.overlay.hoverY === cellY) {
+      this.overlay.hoverRuinId = id;
     }
   }
 
@@ -1033,100 +841,6 @@ class BattlefieldScene extends Phaser.Scene {
     }
   }
 
-  // Presentation only: derived from the snapshot's event tail, never fed back into the simulation.
-  private playEvents(events: MatchEvent[], snapshot: MatchSnapshot, glideMs: number): void {
-    const fx = this.fx;
-    if (!fx || events.length === 0) {
-      return;
-    }
-    const cellSize = this.cellSize;
-    const sameWave = snapshot.wave === this.lastWave;
-    const span = sameWave ? Math.max(1, snapshot.waveTick - this.lastWaveTick) : 1;
-    const now = performance.now();
-    let budget = MAX_FX_EVENTS;
-
-    const start = Math.max(0, events.length - 200);
-    for (let index = start; index < events.length && budget > 0; index += 1) {
-      const event = events[index];
-      if (!event) {
-        continue;
-      }
-      const delay = span > 1 && sameWave
-        ? Math.max(0, Math.min(1, (event.tick - this.lastWaveTick - 1) / span)) * glideMs
-        : 0;
-
-      switch (event.type) {
-        case "tower-hit": {
-          const tower = this.towerVisuals.get(event.towerId);
-          const creature = this.creatureVisuals.get(event.creatureId);
-          if (tower) {
-            const color = colorForPlayer(event.playerId);
-            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
-            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
-            fx.projectile(tower.baseX, tower.baseY, x, y, color, delay, tower.tier);
-            tower.recoilUntil = now + delay + RECOIL_MS;
-            budget -= 1;
-          }
-          break;
-        }
-        case "tower-miss": {
-          const tower = this.towerVisuals.get(event.towerId);
-          const creature = this.creatureVisuals.get(event.creatureId);
-          if (tower) {
-            const color = colorForPlayer(event.playerId);
-            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
-            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
-            // The shot flies past the creature, offset sideways so a miss is visibly different from a hit.
-            const dx = x - tower.baseX;
-            const dy = y - tower.baseY;
-            const length = Math.max(1, Math.hypot(dx, dy));
-            const missX = x + (-dy / length) * cellSize * 0.9;
-            const missY = y + (dx / length) * cellSize * 0.9;
-            fx.projectile(tower.baseX, tower.baseY, missX, missY, color, delay, tower.tier);
-            fx.floatText(x, y - cellSize * 0.5, "miss", 0xcfc8b8, delay + 120);
-            tower.recoilUntil = now + delay + RECOIL_MS;
-            budget -= 1;
-          }
-          break;
-        }
-        case "creature-defeated": {
-          const creature = this.creatureVisuals.get(event.creatureId);
-          const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
-          const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
-          const color = colorForPlayer(event.playerId);
-          fx.puff(x, y, 0xd9d2c0, delay + 120);
-          fx.burst(x, y, color, delay + 120);
-          fx.floatText(x, y - cellSize * 0.5, `+${event.rewardPoints}`, color, delay + 120);
-          budget -= 1;
-          break;
-        }
-        case "creature-attack": {
-          const tower = this.towerVisuals.get(event.targetTowerId);
-          if (tower) {
-            tower.flashUntil = now + delay + FLASH_MS;
-            tower.shakeUntil = now + delay + SHAKE_MS;
-            fx.spark(tower.baseX, tower.baseY, 0xff7a66, delay);
-            budget -= 1;
-          }
-          break;
-        }
-        case "tower-destroyed": {
-          const tower = this.towerVisuals.get(event.towerId);
-          if (tower) {
-            fx.explosion(tower.baseX, tower.baseY, delay);
-            this.pendingDeaths.set(event.towerId, {
-              delayMs: delay,
-              info: { ownerName: ownerNameFor(snapshot.players, event.playerId), wave: event.wave }
-            });
-            budget -= 1;
-          }
-          break;
-        }
-        default:
-          break;
-      }
-    }
-  }
 }
 
 export interface BattlefieldMountOptions {
