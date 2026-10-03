@@ -43,7 +43,8 @@ jobs:
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.number }}/
           VITE_IN_BROWSER_SERVER: "true"
-        run: npm run build
+        # Not `npm run build`: its `tsc -b` step would emit .d.ts/.js files into the published dist.
+        run: npx vite build
 
       - name: Upload build
         uses: actions/upload-artifact@v4
