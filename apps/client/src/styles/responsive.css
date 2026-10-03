@@ -1,0 +1,40 @@
+/* ---------------------------------------------------------------- responsive */
+
+@media (max-width: 1040px) {
+  .game-screen {
+    grid-template-columns: 1fr;
+  }
+
+  .board-grid canvas {
+    max-height: none;
+  }
+
+  .phase-sub {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .menu-fields,
+  .menu-actions,
+  .menu-player-names {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .wave-banner.show,
+  .turn-banner.show {
+    animation: none;
+  }
+}
+

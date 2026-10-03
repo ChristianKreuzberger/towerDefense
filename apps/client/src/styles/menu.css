@@ -1,0 +1,135 @@
+/* ---------------------------------------------------------------- menu */
+
+.menu-screen {
+  min-height: calc(100vh - 44px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.menu-card {
+  width: min(760px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), 0 0 0 6px rgba(255, 255, 255, 0.02);
+}
+
+.menu-hero {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 1;
+  border-bottom: 3px solid var(--ink);
+}
+
+.menu-body {
+  padding: 22px 26px 24px;
+}
+
+.menu-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(95, 191, 143, 0.12);
+  border: 1px solid rgba(95, 191, 143, 0.35);
+  color: var(--good);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.menu-title {
+  margin: 10px 0 0;
+  font-size: clamp(34px, 6vw, 52px);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.menu-title span {
+  color: var(--gold);
+}
+
+.menu-subtitle {
+  margin: 10px 0 18px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.menu-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.menu-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--gold);
+}
+
+.menu-player-names {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.menu-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch,
+.chip-swatch {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+  background: var(--panel-2);
+  border: 2px solid var(--ink);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+.swatch.p1 { background: var(--p1); }
+.swatch.p2 { background: var(--p2); }
+.swatch.p3 { background: var(--p3); }
+.swatch.p4 { background: var(--p4); }
+.swatch.p5 { background: var(--p5); }
+.swatch.p6 { background: var(--p6); }
+.swatch.p7 { background: var(--p7); }
+.swatch.p8 { background: var(--p8); }
+
+.menu-actions {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+}
+
+.menu-actions .primary {
+  padding: 13px;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.menu-message {
+  min-height: 18px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
