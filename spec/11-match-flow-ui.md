@@ -202,7 +202,7 @@ Event to sound table
 
 - Towers target creatures only
 - Friendly tower targeting and damage are disabled
-- Creatures attack towers when in attack range
+- Creatures attack every tower within their attack range, and hit harder the closer the tower is
 
 ## Win and endgame UX
 
