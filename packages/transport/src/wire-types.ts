@@ -1,4 +1,4 @@
-import type { MapCell, MatchSetup, MatchSnapshot } from "@tower-defense/shared";
+import type { MapCell, MatchSetup, MatchSnapshot, SimulationCommand } from "@tower-defense/shared";
 
 // Snapshot as sent by the host: lite responses carry wornCells/eventsOffset instead of map.cells (see spec/07).
 export type WireSnapshot = Omit<MatchSnapshot, "map"> & {
@@ -31,6 +31,15 @@ export type ApiCommandPayload = {
     accepted: boolean;
     reason?: string;
   };
+  snapshot?: WireSnapshot;
+  error?: string;
+  message?: string;
+};
+
+export type ApiAiStepPayload = {
+  ok: boolean;
+  action?: { playerId: string; command: SimulationCommand; accepted: boolean } | null;
+  pending?: boolean;
   snapshot?: WireSnapshot;
   error?: string;
   message?: string;
