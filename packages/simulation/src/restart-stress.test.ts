@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { STARTING_POINTS } from "@tower-defense/shared";
 import { createMatch } from "./match-simulation.js";
 
 test("repeated match restarts preserve fresh deterministic state", () => {
@@ -19,7 +20,7 @@ test("repeated match restarts preserve fresh deterministic state", () => {
     assert.equal(snapshot.wave, 1);
     assert.equal(snapshot.towers.length, 0);
     assert.equal(snapshot.walls.length, 0);
-    assert.equal(snapshot.players[0]?.points, 0);
+    assert.equal(snapshot.players[0]?.points, STARTING_POINTS);
 
     const previousSignature = mapsBySeed.get(seed);
     if (previousSignature !== undefined) {

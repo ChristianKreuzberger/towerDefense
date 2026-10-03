@@ -8,6 +8,7 @@ import {
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   MAX_PLAYERS,
   WIN_SCORE,
+  STARTING_POINTS,
   BASE_TOWER_RANGE,
   SPAWN_PROTECTION_TICKS,
   TOWER_RANGE_PER_LEVEL,
@@ -589,7 +590,7 @@ test("places wall in wave phase and deducts wall cost", () => {
 
   const snapshot = simulation.getSnapshot();
   assert.equal(snapshot.walls.length, 1);
-  assert.equal(snapshot.players[0]?.points, awardedPoints - getWallCost(0));
+  assert.equal(snapshot.players[0]?.points, STARTING_POINTS + awardedPoints - getWallCost(0));
   assert.equal(snapshot.walls[0]?.health, DEFAULT_WALL_HEALTH);
   assert.equal(snapshot.walls[0]?.maxHealth, DEFAULT_WALL_HEALTH);
 });
@@ -609,6 +610,11 @@ test("rejects wall placement when player has insufficient points", () => {
     y: towerCoordinate.y
   });
   assert.equal(placeTower.accepted, true);
+
+  // Spend most of the starting points so the player cannot afford a wall.
+  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
+  assert.equal(upgrade.accepted, true);
+  assert.ok((simulation.getSnapshot().players[0]?.points ?? 0) < getWallCost(0));
 
   const ready = simulation.applyCommand({
     type: "ready-for-wave",
@@ -654,7 +660,31 @@ test("upgrades tower in prep phase before ready and deducts deterministic cost",
 
   const snapshot = simulation.getSnapshot();
   assert.equal(snapshot.towers[0]?.level, 2);
-  assert.equal(snapshot.players[0]?.points, 0);
+  assert.equal(snapshot.players[0]?.points, STARTING_POINTS);
+});
+
+test("every player starts with starting points and can spend them on an upgrade right after placing", () => {
+  const [firstTower, secondTower] = getBuildableCoordinates(10, 2);
+  assert.ok(firstTower);
+  assert.ok(secondTower);
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    seed: 10
+  });
+  assert.deepEqual(simulation.getSnapshot().players.map((player) => player.points), [STARTING_POINTS, STARTING_POINTS]);
+
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstTower.x, y: firstTower.y });
+  simulation.applyCommand({ type: "place-tower", playerId: "p2", x: secondTower.x, y: secondTower.y });
+  // The late placer can use the points to make up for a worse spot, e.g. with more range.
+  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2", track: "range" });
+  assert.equal(upgrade.accepted, true);
+  assert.equal(
+    simulation.getSnapshot().players.find((player) => player.id === "p2")?.points,
+    STARTING_POINTS - getTowerUpgradeCost("range", 1)
+  );
 });
 
 test("rejects tower upgrade after the player readied while the phase is still placement", () => {
@@ -730,6 +760,9 @@ test("rejects tower upgrade when player has insufficient points", () => {
   });
   assert.equal(placeTower.accepted, true);
 
+  // The starting points cover one damage upgrade (96) but not a second (153).
+  const first = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
+  assert.equal(first.accepted, true);
   const upgrade = simulation.applyCommand({
     type: "upgrade-tower",
     playerId: "p1",
@@ -1466,7 +1499,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
 
   const defeatedCreature = snapshot.creatures.find((entry) => entry.id === "wave-1-creature-1");
   assert.equal(defeatedCreature, undefined);
-  assert.equal((snapshot.players[0]?.points ?? 0) + (snapshot.players[1]?.points ?? 0), 10);
+  assert.equal((snapshot.players[0]?.points ?? 0) + (snapshot.players[1]?.points ?? 0), 10 + 2 * STARTING_POINTS);
 });
 
 test("resolves same-target multi-tower combat in deterministic towerId order", () => {
@@ -1536,8 +1569,8 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
   assert.equal(firstRun.events.defeatedEvents[0]?.creatureId, "wave-1-creature-1");
   assert.equal(firstRun.events.defeatedEvents[0]?.rewardPoints, 10);
   assert.deepEqual(firstRun.players, [
-    { id: "p2", points: 0 },
-    { id: "p1", points: 10 }
+    { id: "p2", points: STARTING_POINTS },
+    { id: "p1", points: STARTING_POINTS + 10 }
   ]);
 });
 
@@ -3476,7 +3509,7 @@ test("upgrades up to MAX_TOWER_LEVEL, then rejects with tower-max-level and char
     );
   }
   assert.equal(simulation.getSnapshot().towers[0]?.level, MAX_TOWER_LEVEL);
-  assert.equal(simulation.getSnapshot().players[0]?.points, 0);
+  assert.equal(simulation.getSnapshot().players[0]?.points, STARTING_POINTS);
 
   simulation.awardPoints("p1", 500);
   const pointsBefore = simulation.getSnapshot().players[0]?.points;
@@ -3542,7 +3575,7 @@ test("an unknown upgrade track is rejected and costs nothing", () => {
     track: "speed" as unknown as "range"
   });
   assert.deepEqual(result, { accepted: false, reason: "invalid-upgrade-track" });
-  assert.equal(simulation.getSnapshot().players[0]?.points, 200);
+  assert.equal(simulation.getSnapshot().players[0]?.points, STARTING_POINTS + 200);
 });
 
 test("range upgrades extend reach and damage upgrades raise damage per shot, independently", () => {

@@ -195,7 +195,7 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   ]);
   await expect(page.locator("#matchEndOverlay")).toBeHidden();
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
-  await expect(page.locator("#playerCards")).toContainText("0 pts");
+  await expect(page.locator("#playerCards")).toContainText("100 pts");
   await expect(page.locator("#playerCards")).not.toContainText("1000 pts");
 });
 
@@ -224,11 +224,11 @@ test("debug mode: pause, manual ticks, wall mode, and snapshot panel", async ({ 
   await expect(page.locator("#snapshot")).toHaveValue(/"waveTick": 1/);
   await expect(page.locator("#battlefieldMeta")).toContainText("Tick 1");
 
-  // Wall mode sends place-wall for the clicked tile (rejected here: players start with 0 points).
+  // Wall mode sends place-wall for the clicked tile (accepted here: players start with 100 points, a wall costs 25).
   await page.getByRole("button", { name: "Place Wall" }).click();
   await expect(page.getByRole("button", { name: "Place Wall" })).toHaveAttribute("aria-pressed", "true");
   await clickBuildableCell(page, 5);
-  await expect(page.locator("#feedbackQueue")).toContainText("Wall rejected: not enough points");
+  await expect(page.locator("#feedbackQueue")).toContainText("Wall placed");
 
   await page.getByRole("button", { name: "Advance Wave (Auto)" }).click();
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");

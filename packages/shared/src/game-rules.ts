@@ -7,6 +7,8 @@ export const MIN_TOWER_SITES = MAX_PLAYERS;
 // Names are shown in the HUD and the end screen; the cap keeps those layouts intact.
 export const MAX_PLAYER_NAME_LENGTH = 24;
 export const WIN_SCORE = 1000;
+// Every player starts with these points so late placers can offset a worse tower spot with an upgrade (spec/06).
+export const STARTING_POINTS = 100;
 export const DEFAULT_MAP_WIDTH = 50;
 export const DEFAULT_MAP_HEIGHT = 50;
 export const DEFAULT_TOWER_HEALTH = 100;
@@ -61,6 +63,7 @@ export const GAME_RULES = {
   maxPlayers: MAX_PLAYERS,
   maxPlayerNameLength: MAX_PLAYER_NAME_LENGTH,
   winScore: WIN_SCORE,
+  startingPoints: STARTING_POINTS,
   towersPerPlayer: 1,
   mapWidth: DEFAULT_MAP_WIDTH,
   mapHeight: DEFAULT_MAP_HEIGHT,

@@ -26,7 +26,7 @@ Point economy with per-player score tracking.
 
 ## Example tuning parameters
 
-- Starting points: 0
+- Starting points: `STARTING_POINTS` = 100 per player. A tower close to the cave is in more danger but also has the advantage, and whoever places later gets the worse spots, so everyone can buy a first upgrade in the opening prep, after placing a tower and before readying. 100 buys one damage upgrade (96), one range upgrade (64) or one accuracy upgrade (45), so a late placer can offset a weak spot with range or damage. A default chosen by the implementer; tune with the balance reports
 - Win threshold: 1000 points
 - Wall cost scaling: baseWallCost * 1.2^placedWalls
 - Upgrade cost per track: floor(baseCost * growth^currentTrackLevel). Range: base 40, growth 1.6 (64, 102, 163, 262; 591 for the whole track). Damage: base 60, growth 1.6 (96, 153, 245, 393; 887). Accuracy: base 30, growth 1.5 (45, 67, 101, 151; 364). Damage is the strongest and so the most expensive; accuracy is the cheapest. Buying every track completely costs 1842 points, more than the 1000 needed to win, so players must choose. These are defaults chosen by the implementer (issue #60 left them open) and should be tuned with the balance reports

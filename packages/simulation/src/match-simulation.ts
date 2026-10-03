@@ -57,6 +57,7 @@ import {
   TOWER_MOVE_AFTER_WAVES,
   isValidWallPlacement,
   WIN_SCORE,
+  STARTING_POINTS,
   validateGameMap,
 } from "@tower-defense/shared";
 
@@ -336,7 +337,7 @@ export class MatchSimulation {
       players: setup.players.map((player) => ({
         id: player.id,
         name: player.name,
-        points: 0,
+        points: STARTING_POINTS,
         hasPlacedTower: false,
         readyForWave: false,
         eliminated: false,
