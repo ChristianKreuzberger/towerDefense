@@ -73,9 +73,23 @@ Palette and identity
 - UI is a dark frame with cream text (no parchment)
 
 Board scaling
-- The canvas keeps a fixed internal resolution per map size and is scaled by CSS to fit the board container (both width and viewport height), keeping the aspect ratio
-- Default board display size is 20% larger than the original: cell sizes are 34 / 26 / 19 px (small / medium / large maps, previously 28 / 22 / 16), and the viewport-height cap is relaxed to match, so on short screens the board may exceed the viewport height and the page scrolls (`calc(120vh - 204px)`). This is done by the internal resolution, not CSS zoom or transform
-- Pointer to cell conversion measures the canvas rectangle at event time, so any CSS scaling stays correct
+- The canvas keeps a fixed internal resolution per map size and is scaled by CSS to fit the board area (both width and height), keeping the aspect ratio. The board area is whatever is left of the viewport after the fixed-height HUD rows, so the board never makes the page taller than the viewport (see Mobile layout)
+- Cell sizes are 34 / 26 / 19 px (small / medium / large maps). This is done by the internal resolution, not CSS zoom or transform
+- Pointer to cell conversion measures the canvas rectangle at event time and undoes the current zoom and pan (see Zoom and pan), so any CSS scaling stays correct
+
+Mobile layout
+- The game fills the viewport like a fullscreen app (`100dvh`). The page itself never scrolls and shows no scrollbars on the menu or game screen at any size; only the side panel (desktop) or the menu card (small phones) may scroll inside themselves
+- No layout jumping: every HUD row that can change content has a fixed height (top bar, next-wave line, guide card, battlefield meta line). Long text is cut with an ellipsis instead of growing the row, and an empty row keeps its height. Banners, toasts, the tower tooltip and the upgrade popover are overlays and never move the board. The board rectangle is identical before and after a guide, wave preview, toast or banner appears
+- Up to 1040px width (width only, not pointer type) the compact layout applies: slim top bar (phase label and playback controls, no brand), a one-row scrollable strip of scoreboard chips that still switch the active player, the board filling the rest, and a bottom action bar with Place Tower, Move Tower, Ready and More. More opens a sheet with target mode, damage type, status, How to play, Settings, Refresh and Back To Menu (`Esc`, a tap on the board or More again closes it). The Active Player select, tile inputs and the upgrade buttons are not shown in the compact layout; upgrades go through the tower popover
+- Above 1040px the desktop layout keeps the side panel and toolbar, only inside the fixed-height shell. The shortcut bar is shown on desktop and hidden in the compact layout
+- Browser pinch zoom is not disabled for the page (no `maximum-scale`); the board canvas uses `touch-action: none` so gestures on it are handled by the game
+
+Zoom and pan
+- The board can be zoomed from 1x (fit, the default) to 3x and panned while zoomed. The view is clamped so the map always fills the canvas
+- Mouse wheel (including trackpad pinch) zooms around the pointer; two fingers pinch to zoom and drag to pan; one finger or the mouse drags to pan when zoomed in. A press that moves more than 8 px is a drag, not a tap, so it never places or selects anything
+- On-screen buttons `+`, `-` and `Fit` sit in the board corner (steps of 0.25x; Fit returns to 1x). Keys `+`/`=`, `-` and `0` do the same inside a match when no dialog is open and no form field has focus
+- Zoom uses the Phaser camera, so the picture stays crisp. Tile clicks, hover, ghost, cursor, tooltip and the tower popover all use the same view transform and hit the same cell at any zoom and pan
+- The view stays between waves of one match and resets to fit on a new match or rematch (new map)
 
 Terrain
 - Buildable cells are the walkable layer: they are drawn as the road (2 cells wide), and creatures walk on them. Towers are never placed on the road; they go on the map's tower spots (spec/05), which are drawn as visible stone pads in the grass. Other non-buildable cells are raised grass that creatures never enter. Creatures are drawn shifted about 0.25 cell to one side of the road centre according to their lane (0 or 1). There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
@@ -89,7 +103,14 @@ Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
 - Tower style tiers: every 3rd upgrade (counted across all tracks, so by the tower's overall `level`) switches the tower to a new look. Tier = floor((level - 1) / 3), tiers 0 to 4 (level 13 is the highest). Each tier has its own turret art and its shots look different (longer, thicker bolts with a brighter muzzle flash from tier 2, a white core from tier 3). The level pips under the tower show progress to the next tier (0 to 2 pips)
 - Level-up: when an upgrade is bought the tower plays a short shine (gold ring, sparkles, a small pulse and a floating "Level up"); when the purchase starts a new tier it is bigger and says "New style!". Nothing plays on first render or reconnect, and with reduced motion only the floating text shows
+- Tapping or clicking a tower opens the upgrade popover (see Tower popover). It does not place or move anything; while move mode is on a click still moves the tower as before
 - The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, the level of each upgrade track (range, damage, accuracy), health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. The tooltip also names the tower's damage type. Accuracy is the shared `getTowerAccuracy` value. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
+
+Tower popover
+- A popover with three buttons (Range, Damage, Accuracy) shows the tower's level in each track and the next cost (`MAX` when maxed). It opens when a tower is tapped or clicked and stays open after a purchase so several upgrades can be bought in a row
+- Tapping another player's tower makes its owner the active player first (hot-seat), then shows that player's upgrades
+- The buttons use exactly the same command, costs and availability rules as the toolbar upgrade buttons (`getToolbarState`, shared cost functions); an unavailable upgrade is dimmed and a press explains the rejection with the usual toast
+- It closes on Esc, on a tap on any other cell, when the phase changes, when the tower is gone, or when another player becomes active. On desktop it floats above the tower, on narrow screens it docks to the bottom of the board so a finger does not hide it. Hovering still shows the stats tooltip on desktop
 
 Ruins
 - A destroyed tower leaves ruins on its cell (broken base in the owner's colour, rubble, scorch mark) for the rest of the match. They are presentation only: they do not block placement, targeting or paths
@@ -151,7 +172,7 @@ Match-end modal
 - Esc or the Close button dismisses it; focus returns to the element that had it before (or the Settings button if that is gone). Once dismissed it does not reopen on later snapshot refreshes of the same ended match; a new match or rematch resets that
 - While it is open game hotkeys are ignored
 - The guide's close button is a "×" with an accessible name and a `title` tooltip ("Dismiss guidance")
-- The shortcut bar lists exactly the hotkeys that exist: R, T, W, V, U/I/O, 1-8 (switch player), P, M and the arrow keys
+- The shortcut bar lists exactly the hotkeys that exist: R, T, W, V, U/I/O, 1-8 (switch player), P, M, +/-/0 (zoom) and the arrow keys
 
 Engine rules
 - The `AudioContext` is created lazily, never at import time, and unlocked (resumed) on the first `pointerdown`, `keydown` or `touchend`; the listeners are removed once the context is running and re-armed if the context later leaves the running state (for example Safari interruptions)
