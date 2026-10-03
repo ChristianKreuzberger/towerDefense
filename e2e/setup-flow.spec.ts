@@ -69,8 +69,8 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   await expect(page.locator("#playbackControls")).toBeHidden();
   // The shorter range and spawn protection mean the tower now takes more damage in wave 1, so the exact
   // repair amount is no longer fixed; what matters is that the repair is announced.
-  await expect(page.locator("#feedbackQueue")).toContainText(/Alpha tower repaired \+\d+ HP \(\d+\/100\)/);
-  await expect(page.locator("#playerCards")).toContainText(/Tower \d+\/100/);
+  await expect(page.locator("#feedbackQueue")).toContainText(/Alpha tower repaired \+\d+ HP \(\d+\/150\)/);
+  await expect(page.locator("#playerCards")).toContainText(/Tower \d+\/150/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveClass(/repair-pulse/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveAttribute("role", "progressbar");
 
