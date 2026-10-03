@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./match": { "types": "./dist/match-simulation.d.ts", "default": "./dist/match-simulation.js" }
+    "./match": { "types": "./dist/match-simulation.d.ts", "default": "./dist/match-simulation.js" },
+    "./ai-player": { "types": "./dist/ai-player.d.ts", "default": "./dist/ai-player.js" }
   },
   "scripts": {
     "build": "tsc -b",
