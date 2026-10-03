@@ -1,6 +1,11 @@
 import type { MatchSetup, MatchSnapshot, SimulationCommand } from "@tower-defense/shared";
 import { getJson, postJson } from "./api";
-import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
+import type {
+  ApiAdvanceManyPayload,
+  ApiCommandPayload,
+  ApiStartPayload,
+  WireSnapshot
+} from "@tower-defense/transport/wire-types";
 import { applyWireSnapshot } from "./apply";
 import { cueForCommandResult } from "./audio/index";
 import { rebuildBattlefield, setMoveMode } from "./board";
