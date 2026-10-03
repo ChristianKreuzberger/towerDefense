@@ -259,7 +259,7 @@ test("the damage type selector follows the tower, is sent as a command and locks
 
 test("the prep banner previews the next wave and combat shows creatures still to spawn", async ({ page }) => {
   await startMatch(page, "/");
-  await expect(page.locator("#wavePreview")).toHaveText("Next wave 1: 1x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic)");
+  await expect(page.locator("#wavePreview")).toHaveText("Next wave 1: 2x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic), 1x Tank (weak: physical)");
 
   await clickCellNearSpawn(page, 0);
   await page.locator("#playerId").selectOption("p2");
