@@ -1,0 +1,20 @@
+import type { DamageType, MatchEvent, TowerTargetMode } from "@tower-defense/shared";
+export declare const TARGET_MODES: TowerTargetMode[];
+export declare const DAMAGE_TYPE_OPTIONS: DamageType[];
+export declare const PLAYER_COLORS: readonly ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"];
+export declare const TOAST_CAPACITY = 5;
+export declare const TOAST_LIFETIME_MS = 4500;
+export declare const BANNER_LIFETIME_MS = 2600;
+export declare const TURN_BANNER_LIFETIME_MS = 3500;
+export declare const BASE_TICKS_PER_SECOND = 5;
+export declare const PLAYBACK_SPEEDS: readonly [1, 2, 4];
+export declare const PLAYBACK_CHECK_INTERVAL_MS = 50;
+export declare const MAX_TICKS_PER_REQUEST = 4;
+export declare const MAX_PLAYBACK_ERRORS = 3;
+export declare const MANUAL_TRANSITION_MS = 120;
+export declare const RETAINED_EVENT_TYPES: ReadonlySet<MatchEvent["type"]>;
+export declare const EVENT_LOG_CAPACITY = 200;
+export declare const MAX_FX_EVENT_BACKLOG = 300;
+export declare const BOT_STEP_DELAY_MS: number;
+export declare const DEBUG: boolean;
+//# sourceMappingURL=constants.d.ts.map
