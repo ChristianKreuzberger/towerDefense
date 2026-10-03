@@ -6,8 +6,8 @@ snapshots=3
 === Wave 1 (export=1, tick=20) ===
 DPS proxy: 0.55 dmg/tick (dealt=11, ticks=20)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=3, exited=0)
-Damage intake: towers=0
-Repairs: towers=0
+Damage intake: towers=2
+Repairs: towers=2
 Economy delta: awarded=77 spentUpgrades=0 net=77
 Wave-clear bonus: awarded=45
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
@@ -46,8 +46,8 @@ Players:
 Waves completed: 3
 DPS proxy: 0.78 dmg/tick (dealt=52, ticks=67)
 Kills by archetype: runner=4 swarm=3 armored=3 tank=2
-Damage intake totals: towers=0
-Repairs totals: towers=0
+Damage intake totals: towers=2
+Repairs totals: towers=2
 Wave-clear bonus total: 135
 Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
 Economy totals: awarded=281 spentUpgrades=96 net=185 ending=485
