@@ -23,6 +23,8 @@ export const TERRAIN = {
   grass: [0x79a85f, 0x7fae64, 0x73a25a, 0x84b46a] as readonly number[],
   grassBlade: 0x5c8a48,
   grassEdge: 0x3f5f3a,
+  // Stone pad under a tower spot: lighter than grass and road so it reads at a glance.
+  spot: 0xb9b2a4,
   flower: [0xf6efe0, 0xf2c9d8, 0xf5dc7a] as readonly number[],
   shadow: 0x2b2f26
 };

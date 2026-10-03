@@ -5,10 +5,12 @@ import { createMatch } from "./match-simulation.js";
 import {
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   type MatchEvent,
+  type Creature,
   getCreatureMovementSpeedUnits,
   PATH_CELL_MAX_WEAR,
   getWaveCreatureCount,
 } from "@tower-defense/shared";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 import { getBuildableCoordinate, getBuildableCoordinates, createSinglePlayerWaveSimulation, tickUntil, LANE_SEEDS, createPrepMatchWithTower } from "./test-helpers.js";
 
 test("records wave-start event when readiness transitions into wave", () => {
@@ -427,4 +429,58 @@ test("a creature cut off from its route cell is re-anchored by walking distance 
     internals.refreshCreatureRoute();
   }
   assert.ok(reanchored > 0, "expected the maze to offer at least one detour");
+});
+
+// Wider road (spec/05): two creatures walk side by side or overtake, and the lane is only a drawing offset.
+
+function startFarTowerWave(seed: number): ReturnType<typeof createMatch> {
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  // The farthest spot keeps the tower out of range so creatures are never shot during these movement tests.
+  const farthest = [...getTowerSpotsNearSpawn(seed)].reverse()[0];
+  assert.ok(farthest);
+  assert.equal(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: farthest.x, y: farthest.y }).accepted, true);
+  assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" }).accepted, true);
+  return simulation;
+}
+
+test("creatures alternate between the two lanes of the road in spawn order", () => {
+  const simulation = startFarTowerWave(777);
+  const lanes = new Map<string, number>();
+  for (let tick = 0; tick < 200 && lanes.size < 3 && simulation.applyCommand({ type: "advance-wave" }).accepted; tick += 1) {
+    for (const creature of simulation.getSnapshot().creatures) {
+      lanes.set(creature.id, creature.lane);
+    }
+  }
+  assert.deepEqual(
+    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3"].map((id) => lanes.get(id)),
+    [0, 1, 0]
+  );
+});
+
+test("two creatures can share a cell and the one with more progress passes the other", () => {
+  const simulation = startFarTowerWave(777);
+  const internals = simulation as unknown as {
+    state: { creatures: Creature[] };
+    currentWavePath: Array<{ x: number; y: number }>;
+  };
+  while (simulation.getSnapshot().creatures.length < 2) {
+    assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+  }
+  const [front, behind] = internals.state.creatures;
+  assert.ok(front && behind);
+  // Puts the later creature on the front one's cell, closer to leaving it: nothing blocks it, there is no queue.
+  const cell = internals.currentWavePath[front.pathIndex];
+  assert.ok(cell);
+  behind.pathIndex = front.pathIndex;
+  behind.x = cell.x;
+  behind.y = cell.y;
+  front.pathProgressUnits = 0;
+  behind.pathProgressUnits = MOVEMENT_PROGRESS_UNITS_PER_CELL - 10;
+
+  assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+  const after = simulation.getSnapshot().creatures;
+  const passed = after.find((creature) => creature.id === behind.id);
+  const passedBy = after.find((creature) => creature.id === front.id);
+  assert.ok(passed && passedBy);
+  assert.ok(passed.pathIndex > passedBy.pathIndex, "the later creature should be ahead now");
 });

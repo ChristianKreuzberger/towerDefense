@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 declare global {
   interface Window {
     __testBoard?: {
-      findBuildableCell(index?: number): { x: number; y: number } | null;
+      findTowerSpot(index?: number): { x: number; y: number } | null;
       cellSize(): number;
       cellToPixel(x: number, y: number): { x: number; y: number };
       creaturePositions(): Array<{ id: string; x: number; y: number }>;
@@ -30,39 +30,32 @@ test.beforeEach(async ({ page }, testInfo) => {
 async function cellPixel(page: Page, index = 0): Promise<{ x: number; y: number }> {
   const pixel = await page.evaluate((cellIndex) => {
     const board = window.__testBoard;
-    const cell = board?.findBuildableCell(cellIndex);
+    const cell = board?.findTowerSpot(cellIndex);
     return board && cell ? board.cellToPixel(cell.x, cell.y) : null;
   }, index);
   if (!pixel) {
-    throw new Error("No buildable cell found via __testBoard hook");
+    throw new Error("No tower spot found via __testBoard hook");
   }
   return pixel;
 }
 
 // Deliberately a plain click (no force): the guide must never sit on top of the board.
-async function clickBuildableCell(page: Page, index = 0): Promise<void> {
+async function clickTowerSpot(page: Page, index = 0): Promise<void> {
   await page.locator("#board canvas").click({ position: await cellPixel(page, index) });
 }
 
-// Towers have a limited range, so tests that need combat place them just outside the protected area
-// around seed 777's monster cave at (0, 0). They are isolated pads inside the maze walls, so they never cut the route.
-const SEED_777_TOWER_CELLS = [{ x: 9, y: 6 }, { x: 6, y: 10 }];
-// On seed 777 no tower ever takes damage in wave 1 (the maze keeps creatures away from every pad), but the repair
-// flow needs a damaged tower. On seed 43 the first pad sits on a corridor corner that creatures reach in wave 1.
-const SEED_43_TOWER_CELLS = [{ x: 5, y: 7 }, { x: 47, y: 46 }];
-
-async function clickCellNearSpawn(
-  page: Page,
-  slot: 0 | 1,
-  cells: ReadonlyArray<{ x: number; y: number }> = SEED_777_TOWER_CELLS
-): Promise<void> {
-  const cell = cells[slot]!;
-  // Fail with a clear message if map generation changes, instead of a silent "tower never fires" later.
+// Towers have a limited range, so tests that need combat use the tower spots closest to the monster cave. The spots
+// come from the live map, so these tests keep working when generation changes.
+async function clickCellNearSpawn(page: Page, slot: 0 | 1, skipNearest = 0): Promise<void> {
   const { snapshot } = (await (await page.request.get("/api/snapshot")).json()) as {
-    snapshot: { map: { cells: Array<{ x: number; y: number; buildable: boolean }> } };
+    snapshot: { map: { spawn: { x: number; y: number }; towerSpots: Array<{ x: number; y: number }> } };
   };
-  const buildable = snapshot.map.cells.some((entry) => entry.x === cell.x && entry.y === cell.y && entry.buildable);
-  expect(buildable, `tower cell ${slot} (${cell.x},${cell.y}) is no longer buildable on this seed; update the cells`).toBe(true);
+  const { spawn, towerSpots } = snapshot.map;
+  const byDistance = [...towerSpots].sort(
+    (a, b) => Math.hypot(a.x - spawn.x, a.y - spawn.y) - Math.hypot(b.x - spawn.x, b.y - spawn.y) || a.y - b.y || a.x - b.x
+  );
+  const cell = byDistance[skipNearest + slot];
+  expect(cell, `map has no tower spot number ${skipNearest + slot}`).toBeTruthy();
   const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, cell);
   if (!position) {
     throw new Error("No board hook available to locate the tower cell");
@@ -141,11 +134,11 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   const canvasBox = await page.locator("#board canvas").boundingBox();
   expect(guideBox && canvasBox && guideBox.y + guideBox.height <= canvasBox.y).toBe(true);
 
-  await clickCellNearSpawn(page, 0, SEED_43_TOWER_CELLS);
+  await clickCellNearSpawn(page, 0);
   await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
 
   await page.locator("#playerId").selectOption("p2");
-  await clickCellNearSpawn(page, 1, SEED_43_TOWER_CELLS);
+  await clickCellNearSpawn(page, 1);
   await expect(page.locator("#playerCards")).toContainText("Alpha");
   await expect(page.locator("#playerCards")).toContainText("Bravo");
   await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE");
@@ -244,11 +237,39 @@ test("debug mode: pause, manual ticks, and snapshot panel", async ({ page }) => 
   await expect(page.locator("#phaseSub")).toContainText("Round 1 complete");
 });
 
+test("clicking the road is refused with a hint, and a tower spot accepts the tower", async ({ page }) => {
+  await startMatch(page, "/");
+  const { snapshot } = (await (await page.request.get("/api/snapshot")).json()) as {
+    snapshot: {
+      map: {
+        spawn: { x: number; y: number };
+        cells: Array<{ x: number; y: number; buildable: boolean }>;
+        towerSpots: Array<{ x: number; y: number }>;
+      };
+    };
+  };
+  const { spawn, cells, towerSpots } = snapshot.map;
+  // A road cell well outside the cave's protected area, so only "not a tower spot" can reject it.
+  const road = cells.find((cell) => cell.buildable && Math.hypot(cell.x - spawn.x, cell.y - spawn.y) > 10);
+  expect(road).toBeTruthy();
+  expect(towerSpots.some((spot) => spot.x === road?.x && spot.y === road?.y)).toBe(false);
+
+  const roadPixel = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, road!);
+  expect(roadPixel).not.toBeNull();
+  await page.locator("#board canvas").click({ position: roadPixel! });
+  await expect(page.locator("#feedbackQueue")).toContainText("towers go on the marked spots");
+  const afterRoad = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: unknown[] } };
+  expect(afterRoad.snapshot.towers).toHaveLength(0);
+
+  await clickTowerSpot(page);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+});
+
 test("creatures glide between snapshots instead of jumping", async ({ page }) => {
   await startMatch(page, "/");
-  await clickBuildableCell(page);
+  await clickTowerSpot(page);
   await page.locator("#playerId").selectOption("p2");
-  await clickBuildableCell(page);
+  await clickTowerSpot(page);
   await page.locator("#readyBtn").click();
   await page.locator("#playerId").selectOption("p1");
 
@@ -272,7 +293,8 @@ test("creatures glide between snapshots instead of jumping", async ({ page }) =>
           pathIndex: tick,
           pathProgressUnits: 0,
           spawnTick: 1,
-          targetTowerId: "tower-p1"
+          targetTowerId: "tower-p1",
+          lane: 0
         }
       ]
     };
@@ -315,7 +337,7 @@ test("tile clicks stay accurate when CSS scales the canvas down", async ({ page 
   expect(box && box.width < internalWidth - 50).toBe(true);
 
   // Computed from the on-screen rectangle only (not via the board hook) so scaling bugs cannot cancel out.
-  const cell = await page.evaluate(() => window.__testBoard?.findBuildableCell(25) ?? null);
+  const cell = await page.evaluate(() => window.__testBoard?.findTowerSpot(5) ?? null);
   const map = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { map: { width: number; height: number } } };
   expect(cell).not.toBeNull();
   if (!box || !cell) {
@@ -338,9 +360,9 @@ test("debug demo combat shows synthetic creatures and stops cleanly", async ({ p
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await startMatch(page, "/?debug=1");
-  await clickBuildableCell(page, 10);
+  await clickTowerSpot(page, 5);
   await page.locator("#playerId").selectOption("p2");
-  await clickBuildableCell(page, 20);
+  await clickTowerSpot(page, 8);
 
   await page.locator("#demoBtn").click();
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
@@ -402,7 +424,7 @@ test("a tower can be placed as a player switched to via hotkey", async ({ page }
   await page.locator("#playerId").selectOption("p1");
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("2");
-  await clickBuildableCell(page);
+  await clickTowerSpot(page);
   await expect(page.locator("#playerCards .player-chip").nth(1)).toContainText("Tower 100/100");
   await expect(page.locator("#playerCards .player-chip").nth(0)).toContainText("Tower not placed");
 });
@@ -423,7 +445,7 @@ test("board renders 20% larger by default and clicks stay accurate", async ({ pa
   const oldCell = mapWidth > 40 ? 16 : mapWidth > 24 ? 22 : 28;
   expect(box.width).toBeGreaterThanOrEqual(1.15 * oldCell * mapWidth);
 
-  const cell = await page.evaluate(() => window.__testBoard?.findBuildableCell(25) ?? null);
+  const cell = await page.evaluate(() => window.__testBoard?.findTowerSpot(5) ?? null);
   expect(cell).not.toBeNull();
   if (!cell) {
     return;
@@ -509,7 +531,7 @@ test("the game runs without Web Audio", async ({ page }) => {
     delete scope.webkitAudioContext;
   });
   await startMatch(page, "/");
-  await clickBuildableCell(page);
+  await clickTowerSpot(page);
   await page.locator("#settingsBtn").click();
   await page.locator("#settingsVolume").fill("20");
   await page.keyboard.press("Escape");
@@ -546,7 +568,9 @@ test("hovering a tower shows its level and combat stats", async ({ page }) => {
 
   const tooltip = page.locator(".tower-tooltip");
   await expect(tooltip).toBeHidden();
-  const position = await page.evaluate(() => window.__testBoard?.cellToPixel(9, 6) ?? null);
+  const towers = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ x: number; y: number }> } };
+  const tower = towers.snapshot.towers[0]!;
+  const position = await page.evaluate(({ x, y }) => window.__testBoard?.cellToPixel(x, y) ?? null, tower);
   await page.locator("#board canvas").hover({ position: position! });
   await expect(tooltip).toBeVisible();
   for (const label of ["Level", "Range", "Damage", "DPS", "Accuracy"]) {
@@ -807,7 +831,7 @@ test("the move button explains itself while locked and, once unlocked, sends a m
 
   await page.keyboard.press("v");
   await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-pressed", "true");
-  await clickBuildableCell(page, 3);
+  await clickTowerSpot(page, 3);
   await expect.poll(() => commands.length).toBe(1);
   expect(commands[0]).toContain('"type":"move-tower"');
   expect(commands[0]).toContain('"towerId":"tower-p1"');
@@ -908,7 +932,7 @@ test("starting further matches replaces the board instead of leaking canvases an
   }
 
   // The fresh board still takes clicks: placing a tower works after the replacements.
-  await clickBuildableCell(page);
+  await clickTowerSpot(page);
   await expect(page.locator("#status")).toHaveText("accepted");
   expect(pageErrors).toEqual([]);
 });

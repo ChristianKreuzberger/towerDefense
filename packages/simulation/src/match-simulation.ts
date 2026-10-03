@@ -1,5 +1,5 @@
 import {
-  getCreatureAttackDamage,
+  getCreatureAttackDamageAt,
   isWithinCreatureAttackRange,
   getCreatureBaseHp,
   getCreatureRewardPoints,
@@ -44,6 +44,7 @@ import {
   WAVE_SPAWN_INTERVAL_TICKS,
   getDamageAgainst,
   isValidDamageType,
+  PATH_WIDTH,
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
@@ -664,6 +665,7 @@ export class MatchSimulation {
         height: this.state.map.height,
         seed: this.state.map.seed,
         cells: this.state.map.cells.map((cell) => ({ ...cell })),
+        towerSpots: this.state.map.towerSpots.map((spot) => ({ ...spot })),
         ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {}),
         ...(this.state.map.goal ? { goal: { ...this.state.map.goal } } : {})
       },
@@ -803,7 +805,9 @@ export class MatchSimulation {
       pathIndex: 0,
       pathProgressUnits: 0,
       spawnTick: this.state.waveTick,
-      targetTowerId: liveTowers[(spawnOrdinal - 1) % liveTowers.length]?.id ?? "tower-missing"
+      targetTowerId: liveTowers[(spawnOrdinal - 1) % liveTowers.length]?.id ?? "tower-missing",
+      // Alternates across the road width so neighbours in the queue are drawn side by side.
+      lane: (spawnOrdinal - 1) % PATH_WIDTH
     };
 
     this.currentWaveSpawned += 1;
@@ -1063,58 +1067,24 @@ export class MatchSimulation {
       assignments: assignments.map((assignment) => ({ ...assignment }))
     });
 
-    const sortedAssignments = [...assignments].sort((a, b) => a.creatureId.localeCompare(b.creatureId));
-    for (const assignment of sortedAssignments) {
-      if (!assignment.targetTowerId) {
+    // Area damage: every tower in reach is hit, each with the damage of its own distance band. Creatures and towers
+    // are walked in id order so the outcome does not depend on array order.
+    const creatures = [...this.state.creatures].sort((a, b) => a.id.localeCompare(b.id));
+    for (const creature of creatures) {
+      if (creature.hp <= 0) {
         continue;
       }
 
-      const creature = this.state.creatures.find((entry) => entry.id === assignment.creatureId);
-      if (!creature || creature.hp <= 0) {
-        continue;
-      }
-
-      const tower = towersById.get(assignment.targetTowerId);
-      if (!tower || tower.health <= 0) {
-        continue;
-      }
-
-      const damage = this.getCreatureAttackDamage(creature);
-      tower.health -= damage;
-      this.state.telemetry.currentWave.towerDamageIntake += damage;
-      this.updateCurrentWaveTelemetryTick();
-      this.state.events.push({
-        type: "creature-attack",
-        wave: this.state.wave,
-        tick: this.state.waveTick,
-        creatureId: creature.id,
-        targetTowerId: tower.id,
-        damage,
-        remainingHp: Math.max(0, tower.health)
-      });
-
-      if (tower.health <= 0) {
-        towersById.delete(tower.id);
-        this.state.events.push({
-          type: "tower-destroyed",
-          wave: this.state.wave,
-          tick: this.state.waveTick,
-          towerId: tower.id,
-          playerId: tower.playerId,
-          destroyedByCreatureId: creature.id
-        });
-
-        const player = this.state.players.find((entry) => entry.id === tower.playerId);
-        if (player) {
-          player.eliminated = true;
-          player.readyForWave = false;
+      const liveTowers = [...towersById.values()].sort((a, b) => a.id.localeCompare(b.id));
+      for (const tower of liveTowers) {
+        if (tower.health <= 0) {
+          continue;
         }
-
-        this.state.creatures = this.state.creatures.map((entry) =>
-          entry.targetTowerId === tower.id ? { ...entry, targetTowerId: "tower-missing" } : entry
-        );
-      } else {
-        towersById.set(tower.id, tower);
+        const damage = getCreatureAttackDamageAt(creature.archetype, creature, tower);
+        if (damage <= 0) {
+          continue;
+        }
+        this.applyCreatureAttack(creature, tower, damage, towersById);
       }
     }
 
@@ -1247,8 +1217,43 @@ export class MatchSimulation {
     return getTowerDamage(tower.upgrades.damage);
   }
 
-  private getCreatureAttackDamage(creature: Creature): number {
-    return Math.max(1, getCreatureAttackDamage(creature.archetype));
+  private applyCreatureAttack(creature: Creature, tower: Tower, damage: number, towersById: Map<string, Tower>): void {
+    tower.health -= damage;
+    this.state.telemetry.currentWave.towerDamageIntake += damage;
+    this.updateCurrentWaveTelemetryTick();
+    this.state.events.push({
+      type: "creature-attack",
+      wave: this.state.wave,
+      tick: this.state.waveTick,
+      creatureId: creature.id,
+      targetTowerId: tower.id,
+      damage,
+      remainingHp: Math.max(0, tower.health)
+    });
+
+    if (tower.health > 0) {
+      return;
+    }
+
+    towersById.delete(tower.id);
+    this.state.events.push({
+      type: "tower-destroyed",
+      wave: this.state.wave,
+      tick: this.state.waveTick,
+      towerId: tower.id,
+      playerId: tower.playerId,
+      destroyedByCreatureId: creature.id
+    });
+
+    const player = this.state.players.find((entry) => entry.id === tower.playerId);
+    if (player) {
+      player.eliminated = true;
+      player.readyForWave = false;
+    }
+
+    this.state.creatures = this.state.creatures.map((entry) =>
+      entry.targetTowerId === tower.id ? { ...entry, targetTowerId: "tower-missing" } : entry
+    );
   }
 
   private computeCreatureTargetAssignments(

@@ -6,8 +6,8 @@ snapshots=2
 === Wave 1 (export=1, tick=16) ===
 DPS proxy: 0.69 dmg/tick (dealt=11, ticks=16)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=3, exited=0)
-Damage intake: towers=0
-Repairs: towers=0
+Damage intake: towers=14
+Repairs: towers=14
 Economy delta: awarded=62 spentUpgrades=0 net=62
 Wave-clear bonus: awarded=30
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
@@ -15,28 +15,28 @@ Players:
 - p1 (Alpha) status=active delta=47 bonus=15 catchUp=0 swarmCapped=0 total=47 ending=147 towerLv=1 towerHp=100
 - p2 (Beta) status=active delta=15 bonus=15 catchUp=0 swarmCapped=0 total=15 ending=115 towerLv=1 towerHp=100
 
-=== Wave 2 (export=2, tick=18) ===
-DPS proxy: 1.06 dmg/tick (dealt=19, ticks=18)
+=== Wave 2 (export=2, tick=19) ===
+DPS proxy: 1.00 dmg/tick (dealt=19, ticks=19)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=1 (defeated=4, spawned=4, exited=0)
-Damage intake: towers=0
-Repairs: towers=0
-Economy delta: awarded=82 spentUpgrades=109 net=-27
+Damage intake: towers=29
+Repairs: towers=20
+Economy delta: awarded=92 spentUpgrades=109 net=-17
 Wave-clear bonus: awarded=30
-Anti-snowball: catchUp=0 swarmIncomeCapped=0
+Anti-snowball: catchUp=10 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=2 bonus=15 catchUp=0 swarmCapped=0 total=49 ending=149 towerLv=2 towerHp=100
-- p2 (Beta) status=active delta=-29 bonus=15 catchUp=0 swarmCapped=0 total=-14 ending=86 towerLv=2 towerHp=100
+- p1 (Alpha) status=active delta=22 bonus=15 catchUp=0 swarmCapped=0 total=69 ending=169 towerLv=2 towerHp=91
+- p2 (Beta) status=active delta=-39 bonus=15 catchUp=10 swarmCapped=0 total=-24 ending=76 towerLv=2 towerHp=100
 
 === Cumulative Summary ===
 Waves completed: 2
-DPS proxy: 0.88 dmg/tick (dealt=30, ticks=34)
+DPS proxy: 0.86 dmg/tick (dealt=30, ticks=35)
 Kills by archetype: runner=2 swarm=2 armored=2 tank=1
-Damage intake totals: towers=0
-Repairs totals: towers=0
+Damage intake totals: towers=43
+Repairs totals: towers=34
 Wave-clear bonus total: 60
-Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
-Economy totals: awarded=144 spentUpgrades=109 net=35 ending=235
-Structures: livingTowers=2 towerHp=200 pathWearTotal=5
+Anti-snowball totals: catchUp=10 swarmIncomeCapped=0
+Economy totals: awarded=154 spentUpgrades=109 net=45 ending=245
+Structures: livingTowers=2 towerHp=191 pathWearTotal=5
 Players (final):
-- p1 (Alpha) status=active delta=2 bonus=15 catchUp=0 swarmCapped=0 total=49 ending=149 towerLv=2 towerHp=100
-- p2 (Beta) status=active delta=-29 bonus=15 catchUp=0 swarmCapped=0 total=-14 ending=86 towerLv=2 towerHp=100
+- p1 (Alpha) status=active delta=22 bonus=15 catchUp=0 swarmCapped=0 total=69 ending=169 towerLv=2 towerHp=91
+- p2 (Beta) status=active delta=-39 bonus=15 catchUp=10 swarmCapped=0 total=-24 ending=76 towerLv=2 towerHp=100

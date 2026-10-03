@@ -1,4 +1,4 @@
-import { PATH_CELL_MAX_WEAR } from "./game-rules.js";
+import { MIN_TOWER_SITES, PATH_CELL_MAX_WEAR } from "./game-rules.js";
 import { MAP_SCHEMA_VERSION, isInSpawnProtection, type GameMap } from "./map-types.js";
 
 export type MapValidationErrorCode =
@@ -14,7 +14,13 @@ export type MapValidationErrorCode =
   | "goal-missing"
   | "goal-not-on-right-edge"
   | "goal-not-buildable"
-  | "goal-unreachable";
+  | "goal-unreachable"
+  | "missing-tower-spots"
+  | "tower-spot-out-of-bounds"
+  | "tower-spot-on-lane"
+  | "tower-spot-in-spawn-protection"
+  | "duplicate-tower-spot"
+  | "too-few-tower-spots";
 
 export interface MapValidationError {
   code: MapValidationErrorCode;
@@ -147,44 +153,43 @@ export function validateGameMap(map: GameMap): MapValidationError[] {
     }
   }
 
+  validateTowerSpots(map, buildable, add);
+
   return errors;
 }
 
-// Tower pads: buildable cells outside the cave's protected area that creatures can never walk to (no buildable
-// path from the spawn). A tower on a pad cannot cut the lane or any other tower's access, so pads can always be
-// filled in any combination. Sorted by row then column so the result is deterministic.
-export function findTowerSites(map: GameMap): Array<{ x: number; y: number }> {
-  const { spawn } = map;
-  if (!spawn) {
-    return [];
+function validateTowerSpots(
+  map: GameMap,
+  road: Set<string>,
+  add: (code: MapValidationErrorCode, message: string) => void
+): void {
+  if (!Array.isArray(map.towerSpots)) {
+    add("missing-tower-spots", "map has no towerSpots list");
+    return;
   }
-  const buildable = new Set(map.cells.filter((cell) => cell.buildable).map((cell) => key(cell.x, cell.y)));
-  const walkable = new Set<string>();
-  const queue: Array<{ x: number; y: number }> = [];
-  if (buildable.has(key(spawn.x, spawn.y))) {
-    walkable.add(key(spawn.x, spawn.y));
-    queue.push({ x: spawn.x, y: spawn.y });
-  }
-  for (let index = 0; index < queue.length; index += 1) {
-    const current = queue[index];
-    if (!current) {
+  const seen = new Set<string>();
+  for (const spot of map.towerSpots) {
+    const name = key(spot.x, spot.y);
+    if (
+      !Number.isInteger(spot.x) || !Number.isInteger(spot.y)
+      || spot.x < 0 || spot.y < 0 || spot.x >= map.width || spot.y >= map.height
+    ) {
+      add("tower-spot-out-of-bounds", `tower spot ${name} is not a whole-number position inside the grid`);
       continue;
     }
-    for (const next of [
-      { x: current.x + 1, y: current.y },
-      { x: current.x - 1, y: current.y },
-      { x: current.x, y: current.y + 1 },
-      { x: current.x, y: current.y - 1 }
-    ]) {
-      const nextKey = key(next.x, next.y);
-      if (buildable.has(nextKey) && !walkable.has(nextKey)) {
-        walkable.add(nextKey);
-        queue.push(next);
-      }
+    if (seen.has(name)) {
+      add("duplicate-tower-spot", `tower spot ${name} appears more than once`);
+      continue;
+    }
+    seen.add(name);
+    if (road.has(name)) {
+      add("tower-spot-on-lane", `tower spot ${name} lies on the road`);
+    }
+    if (isInSpawnProtection(map, spot.x, spot.y)) {
+      add("tower-spot-in-spawn-protection", `tower spot ${name} is inside the cave's protected area`);
     }
   }
-  return map.cells
-    .filter((cell) => cell.buildable && !walkable.has(key(cell.x, cell.y)) && !isInSpawnProtection(map, cell.x, cell.y))
-    .map((cell) => ({ x: cell.x, y: cell.y }))
-    .sort((a, b) => a.y - b.y || a.x - b.x);
+  if (seen.size < MIN_TOWER_SITES) {
+    add("too-few-tower-spots", `map needs at least ${MIN_TOWER_SITES} tower spots, got ${seen.size}`);
+  }
 }

@@ -377,7 +377,7 @@ export type CommandRejectReason =
   | "invalid-damage-type-target"
   | "invalid-damage-type"
   | "out-of-bounds"
-  | "cell-not-buildable"
+  | "not-tower-spot"
   | "tower-overlap"
   | "path-blocked"
   | "spawn-protected"

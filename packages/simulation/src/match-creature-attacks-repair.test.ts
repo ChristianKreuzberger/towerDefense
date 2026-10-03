@@ -7,7 +7,7 @@ import {
   SPAWN_PROTECTION_TICKS,
   type MatchEvent,
   getBetweenWaveTowerRepairAmount,
-  getCreatureAttackDamage,
+  getCreatureAttackDamageAt,
   getCreatureAttackRange,
   type Creature,
   type CreatureArchetype,
@@ -15,7 +15,7 @@ import {
   type Tower,
 } from "@tower-defense/shared";
 import { generateMap } from "./procedural-map.js";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 import { getBuildableCoordinate, createSinglePlayerWaveSimulation, tickUntil } from "./test-helpers.js";
 
 // Creatures spawn out of range, so the first target selection event usually has no target at all.
@@ -33,7 +33,7 @@ test("creature target selection is deterministic by distance then hp then towerI
   // Creatures only select towers within their short attack range. Two towers beside the lane kill every creature
   // before it gets close, so only the first tower stands beside the lane; the second is far out of anyone's reach.
   const firstTower = getTowerCellBesideLane(34);
-  const secondTower = [...getBuildableCellsNearSpawn(34)].reverse()[0];
+  const secondTower = [...getTowerSpotsNearSpawn(34)].reverse()[0];
   assert.ok(secondTower);
   const simulation = createMatch({
     players: [
@@ -115,7 +115,8 @@ test("creature tower selection among in-range towers breaks ties by distance, th
     pathIndex: 0,
     pathProgressUnits: 0,
     spawnTick: 0,
-    targetTowerId: "tower-missing"
+    targetTowerId: "tower-missing",
+    lane: 0
   };
 
   // Distance wins over lower hp and lower id.
@@ -128,9 +129,10 @@ test("creature tower selection among in-range towers breaks ties by distance, th
   // Out-of-range towers never win, even when they would win every tie-break.
   assert.equal(select(tank, towers(tower("a", 14, 10, 1), tower("b", 11, 11)))?.id, "b");
   assert.equal(select(tank, towers(tower("a", 14, 10, 1))), undefined);
-  // A runner (range 1) reaches an adjacent cell (exactly at range) but not the diagonal (1.41).
-  assert.equal(select({ ...tank, archetype: "runner" }, towers(tower("a", 11, 10)))?.id, "a");
-  assert.equal(select({ ...tank, archetype: "runner" }, towers(tower("a", 11, 11))), undefined);
+  // A runner (reach 2.5) reaches a tower sqrt(5) = 2.24 away but not one 3 cells away; a tank (3.5) reaches both.
+  assert.equal(select({ ...tank, archetype: "runner" }, towers(tower("a", 12, 11)))?.id, "a");
+  assert.equal(select({ ...tank, archetype: "runner" }, towers(tower("a", 13, 10))), undefined);
+  assert.equal(select(tank, towers(tower("a", 13, 10)))?.id, "a");
   // A sticky target is kept only while in range, and then wins over a closer tower.
   assert.equal(select({ ...tank, targetTowerId: "b" }, towers(tower("a", 10, 10), tower("b", 11, 11)))?.id, "b");
   assert.equal(select({ ...tank, targetTowerId: "b" }, towers(tower("a", 11, 10), tower("b", 14, 14)))?.id, "a");
@@ -140,19 +142,19 @@ test("emits creature-attack event and reduces tower hp", () => {
   const simulation = createSinglePlayerWaveSimulationBesideLane(35);
 
   // Creatures start at the cave, far from the tower, so the first attack happens a few ticks into the wave.
-  // Remember each creature's archetype per tick: the attacker may already be gone from the final snapshot.
+  // Remember each creature's archetype and cell per tick: the attacker may already be gone from the final snapshot,
+  // and attacks resolve after movement, so the cell from the snapshot after the attack tick is the one it hit from.
   const archetypeById = new Map<string, CreatureArchetype>();
+  const cellById = new Map<string, { x: number; y: number }>();
   tickUntil(
     simulation,
     () => {
       const current = simulation.getSnapshot();
-      if (current.events.some((event) => event.type === "creature-attack")) {
-        return true;
-      }
       for (const creature of current.creatures) {
         archetypeById.set(creature.id, creature.archetype);
+        cellById.set(creature.id, { x: creature.x, y: creature.y });
       }
-      return false;
+      return current.events.some((event) => event.type === "creature-attack");
     },
     1200
   );
@@ -166,13 +168,16 @@ test("emits creature-attack event and reduces tower hp", () => {
   assert.ok(firstAttack);
   assert.equal(firstAttack.targetTowerId, "tower-p1");
 
-  // Damage is exact per attacker archetype, not just bounded.
+  // Damage is exact per attacker archetype and distance band, not just bounded.
   const attackerArchetype = archetypeById.get(firstAttack.creatureId);
   assert.ok(attackerArchetype, `archetype of ${firstAttack.creatureId} was seen before it attacked`);
-  assert.equal(firstAttack.damage, getCreatureAttackDamage(attackerArchetype));
-
+  const attackerCell = cellById.get(firstAttack.creatureId);
+  assert.ok(attackerCell, `cell of ${firstAttack.creatureId} was seen on the attack tick`);
   const tower = snapshot.towers.find((entry) => entry.id === "tower-p1");
   assert.ok(tower);
+  assert.ok(firstAttack.damage > 0);
+  assert.equal(firstAttack.damage, getCreatureAttackDamageAt(attackerArchetype, attackerCell, tower));
+
   assert.equal(tower.health, DEFAULT_TOWER_HEALTH - attackEvents.reduce((total, event) => total + event.damage, 0));
   assert.equal(attackEvents[attackEvents.length - 1]?.remainingHp, tower.health);
   assert.equal(firstAttack.remainingHp, DEFAULT_TOWER_HEALTH - firstAttack.damage);
@@ -365,9 +370,27 @@ test("emits deterministic path-repaired event with stable ordering and values", 
 });
 
 // --- Creature attack range ---
-// Seed 43 has a corridor corner whose diagonal pad sits within reach of the first armored creature while it is still alive.
-// Seed 3 has a lane that leaves the protected cave area while the first creatures are still alive and shootable.
-const RANGE_TEST_SEED = 43;
+// These tests need a map where a tower spot sits within reach of the first armored creature while it is still alive
+// and another diagonal to the runner's walk; with only 16 spots per map that depends on the seed, so the first seed
+// that offers every scenario is used (found once, on first use).
+let rangeTestSeed: number | undefined;
+
+function getRangeTestSeed(): number {
+  if (rangeTestSeed === undefined) {
+    for (let seed = 43; seed < 300 && rangeTestSeed === undefined; seed += 1) {
+      if (
+        tryFindRangeScenario(seed, "wave-1-creature-1", 2.5, 6)
+        && tryFindRangeScenario(seed, "wave-1-creature-3", 2.5, 3.5)
+        && tryFindRangeScenario(seed, "wave-1-creature-1", 1.5, 2.5)
+        && tryFindCellJustOutOfRunnerReach(seed)
+      ) {
+        rangeTestSeed = seed;
+      }
+    }
+  }
+  assert.ok(rangeTestSeed !== undefined, "expected a seed with every range scenario");
+  return rangeTestSeed;
+}
 
 const RANGE_TICK = SPAWN_PROTECTION_TICKS + 1;
 
@@ -375,7 +398,7 @@ const RANGE_TICK = SPAWN_PROTECTION_TICKS + 1;
 // with the farthest placeable tower tells us where the creature will be in the real match.
 function probeCreaturePosition(seed: number, creatureId: string, tick: number): { x: number; y: number } {
   const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  for (const cell of [...getBuildableCellsNearSpawn(seed)].reverse()) {
+  for (const cell of [...getTowerSpotsNearSpawn(seed)].reverse()) {
     if (probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
       break;
     }
@@ -397,6 +420,17 @@ function findRangeScenario(
   minExclusive: number,
   maxInclusive: number
 ): { tick: number; cell: { x: number; y: number } } {
+  const found = tryFindRangeScenario(seed, creatureId, minExclusive, maxInclusive);
+  assert.ok(found, `no tick where ${creatureId} can be met at distance (${minExclusive}, ${maxInclusive}]`);
+  return found;
+}
+
+function tryFindRangeScenario(
+  seed: number,
+  creatureId: string,
+  minExclusive: number,
+  maxInclusive: number
+): { tick: number; cell: { x: number; y: number } } | null {
   const map = generateMap(seed);
   // Early ticks put the creature inside the protected cave area where no tower can stand.
   for (let tick = RANGE_TICK; tick <= 40; tick += 1) {
@@ -406,8 +440,8 @@ function findRangeScenario(
     } catch {
       continue;
     }
-    const candidates = map.cells.filter(
-      (cell) => cell.buildable && Math.hypot(cell.x - roughPosition.x, cell.y - roughPosition.y) <= maxInclusive + 4
+    const candidates = map.towerSpots.filter(
+      (cell) => Math.hypot(cell.x - roughPosition.x, cell.y - roughPosition.y) <= maxInclusive + 4
     );
     for (const cell of candidates) {
       const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
@@ -429,7 +463,7 @@ function findRangeScenario(
       }
     }
   }
-  assert.fail(`no tick where ${creatureId} can be met at distance (${minExclusive}, ${maxInclusive}]`);
+  return null;
 }
 
 function createMatchWithTowerAt(seed: number, cell: { x: number; y: number }): ReturnType<typeof createMatch> {
@@ -463,15 +497,15 @@ function eventsOnTick<T extends MatchEvent["type"]>(
 }
 
 test("creature attack ranges are defined per archetype", () => {
-  assert.equal(getCreatureAttackRange("runner"), 1);
-  assert.equal(getCreatureAttackRange("swarm"), 1);
-  assert.equal(getCreatureAttackRange("armored"), 1.5);
-  assert.equal(getCreatureAttackRange("tank"), 1.5);
+  assert.equal(getCreatureAttackRange("runner"), 2.5);
+  assert.equal(getCreatureAttackRange("swarm"), 2.5);
+  assert.equal(getCreatureAttackRange("armored"), 3.5);
+  assert.equal(getCreatureAttackRange("tank"), 3.5);
 });
 
 test("a creature out of range deals no damage even though its stale target is the tower", () => {
-  const { tick, cell } = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-1", 1.5, 4);
-  const simulation = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
+  const { tick, cell } = findRangeScenario(getRangeTestSeed(), "wave-1-creature-1", 2.5, 6);
+  const simulation = createMatchWithTowerAt(getRangeTestSeed(), cell);
   runToTick(simulation, tick);
 
   assert.equal(eventsOnTick(simulation, "creature-attack", tick, "wave-1-creature-1").length, 0);
@@ -484,30 +518,33 @@ test("a creature out of range deals no damage even though its stale target is th
   assert.equal(assignment?.targetTowerId, null);
 });
 
-// A live creature at exactly 1 cell from a tower is not reachable: a tower kills a runner long before it walks up
-// to it, so the inclusive boundary is checked on the shared range check directly.
+// Exact boundary distances are hard to hit with a live creature, so the inclusive boundary is checked on the shared
+// range check directly.
 test("creature attack range is Euclidean and inclusive", () => {
   const origin = { x: 10, y: 10 };
   assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 11, y: 10 }), true);
   assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 10, y: 10 }), true);
-  assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 11, y: 11 }), false);
-  assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 12, y: 10 }), false);
-  assert.equal(isWithinCreatureAttackRange("tank", origin, { x: 11, y: 11 }), true);
-  assert.equal(isWithinCreatureAttackRange("tank", origin, { x: 12, y: 10 }), false);
-  assert.equal(isWithinCreatureAttackRange("armored", origin, { x: 12, y: 11 }), false);
+  assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 12, y: 10 }), true);
+  assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 12, y: 12 }), false);
+  assert.equal(isWithinCreatureAttackRange("runner", origin, { x: 13, y: 10 }), false);
+  assert.equal(isWithinCreatureAttackRange("tank", origin, { x: 13, y: 11 }), true);
+  assert.equal(isWithinCreatureAttackRange("tank", origin, { x: 14, y: 10 }), false);
+  assert.equal(isWithinCreatureAttackRange("armored", origin, { x: 13, y: 12 }), false);
 });
 
-test("a runner cannot hit a tower at diagonal distance 1.41 but an armored creature can", () => {
-  // Creature 3 is the first armored creature (range 1.5); creature 1 is a runner (range 1).
-  const armored = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-3", 1, 1.5);
-  const armoredSim = createMatchWithTowerAt(RANGE_TEST_SEED, armored.cell);
+test("a runner cannot hit a tower 3 cells away but an armored creature can", () => {
+  // Creature 3 is the first armored creature (reach 3.5, x1 there = 2 damage); creature 1 is a runner (reach 2.5).
+  const armored = findRangeScenario(getRangeTestSeed(), "wave-1-creature-3", 2.5, 3.5);
+  const armoredSim = createMatchWithTowerAt(getRangeTestSeed(), armored.cell);
   runToTick(armoredSim, armored.tick);
-  assert.equal(eventsOnTick(armoredSim, "creature-attack", armored.tick, "wave-1-creature-3").length, 1);
+  const armoredAttacks = eventsOnTick(armoredSim, "creature-attack", armored.tick, "wave-1-creature-3");
+  assert.equal(armoredAttacks.length, 1);
+  assert.equal(armoredAttacks[0]?.damage, 2);
 
   // A tower this close to the lane shoots a runner dead long before it reaches the diagonal, so the runner is kept
   // out of the tower's sights (spawn protection that never ends). Protected creatures still move and attack.
-  const runner = findDiagonalCellForRunner(RANGE_TEST_SEED);
-  const runnerSim = createMatchWithTowerAt(RANGE_TEST_SEED, runner.cell);
+  const runner = findCellJustOutOfRunnerReach(getRangeTestSeed());
+  const runnerSim = createMatchWithTowerAt(getRangeTestSeed(), runner.cell);
   runToTick(runnerSim, 1);
   const internals = runnerSim as unknown as { state: { creatures: Creature[] } };
   for (const creature of internals.state.creatures) {
@@ -517,12 +554,18 @@ test("a runner cannot hit a tower at diagonal distance 1.41 but an armored creat
   const runnerNow = runnerSim.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
   assert.ok(runnerNow, "runner is alive on the tick it passes the tower");
   const runnerDistance = Math.hypot(runner.cell.x - runnerNow.x, runner.cell.y - runnerNow.y);
-  assert.ok(runnerDistance > 1 && runnerDistance <= 1.5, `runner is diagonal to the tower (${runnerDistance})`);
+  assert.ok(runnerDistance > 2.5 && runnerDistance <= 3.5, `runner is just out of reach (${runnerDistance})`);
   assert.equal(eventsOnTick(runnerSim, "creature-attack", runner.tick, "wave-1-creature-1").length, 0);
 });
 
 // The lane does not depend on a tower that stays off it, so a probe run tells where the runner walks.
-function findDiagonalCellForRunner(seed: number): { tick: number; cell: { x: number; y: number } } {
+function findCellJustOutOfRunnerReach(seed: number): { tick: number; cell: { x: number; y: number } } {
+  const found = tryFindCellJustOutOfRunnerReach(seed);
+  assert.ok(found, "no tower spot 2.5 to 3.5 cells from the runner's lane");
+  return found;
+}
+
+function tryFindCellJustOutOfRunnerReach(seed: number): { tick: number; cell: { x: number; y: number } } | null {
   const map = generateMap(seed);
   for (let tick = RANGE_TICK; tick <= 120; tick += 1) {
     let position: { x: number; y: number };
@@ -531,12 +574,11 @@ function findDiagonalCellForRunner(seed: number): { tick: number; cell: { x: num
     } catch {
       break;
     }
-    for (const cell of map.cells) {
+    for (const cell of map.towerSpots) {
       const distance = Math.hypot(cell.x - position.x, cell.y - position.y);
       if (
-        cell.buildable
-        && distance > 1
-        && distance <= 1.5
+        distance > 2.5
+        && distance <= 3.5
         && createMatch({ players: [{ id: "p1", name: "Alpha" }], seed })
           .applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted
       ) {
@@ -544,13 +586,13 @@ function findDiagonalCellForRunner(seed: number): { tick: number; cell: { x: num
       }
     }
   }
-  assert.fail("no cell diagonal to the runner's lane");
+  return null;
 }
 
 test("ranged creature attacks are deterministic for the same seed", () => {
-  const { cell } = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-3", 0, 1.5);
-  const first = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
-  const second = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
+  const { cell } = findRangeScenario(getRangeTestSeed(), "wave-1-creature-3", 0, 1.5);
+  const first = createMatchWithTowerAt(getRangeTestSeed(), cell);
+  const second = createMatchWithTowerAt(getRangeTestSeed(), cell);
   // The wave may end before tick 30, so step until the simulation stops accepting wave ticks.
   for (const simulation of [first, second]) {
     for (let step = 0; step < 30 && simulation.applyCommand({ type: "advance-wave" }).accepted; step += 1) {
@@ -561,16 +603,171 @@ test("ranged creature attacks are deterministic for the same seed", () => {
   assert.deepEqual(first.getSnapshot().events, second.getSnapshot().events);
 });
 
-// Creatures only attack what is within about one cell, so tests that expect creature attacks need towers right beside
-// the lane. The lane runs from the cave to the east edge and only detours around a tower
-// that stands on it, so a cell next to the probe lane that is not on it keeps the lane unchanged.
-// The maze keeps its tower pads out of the corridors' 4-neighbourhood, so the only pads beside the lane sit on a
-// corridor corner's diagonal (1.41 cells away). Those are within reach of tanks and armored creatures (1.5).
-const BESIDE_LANE_OFFSETS = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
+// Spawn protection that never ends keeps the tower from shooting the creatures, so they live long enough to walk past
+// it. Protected creatures still move and attack normally.
+function freezeSpawnProtection(simulation: ReturnType<typeof createMatch>): void {
+  const internals = simulation as unknown as { state: { creatures: Creature[] } };
+  for (const creature of internals.state.creatures) {
+    creature.spawnTick = Number.MAX_SAFE_INTEGER;
+  }
+}
+
+test("a runner hits a tower 2 cells away for double damage", () => {
+  // Creature 1 is a runner: base damage 1, reach 2.5, x2 between 1.5 and 2.5 cells.
+  const { tick, cell } = findRangeScenario(getRangeTestSeed(), "wave-1-creature-1", 1.5, 2.5);
+  const simulation = createMatchWithTowerAt(getRangeTestSeed(), cell);
+  runToTick(simulation, 1);
+  freezeSpawnProtection(simulation);
+  runToTick(simulation, tick - 1);
+
+  const runner = simulation.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
+  assert.ok(runner, "runner is alive on the scenario tick");
+  const distance = Math.hypot(cell.x - runner.x, cell.y - runner.y);
+  assert.ok(distance > 1.5 && distance <= 2.5, `runner is in the x2 band (${distance})`);
+  const attacks = eventsOnTick(simulation, "creature-attack", tick, "wave-1-creature-1");
+  assert.equal(attacks.length, 1);
+  assert.equal(attacks[0]?.damage, 2);
+});
+
+// Hand-built state: in a live wave the towers kill creatures before several towers are in reach at once.
+test("a creature damages every tower in reach, each with the damage of its own distance band", () => {
+  const simulation = createMatch({
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" },
+      { id: "p3", name: "Gamma" }
+    ],
+    seed: getRangeTestSeed()
+  });
+  const cells = getTowerCellsBesideLane(getRangeTestSeed(), 3);
+  for (const [index, cell] of cells.entries()) {
+    const playerId = `p${index + 1}`;
+    assert.equal(simulation.applyCommand({ type: "place-tower", playerId, x: cell.x, y: cell.y }).accepted, true);
+  }
+  for (const playerId of ["p1", "p2", "p3"]) {
+    assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId }).accepted, true);
+  }
+  const internals = simulation as unknown as {
+    state: { creatures: Creature[]; towers: Tower[]; waveTick: number; events: MatchEvent[] };
+    resolveCreatureAttacksForCurrentTick: () => void;
+  };
+  const place = (id: string, x: number, y: number): void => {
+    const tower = internals.state.towers.find((entry) => entry.id === id);
+    assert.ok(tower);
+    tower.x = x;
+    tower.y = y;
+  };
+  // Tank at (10,10): tower-p2 at distance 1 (x3 = 9), tower-p1 at sqrt(5) = 2.24 (x2 = 6), tower-p3 at 4 (out of reach).
+  place("tower-p1", 12, 11);
+  place("tower-p2", 11, 10);
+  place("tower-p3", 14, 10);
+  internals.state.creatures = [
+    {
+      id: "c1",
+      archetype: "tank",
+      hp: 8,
+      x: 10,
+      y: 10,
+      pathIndex: 0,
+      pathProgressUnits: 0,
+      lane: 0,
+      spawnTick: Number.MAX_SAFE_INTEGER,
+      targetTowerId: "tower-p3"
+    }
+  ];
+  const eventCountBefore = internals.state.events.length;
+  internals.resolveCreatureAttacksForCurrentTick();
+  const newEvents = internals.state.events.slice(eventCountBefore);
+
+  const attacks = newEvents.filter(
+    (event): event is Extract<MatchEvent, { type: "creature-attack" }> => event.type === "creature-attack"
+  );
+  assert.deepEqual(
+    attacks.map((event) => ({ creatureId: event.creatureId, targetTowerId: event.targetTowerId, damage: event.damage })),
+    [
+      { creatureId: "c1", targetTowerId: "tower-p1", damage: 6 },
+      { creatureId: "c1", targetTowerId: "tower-p2", damage: 9 }
+    ]
+  );
+  const health = (id: string): number | undefined => internals.state.towers.find((entry) => entry.id === id)?.health;
+  assert.equal(health("tower-p1"), DEFAULT_TOWER_HEALTH - 6);
+  assert.equal(health("tower-p2"), DEFAULT_TOWER_HEALTH - 9);
+  assert.equal(health("tower-p3"), DEFAULT_TOWER_HEALTH);
+
+  // The reported primary target is still the nearest tower in reach.
+  const selected = newEvents.find(
+    (event): event is Extract<MatchEvent, { type: "creature-targets-selected" }> => event.type === "creature-targets-selected"
+  );
+  assert.deepEqual(selected?.assignments, [{ creatureId: "c1", targetTowerId: "tower-p2" }]);
+});
+
+// Seed 44 puts the second tower spot beside the lane where it takes steady damage without dying in wave 1.
+const AT_RISK_TOWER_SEED = 44;
+
+test("towers beside the lane are genuinely at risk", () => {
+  // A lone level-1 tower beside the lane, no upgrades, through wave 6 (or until the match ends). The first pad beside
+  // the lane sits by the cave, where creatures are still spawn-protected and the tower cannot shoot back (it falls in
+  // wave 2), so this uses the next pad, a typical spot. Observed with the default bands on seed 44: total intake
+  // 85 against 77 repaired over waves 1-6; health 100 after wave 1; lowest wave-end health 72.
+  const [, cell] = getTowerCellsBesideLane(AT_RISK_TOWER_SEED, 2);
+  assert.ok(cell);
+  const simulation = createMatchWithTowerAt(AT_RISK_TOWER_SEED, cell);
+  tickUntil(
+    simulation,
+    () => {
+      const snapshot = simulation.getSnapshot();
+      return snapshot.phase === "ended" || (snapshot.phase === "placement" && snapshot.wave === 7);
+    },
+    5000
+  );
+
+  const events = simulation.getSnapshot().events;
+  const attacks = events.filter(
+    (event): event is Extract<MatchEvent, { type: "creature-attack" }> => event.type === "creature-attack"
+  );
+  for (const attack of attacks) {
+    assert.ok(attack.damage <= 9, `no single hit exceeds 9 (got ${attack.damage})`);
+  }
+
+  const intakeByWave = new Map<number, number>();
+  for (const attack of attacks) {
+    intakeByWave.set(attack.wave, (intakeByWave.get(attack.wave) ?? 0) + attack.damage);
+  }
+  const repairs = events.filter(
+    (event): event is Extract<MatchEvent, { type: "tower-repaired" }> => event.type === "tower-repaired"
+  );
+  const totalIntake = [...intakeByWave.entries()].filter(([wave]) => wave <= 6).reduce((sum, [, value]) => sum + value, 0);
+  const totalRepair = repairs.filter((event) => event.wave <= 6).reduce((sum, event) => sum + event.repairAmount, 0);
+
+  // Health at the end of each wave, before the repair.
+  let health = DEFAULT_TOWER_HEALTH;
+  let lowestWaveEndHealth = DEFAULT_TOWER_HEALTH;
+  let healthAfterWave1 = DEFAULT_TOWER_HEALTH;
+  for (let wave = 1; wave <= 6; wave += 1) {
+    health -= intakeByWave.get(wave) ?? 0;
+    lowestWaveEndHealth = Math.min(lowestWaveEndHealth, health);
+    if (wave === 1) {
+      healthAfterWave1 = health;
+    }
+    health += repairs.filter((event) => event.wave === wave).reduce((sum, event) => sum + event.repairAmount, 0);
+  }
+
+  const wave1Destroyed = events.some((event) => event.type === "tower-destroyed" && event.wave === 1);
+  assert.equal(wave1Destroyed, false, "the tower survives wave 1");
+  assert.ok(healthAfterWave1 >= 70, `the tower survives wave 1 comfortably (health ${healthAfterWave1})`);
+  assert.ok(
+    totalIntake > totalRepair || lowestWaveEndHealth <= 70,
+    `the tower is in real danger (intake ${totalIntake}, repair ${totalRepair}, lowest wave-end health ${lowestWaveEndHealth})`
+  );
+});
+
+// Creatures only attack what is within a few cells (2.5 to 3.5), so tests that expect creature attacks need tower spots
+// beside the lane. Tower spots are never on the lane, so any spot close to a lane cell leaves the lane unchanged.
+const ATTACK_REACH = 3.5;
 
 function getLaneCells(seed: number): Array<{ x: number; y: number }> {
   const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  for (const cell of [...getBuildableCellsNearSpawn(seed)].reverse()) {
+  for (const cell of [...getTowerSpotsNearSpawn(seed)].reverse()) {
     if (probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
       break;
     }
@@ -588,21 +785,21 @@ function getLaneCells(seed: number): Array<{ x: number; y: number }> {
 
 function getTowerCellsBesideLane(seed: number, count: number): Array<{ x: number; y: number }> {
   const lane = getLaneCells(seed);
-  const onLane = (cell: { x: number; y: number }): boolean => lane.some((entry) => entry.x === cell.x && entry.y === cell.y);
   const probe = createMatch({
     players: Array.from({ length: count }, (_, index) => ({ id: `p${index + 1}`, name: `P${index + 1}` })),
     seed
   });
   const picked: Array<{ x: number; y: number }> = [];
-  // Skip the first lane cells: they are inside the protected cave area where towers cannot be placed anyway.
+  // Walk the lane from the cave; the first lane cells are inside the protected area and simply yield rejected spots.
   for (const laneCell of lane) {
-    for (const [dx, dy] of BESIDE_LANE_OFFSETS) {
-      const cell = { x: laneCell.x + dx, y: laneCell.y + dy };
-      if (picked.length === count || onLane(cell) || picked.some((entry) => entry.x === cell.x && entry.y === cell.y)) {
-        continue;
-      }
-      if (probe.applyCommand({ type: "place-tower", playerId: `p${picked.length + 1}`, x: cell.x, y: cell.y }).accepted) {
-        picked.push(cell);
+    for (const spot of generateMap(seed).towerSpots) {
+      if (
+        picked.length < count
+        && Math.hypot(spot.x - laneCell.x, spot.y - laneCell.y) <= ATTACK_REACH
+        && !picked.some((entry) => entry.x === spot.x && entry.y === spot.y)
+        && probe.applyCommand({ type: "place-tower", playerId: `p${picked.length + 1}`, x: spot.x, y: spot.y }).accepted
+      ) {
+        picked.push({ x: spot.x, y: spot.y });
       }
     }
   }

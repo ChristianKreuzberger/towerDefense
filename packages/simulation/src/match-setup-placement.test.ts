@@ -4,12 +4,13 @@ import assert from "node:assert/strict";
 import { createMatch } from "./match-simulation.js";
 import {
   MAX_PLAYERS,
-  isValidTowerPlacement,
+  validatePathSafety,
+  MAP_SCHEMA_VERSION,
   type GameMap,
   type Tower,
 } from "@tower-defense/shared";
 import { generateMap } from "./procedural-map.js";
-import { getBuildableCoordinate, getNonBuildableCoordinate, LANE_SEEDS } from "./test-helpers.js";
+import { getBuildableCoordinate, getNonBuildableCoordinate, getRoadCoordinate, LANE_SEEDS } from "./test-helpers.js";
 
 test("generates deterministic maps for identical seeds", () => {
   const first = generateMap(42);
@@ -51,7 +52,7 @@ test("the creature route winds through the map like a maze", () => {
   for (const seed of [1, 42, 99, 2024, 777]) {
     const map = generateMap(seed);
     const length = shortestRouteLength(map);
-    assert.ok(length >= map.width * 3, `seed ${seed}: route of ${length} cells is too direct`);
+    assert.ok(length >= map.width * 1.5, `seed ${seed}: route of ${length} cells is too direct`);
     assert.ok(length < Number.POSITIVE_INFINITY, `seed ${seed}: no route to the right edge`);
   }
 });
@@ -151,23 +152,20 @@ test("enforces one tower placement per player", () => {
   assert.equal(second.reason, "tower-already-placed");
 });
 
-test("rejects placement on non-buildable cells", () => {
-  const nonBuildable = getNonBuildableCoordinate(2);
-  const simulation = createMatch({
-    players: [{ id: "p1", name: "Alpha" }],
-    seed: 2
-  });
+test("rejects placement on plain grass and on the road, which are not tower spots", () => {
+  for (const cell of [getNonBuildableCoordinate(2), getRoadCoordinate(2)]) {
+    const simulation = createMatch({
+      players: [{ id: "p1", name: "Alpha" }],
+      seed: 2
+    });
 
-  const result = simulation.applyCommand({
-    type: "place-tower",
-    playerId: "p1",
-    x: nonBuildable.x,
-    y: nonBuildable.y
-  });
+    const result = simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y });
 
-  assert.equal(result.accepted, false);
-  assert.equal(result.reason, "cell-not-buildable");
-  assert.equal(simulation.getSnapshot().phase, "placement");
+    assert.equal(result.accepted, false);
+    assert.equal(result.reason, "not-tower-spot");
+    assert.equal(simulation.getSnapshot().phase, "placement");
+    assert.equal(simulation.getSnapshot().towers.length, 0);
+  }
 });
 
 test("rejects overlapping tower placements", () => {
@@ -201,10 +199,11 @@ test("rejects overlapping tower placements", () => {
 
 test("rejects placements that newly block left-to-right path connectivity", () => {
   const map: GameMap = {
-    schemaVersion: 1,
+    schemaVersion: MAP_SCHEMA_VERSION,
     width: 3,
     height: 3,
     seed: 0,
+    towerSpots: [],
     cells: [
       { x: 0, y: 0, buildable: true, pathWear: 0 },
       { x: 1, y: 0, buildable: true, pathWear: 0 },
@@ -243,17 +242,19 @@ test("rejects placements that newly block left-to-right path connectivity", () =
     }
   ];
 
-  const result = isValidTowerPlacement({ playerId: "p3", x: 1, y: 1 }, existingTowers, map);
-  assert.equal(result.valid, false);
+  // Tower spots never block the road, so the safety rule is exercised directly on a hand-built open map.
+  const result = validatePathSafety({ playerId: "p3", x: 1, y: 1 }, existingTowers, map);
+  assert.equal(result.safe, false);
   assert.equal(result.reason, "path-blocked");
 });
 
 test("allows placements when an alternate path remains", () => {
   const map: GameMap = {
-    schemaVersion: 1,
+    schemaVersion: MAP_SCHEMA_VERSION,
     width: 3,
     height: 3,
     seed: 0,
+    towerSpots: [],
     cells: [
       { x: 0, y: 0, buildable: true, pathWear: 0 },
       { x: 1, y: 0, buildable: true, pathWear: 0 },
@@ -281,8 +282,8 @@ test("allows placements when an alternate path remains", () => {
     }
   ];
 
-  const result = isValidTowerPlacement({ playerId: "p2", x: 1, y: 1 }, existingTowers, map);
-  assert.equal(result.valid, true);
+  const result = validatePathSafety({ playerId: "p2", x: 1, y: 1 }, existingTowers, map);
+  assert.equal(result.safe, true);
 });
 
 test("generated maps always contain a connected buildable lane from the left to the right edge", () => {

@@ -5,7 +5,7 @@ import { demo } from "./demo-instance";
 import { store } from "./state";
 
 interface TestBoardHook {
-  findBuildableCell(index?: number): { x: number; y: number } | null;
+  findTowerSpot(index?: number): { x: number; y: number } | null;
   cellSize(): number;
   demo?: { start(): boolean; stop(): void; running(): boolean };
   cellToPixel(x: number, y: number): { x: number; y: number };
@@ -19,30 +19,23 @@ declare global {
   }
 }
 
-// Read-only test hook so Playwright can locate buildable cells without DOM grid elements.
-function findBuildableCellsInOrder(): Array<{ x: number; y: number }> {
+// Read-only test hook so Playwright can locate free tower spots without DOM grid elements.
+function findTowerSpotsInOrder(): Array<{ x: number; y: number }> {
   if (!store.current || !store.mapCache) {
     return [];
   }
 
   const occupied = occupiedCellKeys(store.current);
   const map = store.current.map;
-  const open = new Set(store.mapCache.buildable.map((cell) => `${cell.x},${cell.y}`));
-  // Maze corridors are the creatures' only route, so placements there are usually rejected.
-  // Isolated pads (no walkable neighbour) are always legal spots for tests to click.
-  const isPad = (cell: { x: number; y: number }): boolean =>
-    [`${cell.x + 1},${cell.y}`, `${cell.x - 1},${cell.y}`, `${cell.x},${cell.y + 1}`, `${cell.x},${cell.y - 1}`].every(
-      (key) => !open.has(key)
-    );
-  return store.mapCache.buildable
-    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`) && !isInSpawnProtection(map, cell.x, cell.y) && isPad(cell))
+  return store.mapCache.towerSpots
+    .filter((cell) => !occupied.has(`${cell.x},${cell.y}`) && !isInSpawnProtection(map, cell.x, cell.y))
     .map((cell) => ({ x: cell.x, y: cell.y }));
 }
 
 export function installTestHooks(): void {
   window.__testBoard = {
-    findBuildableCell(index = 0): { x: number; y: number } | null {
-      return findBuildableCellsInOrder()[index] ?? null;
+    findTowerSpot(index = 0): { x: number; y: number } | null {
+      return findTowerSpotsInOrder()[index] ?? null;
     },
     cellSize(): number {
       return battlefieldMount.cellSize();

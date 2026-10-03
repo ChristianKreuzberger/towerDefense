@@ -15,7 +15,7 @@ export function setMenuMessage(text: string): void {
 
 export const REJECT_REASON_TEXT: Record<string, string> = {
   "insufficient-points": "not enough points",
-  "cell-not-buildable": "that tile is not buildable",
+  "not-tower-spot": "towers go on the marked spots, not on the road",
   "tower-overlap": "a tower is already there",
   "path-blocked": "that would block the path",
   "spawn-protected": "too close to the monster cave",

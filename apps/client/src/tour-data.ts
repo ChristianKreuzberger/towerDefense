@@ -29,7 +29,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     title: "Combat",
     body: [
       "Waves play out on their own. Wave N brings N + 2 creatures: runners, swarms, armored and tanks, all walking one lane.",
-      "Towers shoot creatures, never each other. Creatures only hurt a tower that is within their short attack range.",
+      "Towers shoot creatures, never each other. Creatures hurt towers near the lane, and hit harder the closer they get.",
       "You can pause, or run at 2x or 4x speed."
     ]
   },

@@ -76,7 +76,7 @@ export const APP_TEMPLATE = `
           <div id="waveBanner" class="wave-banner" aria-live="polite"><strong></strong><span></span></div>
           <div id="turnBanner" class="turn-banner" aria-live="polite"><strong></strong><span></span></div>
         </div>
-        <div class="small battlefield-meta" id="battlefieldMeta">Click a buildable tile to place your tower.</div>
+        <div class="small battlefield-meta" id="battlefieldMeta">Click a marked tower spot to place your tower.</div>
       </section>
     </div>
 

@@ -37,6 +37,7 @@ export type WireSnapshot = Omit<MatchSnapshot, "map"> & {
     spawn?: { x: number; y: number };
     goal?: { x: number; y: number };
     cells?: MapCell[];
+    towerSpots: Array<{ x: number; y: number }>;
     wornCells?: Array<{ x: number; y: number; pathWear: number }>;
   };
   eventsOffset?: number;

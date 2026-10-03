@@ -10,7 +10,7 @@ import {
   MAX_TOWER_LEVEL,
   type DamageType,
 } from "@tower-defense/shared";
-import { getPlaceableCellsNearSpawn, getBuildableCoordinate, getNonBuildableCoordinate, getSecondBuildableCoordinate, getBuildableCoordinates, tickUntil, findTowerCellAtDistance, firstTickTarget, createPrepMatchWithTower } from "./test-helpers.js";
+import { getPlaceableCellsNearSpawn, getBuildableCoordinate, getNonBuildableCoordinate, getRoadCoordinate, getSecondBuildableCoordinate, getBuildableCoordinates, tickUntil, findTowerCellAtDistance, firstTickTarget, createPrepMatchWithTower } from "./test-helpers.js";
 
 test("upgrades tower in prep phase before ready and deducts deterministic cost", () => {
   const towerCoordinate = getBuildableCoordinate(10);
@@ -671,7 +671,9 @@ test("a move follows the placement rules and needs prep, before ready, and the p
     simulation.applyCommand({ type: "move-tower", playerId, towerId, x, y });
 
   assert.equal(move(-1, 0).reason, "out-of-bounds");
-  assert.equal(move(getNonBuildableCoordinate(10).x, getNonBuildableCoordinate(10).y).reason, "cell-not-buildable");
+  assert.equal(move(getNonBuildableCoordinate(10).x, getNonBuildableCoordinate(10).y).reason, "not-tower-spot");
+  // Moving onto the road is refused like placing there.
+  assert.equal(move(getRoadCoordinate(10).x, getRoadCoordinate(10).y).reason, "not-tower-spot");
   const map = simulation.getSnapshot().map;
   const protectedCell = map.cells.find((cell) => cell.buildable && isInSpawnProtection(map, cell.x, cell.y));
   assert.ok(protectedCell, "expected a buildable cell inside the cave's protected area");

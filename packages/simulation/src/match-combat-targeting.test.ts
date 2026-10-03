@@ -16,7 +16,7 @@ import {
   type DamageType,
   type Tower,
 } from "@tower-defense/shared";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 import { getBuildableCoordinate, getSecondBuildableCoordinate, createSinglePlayerWaveSimulation, tickUntil, advanceToFirstTargetableTick, findTowerCellAtDistance, tryFindTowerCellAtDistance, firstTickTarget, createPrepMatchWithTower } from "./test-helpers.js";
 
 test("records deterministic target assignments on each wave tick", () => {
@@ -220,7 +220,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
 });
 
 test("resolves same-target multi-tower combat in deterministic towerId order", () => {
-  // Seed picked so the shots land in the order the assertions describe: hits and misses depend on the seed.
+  // Seed picked (the first one that works on the tower-spot maps) so the shots land in the order the assertions describe: hits and misses depend on the seed.
   const runScenario = (): {
     events: {
       hitEvents: Array<{ towerId: string; creatureId: string; remainingHp: number }>;
@@ -228,14 +228,14 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     };
     players: Array<{ id: string; points: number }>;
   } => {
-    const firstTower = getBuildableCoordinate(29);
-    const secondTower = getSecondBuildableCoordinate(29, firstTower);
+    const firstTower = getBuildableCoordinate(31);
+    const secondTower = getSecondBuildableCoordinate(31, firstTower);
     const simulation = createMatch({
       players: [
         { id: "p2", name: "Beta" },
         { id: "p1", name: "Alpha" }
       ],
-      seed: 29
+      seed: 31
     });
 
     simulation.applyCommand({
@@ -321,7 +321,7 @@ test("range boundary is inclusive: creature at exactly range distance is targeta
   // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance. With the short
   // range and moving creatures such a cell does not exist on every seed, so take the first seed that has one.
   let found: { seed: number; cell: { x: number; y: number } } | null = null;
-  for (let seed = 40; seed < 80 && !found; seed += 1) {
+  for (let seed = 40; seed < 300 && !found; seed += 1) {
     const cell = tryFindTowerCellAtDistance(seed, range - 1e-9, range);
     found = cell ? { seed, cell } : null;
   }
@@ -356,7 +356,7 @@ test("a freshly spawned creature is untargetable and undamaged until spawn prote
   // The lane is independent of the tower, so record where creature 1 is on every tick 1..SPAWN_PROTECTION_TICKS + 1
   // and pick a cell that covers all of those positions: the creature is in range the whole time.
   const laneProbe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  const probeCells = [...getBuildableCellsNearSpawn(seed)].reverse();
+  const probeCells = [...getTowerSpotsNearSpawn(seed)].reverse();
   const probeCell = probeCells.find(
     (entry) => laneProbe.applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
   );
@@ -369,7 +369,7 @@ test("a freshly spawned creature is untargetable and undamaged until spawn prote
     assert.ok(probeCreature);
     lane.push({ x: probeCreature.x, y: probeCreature.y });
   }
-  const cell = getBuildableCellsNearSpawn(seed).find(
+  const cell = getTowerSpotsNearSpawn(seed).find(
     (entry) =>
       lane.every((point) => Math.hypot(entry.x - point.x, entry.y - point.y) <= getTowerRange(1))
       && createMatch({ players: [{ id: "p1", name: "Alpha" }], seed })

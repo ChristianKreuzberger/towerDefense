@@ -3,16 +3,17 @@ import assert from "node:assert/strict";
 import { createMatch } from "./match-simulation.js";
 import {
   SPAWN_PROTECTION_TICKS,
+  isInSpawnProtection,
   getTowerUpgradeCost,
   type DamageType,
 } from "@tower-defense/shared";
 import { generateMap } from "./procedural-map.js";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 
 // Where the first creature is on the first tick it can be targeted. With range 6 and spawn protection, towers
 // sorted by distance to the cave itself would see creatures walk out of range before they become shootable.
 export function getFirstTargetablePosition(seed: number): { x: number; y: number } {
-  const candidates = getBuildableCellsNearSpawn(seed);
+  const candidates = getTowerSpotsNearSpawn(seed);
   const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
   // The lane does not depend on the tower, so any placeable cell works for the probe; the farthest one stays out of the way.
   for (const cell of [...candidates].reverse()) {
@@ -30,7 +31,7 @@ export function getFirstTargetablePosition(seed: number): { x: number; y: number
 // Greedily places one tower per player so combinations that block the lane are skipped.
 export function getPlaceableCellsNearSpawn(seed: number, count: number): Array<{ x: number; y: number }> {
   const lanePoint = getFirstTargetablePosition(seed);
-  const cellsNearLane = [...getBuildableCellsNearSpawn(seed)].sort(
+  const cellsNearLane = [...getTowerSpotsNearSpawn(seed)].sort(
     (a, b) =>
       Math.hypot(a.x - lanePoint.x, a.y - lanePoint.y) - Math.hypot(b.x - lanePoint.x, b.y - lanePoint.y)
       || a.y - b.y || a.x - b.x
@@ -59,10 +60,24 @@ export function getBuildableCoordinate(seed: number): { x: number; y: number } {
   return cell;
 }
 
+// Plain grass: not road and not a tower spot.
 export function getNonBuildableCoordinate(seed: number): { x: number; y: number } {
   const map = generateMap(seed);
-  const cell = map.cells.find((entry) => !entry.buildable);
-  assert.ok(cell, "expected at least one non-buildable cell");
+  const cell = map.cells.find(
+    (entry) =>
+      !entry.buildable
+      && !isInSpawnProtection(map, entry.x, entry.y)
+      && !map.towerSpots.some((spot) => spot.x === entry.x && spot.y === entry.y)
+  );
+  assert.ok(cell, "expected at least one grass cell");
+  return { x: cell.x, y: cell.y };
+}
+
+// A road cell outside the cave's protected area.
+export function getRoadCoordinate(seed: number): { x: number; y: number } {
+  const map = generateMap(seed);
+  const cell = map.cells.find((entry) => entry.buildable && !isInSpawnProtection(map, entry.x, entry.y));
+  assert.ok(cell, "expected a road cell outside the cave area");
   return { x: cell.x, y: cell.y };
 }
 
@@ -166,7 +181,7 @@ export function tryFindTowerCellAtDistance(
   maxInclusive: number
 ): { x: number; y: number } | null {
   const probeMap = generateMap(seed);
-  for (const cell of probeMap.cells.filter((entry) => entry.buildable)) {
+  for (const cell of probeMap.towerSpots) {
     const probe = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
     if (!probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
       continue;

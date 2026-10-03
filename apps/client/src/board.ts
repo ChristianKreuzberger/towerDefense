@@ -50,7 +50,7 @@ export function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs =
   syncPlacementContext(snapshot);
 
   if (!snapshot) {
-    el.battlefieldMeta.textContent = "Click a buildable tile to place your tower.";
+    el.battlefieldMeta.textContent = "Click a marked tower spot to place your tower.";
     return;
   }
 
@@ -89,7 +89,7 @@ export function occupiedCellKeys(snapshot: MatchSnapshot): Set<string> {
   return occupied;
 }
 
-export function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: number; y: number } | null {
+export function firstFreeTowerSpot(snapshot: MatchSnapshot | null): { x: number; y: number } | null {
   if (!snapshot || !store.mapCache) {
     return null;
   }
@@ -99,16 +99,16 @@ export function firstFreeBuildableCoord(snapshot: MatchSnapshot | null): { x: nu
   const currentY = coordValue(el.y);
   const currentCell = store.mapCache.byKey.get(`${currentX},${currentY}`);
   const isFree = (x: number, y: number): boolean => !occupied.has(`${x},${y}`) && !isInSpawnProtection(snapshot.map, x, y);
-  if (currentCell?.buildable && isFree(currentX, currentY)) {
+  if (currentCell && store.mapCache.towerSpotKeys.has(`${currentX},${currentY}`) && isFree(currentX, currentY)) {
     return { x: currentX, y: currentY };
   }
 
-  const cell = store.mapCache.buildable.find((entry) => isFree(entry.x, entry.y));
+  const cell = store.mapCache.towerSpots.find((entry) => isFree(entry.x, entry.y));
   return cell ? { x: cell.x, y: cell.y } : null;
 }
 
-export function syncCursorToBuildableCell(snapshot: MatchSnapshot | null): void {
-  const nextCell = firstFreeBuildableCoord(snapshot);
+export function syncCursorToTowerSpot(snapshot: MatchSnapshot | null): void {
+  const nextCell = firstFreeTowerSpot(snapshot);
   if (!nextCell) {
     return;
   }

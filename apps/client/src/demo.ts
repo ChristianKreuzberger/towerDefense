@@ -171,7 +171,8 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
           pathIndex: creature.index,
           pathProgressUnits: 0,
           spawnTick: creature.spawnTick,
-          targetTowerId: base.towers[0]?.id ?? ""
+          targetTowerId: base.towers[0]?.id ?? "",
+          lane: Number(creature.id.split("-")[1]) % 2
         };
       });
       const falling = finished ? base.towers[base.towers.length - 1] : undefined;

@@ -11,9 +11,10 @@
 
 `GameMap` (packages/shared) carries:
 
-- `schemaVersion`: integer, currently 1 (`MAP_SCHEMA_VERSION`)
+- `schemaVersion`: integer, currently 2 (`MAP_SCHEMA_VERSION`)
 - `width`, `height`, `seed`
-- `cells`: one entry per grid cell with `x`, `y`, `buildable`, `pathWear`
+- `cells`: one entry per grid cell with `x`, `y`, `buildable`, `pathWear`. `buildable` is the walkable layer (the road): creatures walk on these cells. It does not mean towers may be built there
+- `towerSpots`: the only cells where towers may be placed, a list of `{ x, y }`. Spots are non-walkable cells (see Tower spots)
 - `spawn`: the monster cave cell on the left edge (x = 0)
 - `goal`: the cell where the lane leaves the map on the right edge (x = width - 1); creatures that reach it have exited
 
@@ -29,6 +30,8 @@ Not part of the schema (documented decisions): multiple lanes, per-tower routes,
 - every cell has a boolean `buildable` and a finite `pathWear` from 0 to the maximum wear (`invalid-cell` otherwise)
 - the spawn is on the left edge and on a buildable cell
 - the goal is on the right edge and on a buildable cell
+- `towerSpots` is an array (`missing-tower-spots`); every spot is inside the grid (`out-of-bounds`), listed once (`duplicate-tower-spot`), not on a road cell (`tower-spot-on-lane`) and outside the cave's protected area (`tower-spot-in-spawn-protection`)
+- there are at least `MIN_TOWER_SITES` spots (`too-few-tower-spots`)
 - the goal can be reached from the spawn over buildable cells
 
 Hand-built `GameMap` objects in tests are not validated unless a test calls `validateGameMap` itself.
@@ -51,24 +54,34 @@ Hand-built `GameMap` objects in tests are not validated unless a test calls `val
 ## Creature lane
 
 - Creatures walk over buildable cells only (the walkable layer).
-- Procedural generation carves a maze of corridors (buildable cells) with a seeded randomized depth-first search on a coarse grid (one corridor every 4 cells, so walls between corridors are 3 cells thick). A few extra walls are knocked through for loops.
-- The cave (left edge, `spawn`) and the goal (right edge, `goal`) are the pair of rooms furthest apart in the maze, so the creature route winds back and forth across the map (at least 3 x width cells for the default map).
-- The remaining cells are random buildable noise, but only cells that do not touch a corridor. Noise therefore forms isolated tower pads inside the walls and never opens a shortcut through the maze.
-- Towers may be placed on lane cells, but the placement path check rejects any placement that would cut the last route.
-- Rendering follows the same model: buildable cells are the walkable road and non-buildable cells are raised grass pads (see spec/11, Terrain).
+- Procedural generation carves a maze of corridors (buildable cells) with a seeded randomized depth-first search on a coarse grid (one corridor every 6 cells; each corridor is `PATH_WIDTH` = 2 cells wide, so walls between corridors are 4 cells thick). A few extra walls are knocked through for loops.
+- The cave (left edge, `spawn`) and the goal (right edge, `goal`) are the pair of rooms furthest apart in the maze, so the creature route winds back and forth across the map (a 50x50 map gives routes of about 1 to 5 x width cells, never shorter than the width).
+- The remaining cells are not walkable. Tower spots are picked among them (see Tower spots).
+- Wider road: the road is `PATH_WIDTH` (2) cells wide everywhere, so two creatures can walk side by side or overtake. Each creature gets a lane (0 or 1), alternating by spawn order, which only shifts where it is drawn across the road (see Creature route). The simulation still follows one shared route and creatures never block each other.
+- Rendering follows the same model: buildable cells are the walkable road and non-buildable cells are raised grass (see spec/11, Terrain).
+
+## Tower spots
+
+- Spots may touch the road: creatures only attack towers within about 1 cell, so some spots must be within reach of passing creatures for tower damage, repair and ruins to matter.
+- Towers can only be placed on `towerSpots`. Clicking the road or any other cell is rejected with `not-tower-spot`.
+- Generation picks `TOWER_SPOT_COUNT` (16) spots among non-walkable cells that: lie outside the cave's protected area, are within `TOWER_SPOT_MAX_LANE_DISTANCE` (4) cells of the route creatures walk (the shortest route from the cave), and keep at least `TOWER_SPOT_MIN_SPACING` (3) cells (Chebyshev) from each other.
+- Spots are spread along the route: its cells are split into `TOWER_SPOT_COUNT` equal segments and the best-hash candidate of each segment is chosen; every other segment prefers a spot within 1.5 cells of the route (the longest creature attack range), so some towers can be hurt. Fallback is global hash order. On small maps (for example 20x20) spacing and then the distance cap are relaxed so there are still at least `MIN_TOWER_SITES` spots.
+- Every spot has at least 6 route cells within the base tower range (6), measured over 300 default seeds, so no spot is useless. Spots are deterministic per seed.
+- Spots are never walkable, so a tower can never cut the road and the path checks in Placement still pass; they stay as a safety net.
 
 ## Creature route
 
 - There is one shared lane from the cave to the goal. Creatures walk it and attack whatever is in range while moving (spec/02); they never leave it to chase a tower.
 - The route is the shortest walkable path from spawn to goal with all live towers as obstacles. It does not depend on the order of the tower list.
 - The route is computed when a wave starts and recomputed whenever a tower is destroyed during the wave. Creatures already on the lane keep their cell when it is still on the new route; otherwise (for example a destroyed tower opens a shortcut that bypasses it) each moves to the closest cell of the new route by walking distance: a breadth-first search over the same walkable cells as the route (buildable, no live tower), taking the nearest route cell, with ties going to the earlier route cell. The creature's `x`/`y` are set to that cell and its movement progress resets. Straight-line distance is not used, because in the maze it picks cells of a neighbouring corridor.
+- Each spawned creature also gets a `lane` of 0 or 1: `(spawnOrdinal - 1) % PATH_WIDTH`. The lane is a presentation offset across the road width (about 0.25 cell either side, client only). Movement, range and targeting use the shared route cell, and creatures with different `pathProgressUnits` overtake each other freely.
 - Each spawned creature gets a `targetTowerId` from the live towers: round robin by spawn ordinal over the live towers sorted by id (`tower-missing` only when no tower is alive). It is a sticky preference for attack target selection and only counts while that tower is in range, so it never changes the route.
 - If a player's tower is destroyed or the first tower is gone, routing and spawning keep working for the remaining towers.
 
 ## Generation guarantees
 
 - The spawn and goal are the pair of rooms furthest apart in the maze (see Creature lane); the goal is always reachable from the spawn.
-- For every seed there are at least `MIN_TOWER_SITES` (`MAX_PLAYERS` = 8) tower pads: buildable cells outside the cave's protected area that creatures cannot walk to (no buildable path from the cave). A tower on a pad can never cut the lane or another tower's access, so every player can place a tower in any combination, and this is checked by counting pads (`findTowerSites`), not by trying placements. Generation is deterministic per seed and the carved lane does not change because of this guarantee; if the noise leaves too few pads (only on small maps), extra pads are added at the lowest-hash cells that do not touch the lane.
+- For every seed there are at least `MIN_TOWER_SITES` (`MAX_PLAYERS` = 8) tower spots (see Tower spots), checked by `validateGameMap` (`too-few-tower-spots`). A tower on a spot can never cut the road or another tower's access, so every player can place a tower in any combination. Generation is deterministic per seed.
 
 ## Path wear
 
@@ -82,7 +95,7 @@ Hand-built `GameMap` objects in tests are not validated unless a test calls `val
 
 - Every map has one monster cave on the left edge (x = 0), at the start cell of the carved lane. All creatures spawn there.
 - The cave is rendered as a visible cave mouth, and its protected area is shown as a faint warning tint.
-- Protected area: every cell within `SPAWN_PROTECTION_RADIUS` (5 cells, Euclidean) of the cave. Towers may not be placed there (reject reason `spawn-protected`).
+- Protected area: every cell within `SPAWN_PROTECTION_RADIUS` (5 cells, Euclidean) of the cave. No tower spot lies there, and placement would be rejected (reject reason `spawn-protected`).
 - Why 5: a level 1 tower has a range of 6, so towers just outside the area (radius 5) reach only about 1 cell into it and barely cover the cave exit, and nobody can stand next to it and kill monsters the moment they appear.
 - Why it is not enough alone: the protected radius only keeps towers away from the cave. Creatures are additionally invulnerable and untargetable for their first 1 second after spawning (see spec/02 and spec/06), so the cave exit cannot be camped even by a tower at the edge of its range.
 - The left-to-right route check starts from the cave cell, not from any cell on the left edge.

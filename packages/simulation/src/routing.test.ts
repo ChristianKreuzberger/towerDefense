@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import type { Tower } from "@tower-defense/shared";
 
 import { createMatch } from "./match-simulation.js";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 
 type Cell = { x: number; y: number };
 type Match = ReturnType<typeof createMatch>;
@@ -15,21 +15,11 @@ function players(count: number): Array<{ id: string; name: string }> {
 
 function farCell(seed: number): Cell {
   const probe = createMatch({ players: players(1), seed });
-  const cell = [...getBuildableCellsNearSpawn(seed)]
+  const cell = [...getTowerSpotsNearSpawn(seed)]
     .reverse()
     .find((entry) => probe.applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted);
   assert.ok(cell);
   return cell;
-}
-
-function creatureCells(match: Match, ticks: number): Cell[] {
-  const seen: Cell[] = [];
-  for (let tick = 0; tick < ticks && match.applyCommand({ type: "advance-wave" }).accepted; tick += 1) {
-    for (const creature of match.getSnapshot().creatures) {
-      seen.push({ x: creature.x, y: creature.y });
-    }
-  }
-  return seen;
 }
 
 function startMatch(seed: number, towers: Cell[]): Match {
@@ -42,31 +32,30 @@ function startMatch(seed: number, towers: Cell[]): Match {
   return match;
 }
 
-// Finds a seed where a second tower can sit on the shortest route (the maze has a loop to detour around it).
-function findTowerOnRoute(): { seed: number; first: Cell; second: Cell } {
-  for (let seed = 1; seed <= 400; seed += 1) {
-    const first = farCell(seed);
-    const lane = creatureCells(startMatch(seed, [first]), 150);
-    for (const cell of lane) {
-      const probe = createMatch({ players: players(2), seed });
-      probe.applyCommand({ type: "place-tower", playerId: "p1", x: first.x, y: first.y });
-      if (probe.applyCommand({ type: "place-tower", playerId: "p2", x: cell.x, y: cell.y }).accepted) {
-        return { seed, first, second: cell };
-      }
-    }
-  }
-  assert.fail("expected a seed where a tower can stand on the route");
-}
-
+// Tower spots are never on the road, so a tower on the route can only be forced into the state directly. The route
+// logic must still treat every live tower as an obstacle (a destroyed neighbour or a future rule could put one there).
 test("the creature route avoids every tower, not only the first one", () => {
-  const { seed, first, second } = findTowerOnRoute();
-  const match = startMatch(seed, [first, second]);
+  const seed = 777;
+  const first = farCell(seed);
+  const plain = startMatch(seed, [first]);
+  plain.applyCommand({ type: "advance-wave" });
+  const plainRoute = (plain as unknown as { currentWavePath: Cell[] }).currentWavePath;
+  const blocked = plainRoute[Math.floor(plainRoute.length / 2)];
+  assert.ok(blocked);
+
+  const match = createMatch({ players: players(1), seed });
+  match.applyCommand({ type: "place-tower", playerId: "p1", x: first.x, y: first.y });
+  const internals = match as unknown as { state: { towers: Tower[] } };
+  const template = internals.state.towers[0];
+  assert.ok(template);
+  internals.state.towers.push({ ...template, id: "tower-extra", x: blocked.x, y: blocked.y });
+  match.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   match.applyCommand({ type: "advance-wave" });
   // Reads the route directly: towers shoot creatures, so walked cells alone would not prove anything.
   const route = (match as unknown as { currentWavePath: Cell[] }).currentWavePath;
-  assert.ok(route.length > 0);
+  assert.ok(route.length > 0, "the 2-wide road leaves room to walk around a blocked cell");
   assert.equal(
-    route.some((cell) => cell.x === second.x && cell.y === second.y),
+    route.some((cell) => cell.x === blocked.x && cell.y === blocked.y),
     false,
     "the route runs through the second tower"
   );
@@ -74,7 +63,7 @@ test("the creature route avoids every tower, not only the first one", () => {
 
 function placeTowers(match: Match, seed: number, count: number): Cell[] {
   const placed: Cell[] = [];
-  for (const cell of [...getBuildableCellsNearSpawn(seed)].reverse()) {
+  for (const cell of [...getTowerSpotsNearSpawn(seed)].reverse()) {
     if (placed.length === count) {
       break;
     }

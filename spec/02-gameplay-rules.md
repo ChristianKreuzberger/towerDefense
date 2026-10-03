@@ -19,14 +19,14 @@
 
 ## Tower placement rules
 
-- Towers can only be placed on buildable cells
+- Towers can only be placed on the map's tower spots (spec/05), never on the road creatures walk; other cells are rejected with `not-tower-spot`
 - Placement cannot overlap existing towers
 - Towers cannot be placed within 5 cells of the monster cave where creatures spawn (see spec/05)
 - Placement cannot make all enemy paths invalid
 - Placement must not cut off any live tower that creatures could reach before it
 - Each player places one tower at match start
 - Every player starts with `STARTING_POINTS` = 100 (spec/06), which can be spent on upgrades in the opening prep, so a player who places later (and gets a worse spot) can offset it with range, damage or accuracy
-- Once placed, a tower cannot be sold. It cannot be moved either, with one exception: after the first 5 completed rounds (`TOWER_MOVE_AFTER_WAVES` = 5, so from the prep before wave 6) every player has one free move for their tower (a reward, not an upgrade track). The move follows the placement rules (buildable cell, outside the cave's protected area, no overlap with other towers, no blocked route), keeps the tower's level, upgrades, target mode and health, and like upgrades it is only possible during prep before the player is ready. Using it spends the token; a second move is rejected (`tower-move-used`), and before round 5 is done it is rejected with `tower-move-locked`
+- Once placed, a tower cannot be sold. It cannot be moved either, with one exception: after the first 5 completed rounds (`TOWER_MOVE_AFTER_WAVES` = 5, so from the prep before wave 6) every player has one free move for their tower (a reward, not an upgrade track). The move follows the placement rules (a tower spot, outside the cave's protected area, no overlap with other towers, no blocked route), keeps the tower's level, upgrades, target mode and health, and like upgrades it is only possible during prep before the player is ready. Using it spends the token; a second move is rejected (`tower-move-used`), and before round 5 is done it is rejected with `tower-move-locked`
 
 ## Tower lifecycle
 
@@ -43,9 +43,12 @@
 
 ## Enemy model
 
-- All creatures walk one shared lane (spec/05, Creature route). The route treats every live tower as an obstacle and is recomputed when one is destroyed; it never depends on which tower is first in the list. Each creature is assigned a live tower as its preferred target (round robin by spawn order), but it only attacks it once it is in range.
-- Creatures attempt to attack towers. They keep walking the lane and only damage a tower that is within their attack range; with nothing in range they have no target and just keep moving
-- Attack range: a short per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower cell, and inclusive (a target exactly at range can be hit)
+- All creatures walk one shared lane (spec/05, Creature route). The route treats every live tower as an obstacle and is recomputed when one is destroyed; it never depends on which tower is first in the list. Each creature is assigned a live tower as its preferred target (round robin by spawn order), but it only attacks towers that are in reach.
+- The road is 2 cells wide, so creatures can walk side by side and overtake each other; each creature is drawn in lane 0 or 1 of the road, alternating by spawn order, which has no effect on movement or targeting (spec/05)
+- Creatures attempt to attack towers. They keep walking the lane and damage every tower within their attack range (reach) each tick; with nothing in reach they have no target and just keep moving
+- Attack range (reach): a per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower cell, and inclusive (a target exactly at range can be hit)
+- Closer is stronger: the damage of each hit is the archetype's base attack damage times a distance band multiplier (x3 within 1.5 cells, x2 within 2.5, x1 within 3.5; see spec/06). Each tower in reach is hit with the band for its own distance, so clustered towers all take damage. The worst single hit is a tank next to a tower: 3 x 3 = 9 HP
+- Hits are resolved in a fixed order (creatures by id, then towers by id) and one `creature-attack` event is emitted per creature and tower hit. The `creature-targets-selected` event still reports one primary target per creature: its preferred tower while that is in reach, otherwise the nearest tower in reach (ties: lower health, then id). It is informational only; damage does not depend on it
 - Archetypes: runner, tank, armored, swarm
 - Wave size and composition are fixed and public: wave N has N + 2 creatures, spawned one every 2 ticks, cycling runner, swarm, armored, tank in that order (so wave 1 is runner, swarm, armored; wave 2 adds a tank). The same rule gives the composition shown in the next-wave preview. The snapshot carries `creaturesToSpawn`, the number of creatures of the current wave that have not spawned yet
 - Spawn protection: a creature is untargetable and takes no damage for its first 1 second (`CREATURE_SPAWN_PROTECTION_SECONDS`, 5 simulation ticks at the client's 5 ticks per second) after it appears at the monster cave. It still moves and can attack normally; towers just skip it until the protection ends

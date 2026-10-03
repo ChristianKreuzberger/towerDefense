@@ -1,5 +1,5 @@
 import { isInSpawnProtection } from "@tower-defense/shared";
-import { battlefieldMount, firstFreeBuildableCoord, occupiedCellKeys } from "./board";
+import { battlefieldMount, firstFreeTowerSpot, occupiedCellKeys } from "./board";
 import { coordValue } from "./coord";
 import { el, must } from "./dom";
 import { addFeedback } from "./feedback";
@@ -23,7 +23,14 @@ export function handleCellSelected(x: number, y: number): void {
   battlefieldMount.setCursor(x, y);
 
   const cell = store.mapCache?.byKey.get(`${x},${y}`);
-  if (!cell || !cell.buildable) {
+  if (!cell) {
+    return;
+  }
+  // Only tower spots take towers; the road and plain grass explain themselves instead of failing silently.
+  if (!store.mapCache?.towerSpotKeys.has(`${x},${y}`)) {
+    if (store.moveMode || (store.current.phase === "placement" && !store.current.towers.some((tower) => tower.playerId === selectedPlayerId()))) {
+      addFeedback("rejected", "", store.moveMode ? "move-tower" : "place-tower", "not-tower-spot");
+    }
     return;
   }
 
@@ -50,15 +57,15 @@ export function placeTowerForSelectedPlayer(): void {
     ? resolvePlacementCell({
         cursor: { x: coordValue(el.x), y: coordValue(el.y) },
         cursorChosen: store.cursorChosen,
-        isFreeBuildable: (cell) =>
-          Boolean(store.mapCache?.byKey.get(`${cell.x},${cell.y}`)?.buildable)
+        isFreeSpot: (cell) =>
+          Boolean(store.mapCache?.towerSpotKeys.has(`${cell.x},${cell.y}`))
           && !occupiedCellKeys(snapshot).has(`${cell.x},${cell.y}`)
           && !isInSpawnProtection(snapshot.map, cell.x, cell.y),
-        firstFree: () => firstFreeBuildableCoord(snapshot)
+        firstFree: () => firstFreeTowerSpot(snapshot)
       })
     : null;
   if (!coords) {
-    addFeedback("info", "Click a free buildable tile first, then place your tower");
+    addFeedback("info", "Click a free tower spot first, then place your tower");
     return;
   }
   el.x.value = String(coords.x);
