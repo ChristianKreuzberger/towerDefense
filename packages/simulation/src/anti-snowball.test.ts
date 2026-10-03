@@ -14,7 +14,7 @@ import {
   getWaveClearBonus,
   type MatchEvent
 } from "@tower-defense/shared";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 
 type Internals = {
   endWave: () => void;
@@ -30,7 +30,7 @@ function createWaveMatch(playerCount: number, seed = 31) {
   const players = Array.from({ length: playerCount }, (_, i) => ({ id: `p${i + 1}`, name: `P${i + 1}` }));
   const sim = createMatch({ players, seed });
   // Greedy placement: skip cells that would be rejected (for example because they block the lane).
-  const candidates = getBuildableCellsNearSpawn(seed);
+  const candidates = getTowerSpotsNearSpawn(seed);
   let next = 0;
   for (const player of players) {
     for (; next < candidates.length; next += 1) {

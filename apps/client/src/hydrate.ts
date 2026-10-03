@@ -15,20 +15,21 @@ export function resetMatchCaches(): void {
   store.eventCursor = 0;
 }
 
-export function buildMapCache(key: string, cells: MapCell[]): MapCache {
+export function buildMapCache(key: string, cells: MapCell[], towerSpotList: Array<{ x: number; y: number }>): MapCache {
   const byKey = new Map<string, MapCell>();
-  const buildable: MapCell[] = [];
+  const towerSpotKeys = new Set(towerSpotList.map((spot) => `${spot.x},${spot.y}`));
+  const towerSpots: MapCell[] = [];
   const worn: MapCell[] = [];
   for (const cell of cells) {
     byKey.set(`${cell.x},${cell.y}`, cell);
-    if (cell.buildable) {
-      buildable.push(cell);
+    if (towerSpotKeys.has(`${cell.x},${cell.y}`)) {
+      towerSpots.push(cell);
     }
     if (cell.pathWear > 0) {
       worn.push(cell);
     }
   }
-  return { key, cells, byKey, buildable, worn };
+  return { key, cells, byKey, towerSpots, towerSpotKeys, worn };
 }
 
 // Turns a wire snapshot (possibly lite) into a full MatchSnapshot. Returns null when a lite snapshot
@@ -37,7 +38,7 @@ export function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; 
   const key = mapKeyOf(wire.map);
   let cache: MapCache;
   if (wire.map.cells) {
-    cache = buildMapCache(key, wire.map.cells);
+    cache = buildMapCache(key, wire.map.cells, wire.map.towerSpots);
     store.mapCache = cache;
   } else if (!store.mapCache || store.mapCache.key !== key) {
     return null;
@@ -82,6 +83,7 @@ export function hydrateSnapshot(wire: WireSnapshot): { snapshot: MatchSnapshot; 
       height: wire.map.height,
       seed: wire.map.seed,
       cells: cache.cells,
+      towerSpots: wire.map.towerSpots,
       ...(wire.map.spawn ? { spawn: wire.map.spawn } : {}),
       ...(wire.map.goal ? { goal: wire.map.goal } : {})
     },

@@ -157,17 +157,17 @@ function applyCommandOrThrow(
   }
 }
 
-// Creatures only attack what is within about one cell of the lane, so baseline towers have to stand right beside
-// the lane to take any damage at all. Towers further away would never be touched and the intake numbers would be
-// meaningless. Changing the anchor or the placement order shifts the balance baseline.
+// Towers only go on tower spots, which sit a little off the road. Baseline towers take the spots whose nearest road
+// cell is earliest along the creatures' walk, so they cover the start of the lane. Changing the order shifts the
+// balance baseline.
 const SPAWN_ANCHOR_X = 0;
 
 // The lane runs from the cave to the east edge and only detours around a tower standing on it, so a probe match
 // with a tower far from the lane reveals the lane the real match will use.
 function probeLane(seed: number): Array<{ x: number; y: number }> {
   const probe = createMatch({ players: [{ id: "probe", name: "Probe" }], seed });
-  const cells = probe.getSnapshot().map.cells
-    .filter((cell) => cell.buildable)
+  // Tower spots are never on the route, so the farthest spot leaves the lane untouched.
+  const cells = [...probe.getSnapshot().map.towerSpots]
     .sort((a, b) => (b.x + b.y) - (a.x + a.y) || (a.y - b.y) || (a.x - b.x));
   let placed = false;
   for (const cell of cells) {
@@ -201,20 +201,20 @@ function placeTowersDeterministically(
     .sort((a, b) => a.localeCompare(b));
 
   const lane = probeLane(scenario.seed);
-  // Cells beside the lane (not on it), walking the lane from the anchor column onward. Skips the cave area, which
-  // rejects towers anyway.
-  const candidates: Array<{ x: number; y: number }> = [];
-  for (const laneCell of lane.filter((cell) => cell.x >= SPAWN_ANCHOR_X)) {
-    // The maze keeps pads off the corridors' 4-neighbourhood, so diagonal pads (within reach of armored and tank creatures) count too.
-    for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
-      const cell = { x: laneCell.x + dx, y: laneCell.y + dy };
-      const onLane = lane.some((entry) => entry.x === cell.x && entry.y === cell.y);
-      const known = candidates.some((entry) => entry.x === cell.x && entry.y === cell.y);
-      if (!onLane && !known) {
-        candidates.push(cell);
+  const walked = lane.filter((cell) => cell.x >= SPAWN_ANCHOR_X);
+  const nearestIndex = (spot: { x: number; y: number }): { index: number; distance: number } => {
+    let best = { index: Number.POSITIVE_INFINITY, distance: Number.POSITIVE_INFINITY };
+    walked.forEach((cell, index) => {
+      const distance = Math.hypot(cell.x - spot.x, cell.y - spot.y);
+      if (distance < best.distance) {
+        best = { index, distance };
       }
-    }
-  }
+    });
+    return best;
+  };
+  const candidates = simulation.getSnapshot().map.towerSpots
+    .map((spot) => ({ x: spot.x, y: spot.y, ...nearestIndex(spot) }))
+    .sort((a, b) => a.index - b.index || a.distance - b.distance || a.y - b.y || a.x - b.x);
 
   for (const playerId of players) {
     let placed = false;

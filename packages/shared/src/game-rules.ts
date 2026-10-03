@@ -13,6 +13,12 @@ export const DEFAULT_MAP_WIDTH = 50;
 export const DEFAULT_MAP_HEIGHT = 50;
 export const DEFAULT_TOWER_HEALTH = 100;
 export const BUILDABLE_CELL_THRESHOLD = 0.3;
+// Road width in cells: two creatures can walk side by side or overtake (spec/05).
+export const PATH_WIDTH = 2;
+// Towers go on these dedicated spots next to the road, never on the road itself (spec/05, Tower spots).
+export const TOWER_SPOT_COUNT = 16;
+export const TOWER_SPOT_MIN_SPACING = 3;
+export const TOWER_SPOT_MAX_LANE_DISTANCE = 4;
 export const BETWEEN_WAVE_TOWER_REPAIR_PERCENT = 0.2;
 export const BETWEEN_WAVE_TOWER_REPAIR_MIN = 5;
 export const PATH_CELL_MAX_WEAR = 8;
@@ -64,6 +70,10 @@ export const GAME_RULES = {
   mapHeight: DEFAULT_MAP_HEIGHT,
   defaultTowerHealth: DEFAULT_TOWER_HEALTH,
   buildableCellThreshold: BUILDABLE_CELL_THRESHOLD,
+  pathWidth: PATH_WIDTH,
+  towerSpotCount: TOWER_SPOT_COUNT,
+  towerSpotMinSpacing: TOWER_SPOT_MIN_SPACING,
+  towerSpotMaxLaneDistance: TOWER_SPOT_MAX_LANE_DISTANCE,
   upgradeTrackCosts: UPGRADE_TRACK_COSTS,
   betweenWaveTowerRepairPercent: BETWEEN_WAVE_TOWER_REPAIR_PERCENT,
   betweenWaveTowerRepairMin: BETWEEN_WAVE_TOWER_REPAIR_MIN,

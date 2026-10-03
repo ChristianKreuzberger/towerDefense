@@ -42,7 +42,8 @@ export function paintTerrain(
   height: number,
   cs: number,
   seed: number,
-  spawn?: { x: number; y: number }
+  spawn?: { x: number; y: number },
+  towerSpots: Array<{ x: number; y: number }> = []
 ): void {
   const grass = new Uint8Array(width * height);
   for (const cell of cells) {
@@ -188,6 +189,10 @@ export function paintTerrain(
     }
   }
 
+  for (const spot of towerSpots) {
+    paintTowerSpot(ctx, spot, cs);
+  }
+
   if (spawn) {
     paintSpawnZone(ctx, spawn, cs);
   }
@@ -195,6 +200,21 @@ export function paintTerrain(
   if (spawn) {
     paintCave(ctx, spawn, cs);
   }
+}
+
+// Stone pad marking a cell that accepts a tower; it stays visible so players know where they may build.
+function paintTowerSpot(ctx: Ctx, spot: { x: number; y: number }, cs: number): void {
+  const px = spot.x * cs + cs * 0.08;
+  const py = spot.y * cs + cs * 0.08;
+  const size = cs * 0.84;
+  roundRect(ctx, px, py, size, size, cs * 0.18);
+  outline(ctx, TERRAIN.spot, Math.max(2, cs * 0.07), INK);
+  ctx.strokeStyle = "rgba(255, 255, 240, 0.55)";
+  ctx.lineWidth = Math.max(1.5, cs * 0.05);
+  ctx.setLineDash([cs * 0.16, cs * 0.12]);
+  roundRect(ctx, px + cs * 0.1, py + cs * 0.1, size - cs * 0.2, size - cs * 0.2, cs * 0.12);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 // Faint warning tint over the cells where towers are not allowed (see SPAWN_PROTECTION_RADIUS).

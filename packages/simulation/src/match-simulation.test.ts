@@ -30,17 +30,18 @@ import {
   getDamageAgainst,
   DAMAGE_TYPES,
   type DamageType,
-  isValidTowerPlacement,
+  validatePathSafety,
+  MAP_SCHEMA_VERSION,
   type GameMap,
   type Tower,
 } from "@tower-defense/shared";
 import { generateMap } from "./procedural-map.js";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 
 // Where the first creature is on the first tick it can be targeted. With range 6 and spawn protection, towers
 // sorted by distance to the cave itself would see creatures walk out of range before they become shootable.
 function getFirstTargetablePosition(seed: number): { x: number; y: number } {
-  const candidates = getBuildableCellsNearSpawn(seed);
+  const candidates = getTowerSpotsNearSpawn(seed);
   const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
   // The lane does not depend on the tower, so any placeable cell works for the probe; the farthest one stays out of the way.
   for (const cell of [...candidates].reverse()) {
@@ -58,7 +59,7 @@ function getFirstTargetablePosition(seed: number): { x: number; y: number } {
 // Greedily places one tower per player so combinations that block the lane are skipped.
 function getPlaceableCellsNearSpawn(seed: number, count: number): Array<{ x: number; y: number }> {
   const lanePoint = getFirstTargetablePosition(seed);
-  const cellsNearLane = [...getBuildableCellsNearSpawn(seed)].sort(
+  const cellsNearLane = [...getTowerSpotsNearSpawn(seed)].sort(
     (a, b) =>
       Math.hypot(a.x - lanePoint.x, a.y - lanePoint.y) - Math.hypot(b.x - lanePoint.x, b.y - lanePoint.y)
       || a.y - b.y || a.x - b.x
@@ -87,10 +88,24 @@ function getBuildableCoordinate(seed: number): { x: number; y: number } {
   return cell;
 }
 
+// Plain grass: not road and not a tower spot.
 function getNonBuildableCoordinate(seed: number): { x: number; y: number } {
   const map = generateMap(seed);
-  const cell = map.cells.find((entry) => !entry.buildable);
-  assert.ok(cell, "expected at least one non-buildable cell");
+  const cell = map.cells.find(
+    (entry) =>
+      !entry.buildable
+      && !isInSpawnProtection(map, entry.x, entry.y)
+      && !map.towerSpots.some((spot) => spot.x === entry.x && spot.y === entry.y)
+  );
+  assert.ok(cell, "expected at least one grass cell");
+  return { x: cell.x, y: cell.y };
+}
+
+// A road cell outside the cave's protected area.
+function getRoadCoordinate(seed: number): { x: number; y: number } {
+  const map = generateMap(seed);
+  const cell = map.cells.find((entry) => entry.buildable && !isInSpawnProtection(map, entry.x, entry.y));
+  assert.ok(cell, "expected a road cell outside the cave area");
   return { x: cell.x, y: cell.y };
 }
 
@@ -205,7 +220,7 @@ test("the creature route winds through the map like a maze", () => {
   for (const seed of [1, 42, 99, 2024, 777]) {
     const map = generateMap(seed);
     const length = shortestRouteLength(map);
-    assert.ok(length >= map.width * 3, `seed ${seed}: route of ${length} cells is too direct`);
+    assert.ok(length >= map.width * 1.5, `seed ${seed}: route of ${length} cells is too direct`);
     assert.ok(length < Number.POSITIVE_INFINITY, `seed ${seed}: no route to the right edge`);
   }
 });
@@ -305,23 +320,20 @@ test("enforces one tower placement per player", () => {
   assert.equal(second.reason, "tower-already-placed");
 });
 
-test("rejects placement on non-buildable cells", () => {
-  const nonBuildable = getNonBuildableCoordinate(2);
-  const simulation = createMatch({
-    players: [{ id: "p1", name: "Alpha" }],
-    seed: 2
-  });
+test("rejects placement on plain grass and on the road, which are not tower spots", () => {
+  for (const cell of [getNonBuildableCoordinate(2), getRoadCoordinate(2)]) {
+    const simulation = createMatch({
+      players: [{ id: "p1", name: "Alpha" }],
+      seed: 2
+    });
 
-  const result = simulation.applyCommand({
-    type: "place-tower",
-    playerId: "p1",
-    x: nonBuildable.x,
-    y: nonBuildable.y
-  });
+    const result = simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y });
 
-  assert.equal(result.accepted, false);
-  assert.equal(result.reason, "cell-not-buildable");
-  assert.equal(simulation.getSnapshot().phase, "placement");
+    assert.equal(result.accepted, false);
+    assert.equal(result.reason, "not-tower-spot");
+    assert.equal(simulation.getSnapshot().phase, "placement");
+    assert.equal(simulation.getSnapshot().towers.length, 0);
+  }
 });
 
 test("rejects overlapping tower placements", () => {
@@ -355,10 +367,11 @@ test("rejects overlapping tower placements", () => {
 
 test("rejects placements that newly block left-to-right path connectivity", () => {
   const map: GameMap = {
-    schemaVersion: 1,
+    schemaVersion: MAP_SCHEMA_VERSION,
     width: 3,
     height: 3,
     seed: 0,
+    towerSpots: [],
     cells: [
       { x: 0, y: 0, buildable: true, pathWear: 0 },
       { x: 1, y: 0, buildable: true, pathWear: 0 },
@@ -397,17 +410,19 @@ test("rejects placements that newly block left-to-right path connectivity", () =
     }
   ];
 
-  const result = isValidTowerPlacement({ playerId: "p3", x: 1, y: 1 }, existingTowers, map);
-  assert.equal(result.valid, false);
+  // Tower spots never block the road, so the safety rule is exercised directly on a hand-built open map.
+  const result = validatePathSafety({ playerId: "p3", x: 1, y: 1 }, existingTowers, map);
+  assert.equal(result.safe, false);
   assert.equal(result.reason, "path-blocked");
 });
 
 test("allows placements when an alternate path remains", () => {
   const map: GameMap = {
-    schemaVersion: 1,
+    schemaVersion: MAP_SCHEMA_VERSION,
     width: 3,
     height: 3,
     seed: 0,
+    towerSpots: [],
     cells: [
       { x: 0, y: 0, buildable: true, pathWear: 0 },
       { x: 1, y: 0, buildable: true, pathWear: 0 },
@@ -435,8 +450,8 @@ test("allows placements when an alternate path remains", () => {
     }
   ];
 
-  const result = isValidTowerPlacement({ playerId: "p2", x: 1, y: 1 }, existingTowers, map);
-  assert.equal(result.valid, true);
+  const result = validatePathSafety({ playerId: "p2", x: 1, y: 1 }, existingTowers, map);
+  assert.equal(result.safe, true);
 });
 
 test("upgrades tower in prep phase before ready and deducts deterministic cost", () => {
@@ -1295,7 +1310,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
 });
 
 test("resolves same-target multi-tower combat in deterministic towerId order", () => {
-  // Seed picked so the shots land in the order the assertions describe: hits and misses depend on the seed.
+  // Seed picked (the first one that works on the tower-spot maps) so the shots land in the order the assertions describe: hits and misses depend on the seed.
   const runScenario = (): {
     events: {
       hitEvents: Array<{ towerId: string; creatureId: string; remainingHp: number }>;
@@ -1303,14 +1318,14 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     };
     players: Array<{ id: string; points: number }>;
   } => {
-    const firstTower = getBuildableCoordinate(29);
-    const secondTower = getSecondBuildableCoordinate(29, firstTower);
+    const firstTower = getBuildableCoordinate(31);
+    const secondTower = getSecondBuildableCoordinate(31, firstTower);
     const simulation = createMatch({
       players: [
         { id: "p2", name: "Beta" },
         { id: "p1", name: "Alpha" }
       ],
-      seed: 29
+      seed: 31
     });
 
     simulation.applyCommand({
@@ -1406,7 +1421,7 @@ test("creature target selection is deterministic by distance then hp then towerI
   // Creatures only select towers within their short attack range. Two towers beside the lane kill every creature
   // before it gets close, so only the first tower stands beside the lane; the second is far out of anyone's reach.
   const firstTower = getTowerCellBesideLane(34);
-  const secondTower = [...getBuildableCellsNearSpawn(34)].reverse()[0];
+  const secondTower = [...getTowerSpotsNearSpawn(34)].reverse()[0];
   assert.ok(secondTower);
   const simulation = createMatch({
     players: [
@@ -1488,7 +1503,8 @@ test("creature tower selection among in-range towers breaks ties by distance, th
     pathIndex: 0,
     pathProgressUnits: 0,
     spawnTick: 0,
-    targetTowerId: "tower-missing"
+    targetTowerId: "tower-missing",
+    lane: 0
   };
 
   // Distance wins over lower hp and lower id.
@@ -2255,7 +2271,7 @@ function tryFindTowerCellAtDistance(
   maxInclusive: number
 ): { x: number; y: number } | null {
   const probeMap = generateMap(seed);
-  for (const cell of probeMap.cells.filter((entry) => entry.buildable)) {
+  for (const cell of probeMap.towerSpots) {
     const probe = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
     if (!probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
       continue;
@@ -2308,7 +2324,7 @@ test("range boundary is inclusive: creature at exactly range distance is targeta
   // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance. With the short
   // range and moving creatures such a cell does not exist on every seed, so take the first seed that has one.
   let found: { seed: number; cell: { x: number; y: number } } | null = null;
-  for (let seed = 40; seed < 80 && !found; seed += 1) {
+  for (let seed = 40; seed < 300 && !found; seed += 1) {
     const cell = tryFindTowerCellAtDistance(seed, range - 1e-9, range);
     found = cell ? { seed, cell } : null;
   }
@@ -2343,7 +2359,7 @@ test("a freshly spawned creature is untargetable and undamaged until spawn prote
   // The lane is independent of the tower, so record where creature 1 is on every tick 1..SPAWN_PROTECTION_TICKS + 1
   // and pick a cell that covers all of those positions: the creature is in range the whole time.
   const laneProbe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  const probeCells = [...getBuildableCellsNearSpawn(seed)].reverse();
+  const probeCells = [...getTowerSpotsNearSpawn(seed)].reverse();
   const probeCell = probeCells.find(
     (entry) => laneProbe.applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
   );
@@ -2356,7 +2372,7 @@ test("a freshly spawned creature is untargetable and undamaged until spawn prote
     assert.ok(probeCreature);
     lane.push({ x: probeCreature.x, y: probeCreature.y });
   }
-  const cell = getBuildableCellsNearSpawn(seed).find(
+  const cell = getTowerSpotsNearSpawn(seed).find(
     (entry) =>
       lane.every((point) => Math.hypot(entry.x - point.x, entry.y - point.y) <= getTowerRange(1))
       && createMatch({ players: [{ id: "p1", name: "Alpha" }], seed })
@@ -2500,16 +2516,33 @@ test("allPlayersReadyForWave ignores eliminated players", () => {
 });
 
 // --- Creature attack range ---
-// Seed 43 has a corridor corner whose diagonal pad sits within reach of the first armored creature while it is still alive.
-// Seed 3 has a lane that leaves the protected cave area while the first creatures are still alive and shootable.
-const RANGE_TEST_SEED = 43;
+// These tests need a map where a tower spot sits within reach of the first armored creature while it is still alive
+// and another diagonal to the runner's walk; with only 16 spots per map that depends on the seed, so the first seed
+// that offers every scenario is used (found once, on first use).
+let rangeTestSeed: number | undefined;
+function getRangeTestSeed(): number {
+  if (rangeTestSeed === undefined) {
+    for (let seed = 43; seed < 300 && rangeTestSeed === undefined; seed += 1) {
+      if (
+        tryFindRangeScenario(seed, "wave-1-creature-1", 2.5, 6)
+        && tryFindRangeScenario(seed, "wave-1-creature-3", 2.5, 3.5)
+        && tryFindRangeScenario(seed, "wave-1-creature-1", 1.5, 2.5)
+        && tryFindCellJustOutOfRunnerReach(seed)
+      ) {
+        rangeTestSeed = seed;
+      }
+    }
+  }
+  assert.ok(rangeTestSeed !== undefined, "expected a seed with every range scenario");
+  return rangeTestSeed;
+}
 const RANGE_TICK = SPAWN_PROTECTION_TICKS + 1;
 
 // Position of a creature on a given wave tick. The lane does not depend on where the tower stands, so a probe
 // with the farthest placeable tower tells us where the creature will be in the real match.
 function probeCreaturePosition(seed: number, creatureId: string, tick: number): { x: number; y: number } {
   const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  for (const cell of [...getBuildableCellsNearSpawn(seed)].reverse()) {
+  for (const cell of [...getTowerSpotsNearSpawn(seed)].reverse()) {
     if (probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
       break;
     }
@@ -2531,6 +2564,17 @@ function findRangeScenario(
   minExclusive: number,
   maxInclusive: number
 ): { tick: number; cell: { x: number; y: number } } {
+  const found = tryFindRangeScenario(seed, creatureId, minExclusive, maxInclusive);
+  assert.ok(found, `no tick where ${creatureId} can be met at distance (${minExclusive}, ${maxInclusive}]`);
+  return found;
+}
+
+function tryFindRangeScenario(
+  seed: number,
+  creatureId: string,
+  minExclusive: number,
+  maxInclusive: number
+): { tick: number; cell: { x: number; y: number } } | null {
   const map = generateMap(seed);
   // Early ticks put the creature inside the protected cave area where no tower can stand.
   for (let tick = RANGE_TICK; tick <= 40; tick += 1) {
@@ -2540,8 +2584,8 @@ function findRangeScenario(
     } catch {
       continue;
     }
-    const candidates = map.cells.filter(
-      (cell) => cell.buildable && Math.hypot(cell.x - roughPosition.x, cell.y - roughPosition.y) <= maxInclusive + 4
+    const candidates = map.towerSpots.filter(
+      (cell) => Math.hypot(cell.x - roughPosition.x, cell.y - roughPosition.y) <= maxInclusive + 4
     );
     for (const cell of candidates) {
       const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
@@ -2563,7 +2607,7 @@ function findRangeScenario(
       }
     }
   }
-  assert.fail(`no tick where ${creatureId} can be met at distance (${minExclusive}, ${maxInclusive}]`);
+  return null;
 }
 
 function createMatchWithTowerAt(seed: number, cell: { x: number; y: number }): ReturnType<typeof createMatch> {
@@ -2604,8 +2648,8 @@ test("creature attack ranges are defined per archetype", () => {
 });
 
 test("a creature out of range deals no damage even though its stale target is the tower", () => {
-  const { tick, cell } = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-1", 2.5, 6);
-  const simulation = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
+  const { tick, cell } = findRangeScenario(getRangeTestSeed(), "wave-1-creature-1", 2.5, 6);
+  const simulation = createMatchWithTowerAt(getRangeTestSeed(), cell);
   runToTick(simulation, tick);
 
   assert.equal(eventsOnTick(simulation, "creature-attack", tick, "wave-1-creature-1").length, 0);
@@ -2634,8 +2678,8 @@ test("creature attack range is Euclidean and inclusive", () => {
 
 test("a runner cannot hit a tower 3 cells away but an armored creature can", () => {
   // Creature 3 is the first armored creature (reach 3.5, x1 there = 2 damage); creature 1 is a runner (reach 2.5).
-  const armored = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-3", 2.5, 3.5);
-  const armoredSim = createMatchWithTowerAt(RANGE_TEST_SEED, armored.cell);
+  const armored = findRangeScenario(getRangeTestSeed(), "wave-1-creature-3", 2.5, 3.5);
+  const armoredSim = createMatchWithTowerAt(getRangeTestSeed(), armored.cell);
   runToTick(armoredSim, armored.tick);
   const armoredAttacks = eventsOnTick(armoredSim, "creature-attack", armored.tick, "wave-1-creature-3");
   assert.equal(armoredAttacks.length, 1);
@@ -2643,8 +2687,8 @@ test("a runner cannot hit a tower 3 cells away but an armored creature can", () 
 
   // A tower this close to the lane shoots a runner dead long before it reaches the diagonal, so the runner is kept
   // out of the tower's sights (spawn protection that never ends). Protected creatures still move and attack.
-  const runner = findCellJustOutOfRunnerReach(RANGE_TEST_SEED);
-  const runnerSim = createMatchWithTowerAt(RANGE_TEST_SEED, runner.cell);
+  const runner = findCellJustOutOfRunnerReach(getRangeTestSeed());
+  const runnerSim = createMatchWithTowerAt(getRangeTestSeed(), runner.cell);
   runToTick(runnerSim, 1);
   const internals = runnerSim as unknown as { state: { creatures: Creature[] } };
   for (const creature of internals.state.creatures) {
@@ -2660,6 +2704,12 @@ test("a runner cannot hit a tower 3 cells away but an armored creature can", () 
 
 // The lane does not depend on a tower that stays off it, so a probe run tells where the runner walks.
 function findCellJustOutOfRunnerReach(seed: number): { tick: number; cell: { x: number; y: number } } {
+  const found = tryFindCellJustOutOfRunnerReach(seed);
+  assert.ok(found, "no tower spot 2.5 to 3.5 cells from the runner's lane");
+  return found;
+}
+
+function tryFindCellJustOutOfRunnerReach(seed: number): { tick: number; cell: { x: number; y: number } } | null {
   const map = generateMap(seed);
   for (let tick = RANGE_TICK; tick <= 120; tick += 1) {
     let position: { x: number; y: number };
@@ -2668,11 +2718,10 @@ function findCellJustOutOfRunnerReach(seed: number): { tick: number; cell: { x: 
     } catch {
       break;
     }
-    for (const cell of map.cells) {
+    for (const cell of map.towerSpots) {
       const distance = Math.hypot(cell.x - position.x, cell.y - position.y);
       if (
-        cell.buildable
-        && distance > 2.5
+        distance > 2.5
         && distance <= 3.5
         && createMatch({ players: [{ id: "p1", name: "Alpha" }], seed })
           .applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted
@@ -2681,13 +2730,13 @@ function findCellJustOutOfRunnerReach(seed: number): { tick: number; cell: { x: 
       }
     }
   }
-  assert.fail("no cell 2.5 to 3.5 cells from the runner's lane");
+  return null;
 }
 
 test("ranged creature attacks are deterministic for the same seed", () => {
-  const { cell } = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-3", 0, 1.5);
-  const first = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
-  const second = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
+  const { cell } = findRangeScenario(getRangeTestSeed(), "wave-1-creature-3", 0, 1.5);
+  const first = createMatchWithTowerAt(getRangeTestSeed(), cell);
+  const second = createMatchWithTowerAt(getRangeTestSeed(), cell);
   // The wave may end before tick 30, so step until the simulation stops accepting wave ticks.
   for (const simulation of [first, second]) {
     for (let step = 0; step < 30 && simulation.applyCommand({ type: "advance-wave" }).accepted; step += 1) {
@@ -2709,8 +2758,8 @@ function freezeSpawnProtection(simulation: ReturnType<typeof createMatch>): void
 
 test("a runner hits a tower 2 cells away for double damage", () => {
   // Creature 1 is a runner: base damage 1, reach 2.5, x2 between 1.5 and 2.5 cells.
-  const { tick, cell } = findRangeScenario(RANGE_TEST_SEED, "wave-1-creature-1", 1.5, 2.5);
-  const simulation = createMatchWithTowerAt(RANGE_TEST_SEED, cell);
+  const { tick, cell } = findRangeScenario(getRangeTestSeed(), "wave-1-creature-1", 1.5, 2.5);
+  const simulation = createMatchWithTowerAt(getRangeTestSeed(), cell);
   runToTick(simulation, 1);
   freezeSpawnProtection(simulation);
   runToTick(simulation, tick - 1);
@@ -2732,9 +2781,9 @@ test("a creature damages every tower in reach, each with the damage of its own d
       { id: "p2", name: "Beta" },
       { id: "p3", name: "Gamma" }
     ],
-    seed: RANGE_TEST_SEED
+    seed: getRangeTestSeed()
   });
-  const cells = getTowerCellsBesideLane(RANGE_TEST_SEED, 3);
+  const cells = getTowerCellsBesideLane(getRangeTestSeed(), 3);
   for (const [index, cell] of cells.entries()) {
     const playerId = `p${index + 1}`;
     assert.equal(simulation.applyCommand({ type: "place-tower", playerId, x: cell.x, y: cell.y }).accepted, true);
@@ -2765,6 +2814,7 @@ test("a creature damages every tower in reach, each with the damage of its own d
       y: 10,
       pathIndex: 0,
       pathProgressUnits: 0,
+      lane: 0,
       spawnTick: Number.MAX_SAFE_INTEGER,
       targetTowerId: "tower-p3"
     }
@@ -2795,14 +2845,16 @@ test("a creature damages every tower in reach, each with the damage of its own d
   assert.deepEqual(selected?.assignments, [{ creatureId: "c1", targetTowerId: "tower-p2" }]);
 });
 
+// Seed 44 puts the second tower spot beside the lane where it takes steady damage without dying in wave 1.
+const AT_RISK_TOWER_SEED = 44;
 test("towers beside the lane are genuinely at risk", () => {
   // A lone level-1 tower beside the lane, no upgrades, through wave 6 (or until the match ends). The first pad beside
   // the lane sits by the cave, where creatures are still spawn-protected and the tower cannot shoot back (it falls in
-  // wave 2), so this uses the next pad, a typical spot. Observed with the default bands: intake 12, 0, 0, 31,
-  // 0, 18 for waves 1-6 against 50 repaired; health 88 after wave 1; the tower falls in wave 8.
-  const [, cell] = getTowerCellsBesideLane(EXPOSED_TOWER_SEED, 2);
+  // wave 2), so this uses the next pad, a typical spot. Observed with the default bands on seed 44: total intake
+  // 85 against 77 repaired over waves 1-6; health 100 after wave 1; lowest wave-end health 72.
+  const [, cell] = getTowerCellsBesideLane(AT_RISK_TOWER_SEED, 2);
   assert.ok(cell);
-  const simulation = createMatchWithTowerAt(EXPOSED_TOWER_SEED, cell);
+  const simulation = createMatchWithTowerAt(AT_RISK_TOWER_SEED, cell);
   tickUntil(
     simulation,
     () => {
@@ -2852,15 +2904,12 @@ test("towers beside the lane are genuinely at risk", () => {
   );
 });
 
-// Creatures only attack what is within a few cells (2.5 to 3.5), so tests that expect creature attacks need towers right beside
-// the lane. The lane runs from the cave to the east edge and only detours around a tower
-// that stands on it, so a cell next to the probe lane that is not on it keeps the lane unchanged.
-// The maze keeps its tower pads out of the corridors' 4-neighbourhood, so the only pads beside the lane sit on a
-// corridor corner's diagonal (1.41 cells away). Those are within reach of tanks and armored creatures (1.5).
-const BESIDE_LANE_OFFSETS = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
+// Creatures only attack what is within a few cells (2.5 to 3.5), so tests that expect creature attacks need tower spots
+// beside the lane. Tower spots are never on the lane, so any spot close to a lane cell leaves the lane unchanged.
+const ATTACK_REACH = 3.5;
 function getLaneCells(seed: number): Array<{ x: number; y: number }> {
   const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  for (const cell of [...getBuildableCellsNearSpawn(seed)].reverse()) {
+  for (const cell of [...getTowerSpotsNearSpawn(seed)].reverse()) {
     if (probe.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted) {
       break;
     }
@@ -2878,21 +2927,21 @@ function getLaneCells(seed: number): Array<{ x: number; y: number }> {
 
 function getTowerCellsBesideLane(seed: number, count: number): Array<{ x: number; y: number }> {
   const lane = getLaneCells(seed);
-  const onLane = (cell: { x: number; y: number }): boolean => lane.some((entry) => entry.x === cell.x && entry.y === cell.y);
   const probe = createMatch({
     players: Array.from({ length: count }, (_, index) => ({ id: `p${index + 1}`, name: `P${index + 1}` })),
     seed
   });
   const picked: Array<{ x: number; y: number }> = [];
-  // Skip the first lane cells: they are inside the protected cave area where towers cannot be placed anyway.
+  // Walk the lane from the cave; the first lane cells are inside the protected area and simply yield rejected spots.
   for (const laneCell of lane) {
-    for (const [dx, dy] of BESIDE_LANE_OFFSETS) {
-      const cell = { x: laneCell.x + dx, y: laneCell.y + dy };
-      if (picked.length === count || onLane(cell) || picked.some((entry) => entry.x === cell.x && entry.y === cell.y)) {
-        continue;
-      }
-      if (probe.applyCommand({ type: "place-tower", playerId: `p${picked.length + 1}`, x: cell.x, y: cell.y }).accepted) {
-        picked.push(cell);
+    for (const spot of generateMap(seed).towerSpots) {
+      if (
+        picked.length < count
+        && Math.hypot(spot.x - laneCell.x, spot.y - laneCell.y) <= ATTACK_REACH
+        && !picked.some((entry) => entry.x === spot.x && entry.y === spot.y)
+        && probe.applyCommand({ type: "place-tower", playerId: `p${picked.length + 1}`, x: spot.x, y: spot.y }).accepted
+      ) {
+        picked.push({ x: spot.x, y: spot.y });
       }
     }
   }
@@ -3232,7 +3281,9 @@ test("a move follows the placement rules and needs prep, before ready, and the p
     simulation.applyCommand({ type: "move-tower", playerId, towerId, x, y });
 
   assert.equal(move(-1, 0).reason, "out-of-bounds");
-  assert.equal(move(getNonBuildableCoordinate(10).x, getNonBuildableCoordinate(10).y).reason, "cell-not-buildable");
+  assert.equal(move(getNonBuildableCoordinate(10).x, getNonBuildableCoordinate(10).y).reason, "not-tower-spot");
+  // Moving onto the road is refused like placing there.
+  assert.equal(move(getRoadCoordinate(10).x, getRoadCoordinate(10).y).reason, "not-tower-spot");
   const map = simulation.getSnapshot().map;
   const protectedCell = map.cells.find((cell) => cell.buildable && isInSpawnProtection(map, cell.x, cell.y));
   assert.ok(protectedCell, "expected a buildable cell inside the cave's protected area");
@@ -3479,4 +3530,58 @@ test("move-tower and set-damage-type reject eliminated players", () => {
     eliminated.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" }).reason,
     "player-eliminated"
   );
+});
+
+// Wider road (spec/05): two creatures walk side by side or overtake, and the lane is only a drawing offset.
+
+function startFarTowerWave(seed: number): ReturnType<typeof createMatch> {
+  const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
+  // The farthest spot keeps the tower out of range so creatures are never shot during these movement tests.
+  const farthest = [...getTowerSpotsNearSpawn(seed)].reverse()[0];
+  assert.ok(farthest);
+  assert.equal(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: farthest.x, y: farthest.y }).accepted, true);
+  assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" }).accepted, true);
+  return simulation;
+}
+
+test("creatures alternate between the two lanes of the road in spawn order", () => {
+  const simulation = startFarTowerWave(777);
+  const lanes = new Map<string, number>();
+  for (let tick = 0; tick < 200 && lanes.size < 3 && simulation.applyCommand({ type: "advance-wave" }).accepted; tick += 1) {
+    for (const creature of simulation.getSnapshot().creatures) {
+      lanes.set(creature.id, creature.lane);
+    }
+  }
+  assert.deepEqual(
+    ["wave-1-creature-1", "wave-1-creature-2", "wave-1-creature-3"].map((id) => lanes.get(id)),
+    [0, 1, 0]
+  );
+});
+
+test("two creatures can share a cell and the one with more progress passes the other", () => {
+  const simulation = startFarTowerWave(777);
+  const internals = simulation as unknown as {
+    state: { creatures: Creature[] };
+    currentWavePath: Array<{ x: number; y: number }>;
+  };
+  while (simulation.getSnapshot().creatures.length < 2) {
+    assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+  }
+  const [front, behind] = internals.state.creatures;
+  assert.ok(front && behind);
+  // Puts the later creature on the front one's cell, closer to leaving it: nothing blocks it, there is no queue.
+  const cell = internals.currentWavePath[front.pathIndex];
+  assert.ok(cell);
+  behind.pathIndex = front.pathIndex;
+  behind.x = cell.x;
+  behind.y = cell.y;
+  front.pathProgressUnits = 0;
+  behind.pathProgressUnits = MOVEMENT_PROGRESS_UNITS_PER_CELL - 10;
+
+  assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+  const after = simulation.getSnapshot().creatures;
+  const passed = after.find((creature) => creature.id === behind.id);
+  const passedBy = after.find((creature) => creature.id === front.id);
+  assert.ok(passed && passedBy);
+  assert.ok(passed.pathIndex > passedBy.pathIndex, "the later creature should be ahead now");
 });

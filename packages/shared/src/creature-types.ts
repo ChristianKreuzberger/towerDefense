@@ -101,4 +101,6 @@ export interface Creature {
   pathProgressUnits: number;
   spawnTick: number;
   targetTowerId: string;
+  // Which half of the 2-wide road the creature is drawn on (render offset only; the route is shared).
+  lane: number;
 }

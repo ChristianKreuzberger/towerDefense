@@ -24,7 +24,7 @@ How-to-play tour
 
 Map preview step
 - Shown as a dialog over the board right after a new match (menu Start Match or Rematch) has been generated. It is not shown when the client reconnects to a running match
-- Content: a small overview of the generated map (tower pads, the lane creatures walk, blocked ground, the monster cave and its protected no-build area, with a legend). The lane is the set of buildable cells connected to the cave; other buildable cells are tower pads, the seed and size, and the player list with each player's colour/number and name
+- Content: a small overview of the generated map (tower spots, the road creatures walk, the monster cave and its protected no-build area, with a legend). The road is the set of buildable cells; the tower spots come from the map's `towerSpots`, the seed and size, and the player list with each player's colour/number and name
 - A "Continue" button (focused when the dialog opens) closes it and starts placement for the first player; Esc does the same. It follows the match-end modal pattern: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside
 - While it is open no tower can be placed and game hotkeys are ignored
 - The overview is drawn from the snapshot's map cells only, so it shows whatever the map contains
@@ -78,9 +78,10 @@ Board scaling
 - Pointer to cell conversion measures the canvas rectangle at event time, so any CSS scaling stays correct
 
 Terrain
-- The map only distinguishes buildable cells from non-buildable ones. Buildable cells are the walkable layer: they are drawn as the road, creatures walk on them and towers are placed on them (see spec/05, Creature lane). Non-buildable cells are raised grass pads that creatures never enter. There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
+- Buildable cells are the walkable layer: they are drawn as the road (2 cells wide), and creatures walk on them. Towers are never placed on the road; they go on the map's tower spots (spec/05), which are drawn as visible stone pads in the grass. Other non-buildable cells are raised grass that creatures never enter. Creatures are drawn shifted about 0.25 cell to one side of the road centre according to their lane (0 or 1). There are no blocked cells in the simulation, so decoration (pebbles, tufts, flowers) is purely cosmetic and never implies blocking
 - Grass cells pick one of several variants from a seeded hash of (map seed, x, y), so a map always looks the same
 - The road is drawn as one continuous surface: edges against grass pads are chosen from the four-neighbour mask (rounded edge, shadow), interior cells are plain road
+- While placing or moving a tower, tower spots stay visible and only they accept a click; clicking the road or other grass shows the toast "Tower rejected: towers go on the marked spots, not on the road" (reject reason `not-tower-spot`)
 - Path wear draws darker ruts over the road and scales with the wear value
 - The monster cave (spawn) is drawn as a dark cave mouth on the left edge at the lane start, with a faint red tint over its protected area (no towers, see spec/05). The right edge is marked as the goal; creatures leave at the last column
 

@@ -6,18 +6,9 @@ import test from "node:test";
 let TEST_PORT = 4190;
 let SERVER_URL = `http://127.0.0.1:${TEST_PORT}`;
 
-// Maze corridors are the only creature route, so a tower there is rejected. An isolated buildable pad
-// outside the cave's protected area is always a legal spot.
-function findTowerPad(cells: Array<{ buildable: boolean; x: number; y: number }>): { x: number; y: number } | undefined {
-  const open = new Set(cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
-  return cells.find(
-    (cell) =>
-      cell.buildable &&
-      cell.x > 8 &&
-      [`${cell.x + 1},${cell.y}`, `${cell.x - 1},${cell.y}`, `${cell.x},${cell.y + 1}`, `${cell.x},${cell.y - 1}`].every(
-        (key) => !open.has(key)
-      )
-  );
+// Towers only go on the map's tower spots; spots inside the cave's protected area (x <= 5 on the cave row) are refused.
+function findTowerPad(spots: Array<{ x: number; y: number }>): { x: number; y: number } | undefined {
+  return spots.find((spot) => spot.x > 8);
 }
 
 async function findOpenPort(startPort = 4190, endPort = 4299): Promise<number> {
@@ -69,7 +60,7 @@ type JsonResponse = {
   snapshot?: {
     phase?: string;
     map?: {
-      cells?: Array<{ buildable: boolean; x: number; y: number }>;
+      towerSpots?: Array<{ x: number; y: number }>;
     };
     players?: Array<{ id: string; name: string }>;
     towers?: Array<unknown>;
@@ -158,11 +149,11 @@ runServerSmokeTest("server start, snapshot, and command flow preserves rejection
     if (!startSnapshot.map) {
       throw new Error("expected start map");
     }
-    if (!startSnapshot.map.cells) {
-      throw new Error("expected start map cells");
+    if (!startSnapshot.map.towerSpots) {
+      throw new Error("expected start map tower spots");
     }
-    const buildableCell = findTowerPad(startSnapshot.map.cells);
-    assert.ok(buildableCell, "expected a buildable cell in the start snapshot");
+    const buildableCell = findTowerPad(startSnapshot.map.towerSpots);
+    assert.ok(buildableCell, "expected a tower spot in the start snapshot");
 
     const snapshotResponse = await fetch(`${SERVER_URL}/api/snapshot`);
     const snapshotBody = (await snapshotResponse.json()) as { snapshot: { players: Array<{ id: string }> } };
@@ -242,8 +233,7 @@ runServerSmokeTest("lite snapshots omit map cells and return only new events", a
   try {
     await waitForServer(child);
     const start = await postJson("/api/start", { seed: 777, players: [{ id: "p1", name: "Alpha" }] });
-    const cells = start.body.snapshot?.map?.cells ?? [];
-    const buildable = findTowerPad(cells);
+    const buildable = findTowerPad(start.body.snapshot?.map?.towerSpots ?? []);
     assert.ok(buildable);
     await postJson("/api/command", { command: { type: "place-tower", playerId: "p1", x: buildable.x, y: buildable.y } });
     await postJson("/api/command", { command: { type: "ready-for-wave", playerId: "p1" } });

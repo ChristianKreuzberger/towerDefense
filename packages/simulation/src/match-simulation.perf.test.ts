@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 
 import { createMatch } from "./match-simulation.js";
-import { getBuildableCellsNearSpawn } from "./spawn-order.js";
+import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 
 test("8-player match reports tick runtime over three waves", () => {
   const playerIds = Array.from({ length: 8 }, (_, index) => `p${index + 1}`);
@@ -11,7 +11,7 @@ test("8-player match reports tick runtime over three waves", () => {
     players: playerIds.map((id) => ({ id, name: `Player ${id.slice(1)}` })),
     seed: 2024
   });
-  const candidates = getBuildableCellsNearSpawn(2024);
+  const candidates = getTowerSpotsNearSpawn(2024);
 
   for (const playerId of playerIds) {
     let placed = false;

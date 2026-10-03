@@ -6,34 +6,34 @@ snapshots=2
 === Wave 1 (export=1, tick=18) ===
 DPS proxy: 0.61 dmg/tick (dealt=11, ticks=18)
 Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=3, exited=0)
-Damage intake: towers=20
+Damage intake: towers=34
 Repairs: towers=20
 Economy delta: awarded=47 spentUpgrades=0 net=47
 Wave-clear bonus: awarded=15
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=47 bonus=15 catchUp=0 swarmCapped=0 total=47 ending=147 towerLv=1 towerHp=100
+- p1 (Alpha) status=active delta=47 bonus=15 catchUp=0 swarmCapped=0 total=47 ending=147 towerLv=1 towerHp=86
 
-=== Wave 2 (export=2, tick=329) ===
-DPS proxy: 0.05 dmg/tick (dealt=17, ticks=329)
-Kills by archetype: runner=1 swarm=1 armored=1 tank=0 (defeated=3, spawned=4, exited=1)
-Damage intake: towers=52
+=== Wave 2 (export=2, tick=50) ===
+DPS proxy: 0.38 dmg/tick (dealt=19, ticks=50)
+Kills by archetype: runner=1 swarm=1 armored=1 tank=1 (defeated=4, spawned=4, exited=0)
+Damage intake: towers=56
 Repairs: towers=20
-Economy delta: awarded=32 spentUpgrades=0 net=32
-Wave-clear bonus: awarded=0
+Economy delta: awarded=67 spentUpgrades=0 net=67
+Wave-clear bonus: awarded=15
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=32 bonus=0 catchUp=0 swarmCapped=0 total=79 ending=179 towerLv=1 towerHp=68
+- p1 (Alpha) status=active delta=67 bonus=15 catchUp=0 swarmCapped=0 total=114 ending=214 towerLv=1 towerHp=50
 
 === Cumulative Summary ===
 Waves completed: 2
-DPS proxy: 0.08 dmg/tick (dealt=28, ticks=347)
-Kills by archetype: runner=2 swarm=2 armored=2 tank=0
-Damage intake totals: towers=72
+DPS proxy: 0.44 dmg/tick (dealt=30, ticks=68)
+Kills by archetype: runner=2 swarm=2 armored=2 tank=1
+Damage intake totals: towers=90
 Repairs totals: towers=40
-Wave-clear bonus total: 15
+Wave-clear bonus total: 30
 Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
-Economy totals: awarded=79 spentUpgrades=0 net=79 ending=179
-Structures: livingTowers=1 towerHp=68 pathWearTotal=5
+Economy totals: awarded=114 spentUpgrades=0 net=114 ending=214
+Structures: livingTowers=1 towerHp=50 pathWearTotal=5
 Players (final):
-- p1 (Alpha) status=active delta=32 bonus=0 catchUp=0 swarmCapped=0 total=79 ending=179 towerLv=1 towerHp=68
+- p1 (Alpha) status=active delta=67 bonus=15 catchUp=0 swarmCapped=0 total=114 ending=214 towerLv=1 towerHp=50

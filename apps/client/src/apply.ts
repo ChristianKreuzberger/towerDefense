@@ -1,7 +1,7 @@
 import type { MatchEvent, MatchSnapshot } from "@tower-defense/shared";
 import type { WireSnapshot } from "./api";
 import { cuesForSnapshotChange } from "./audio/index";
-import { renderSnapshot, syncCursorToBuildableCell, updateBattlefield } from "./board";
+import { renderSnapshot, syncCursorToTowerSpot, updateBattlefield } from "./board";
 import { MANUAL_TRANSITION_MS, MAX_FX_EVENT_BACKLOG } from "./constants";
 import { renderEndOverlay } from "./end-overlay";
 import { addFeedback } from "./feedback";
@@ -53,7 +53,7 @@ export function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEven
   );
   showGameScreen();
   updatePlayerOptions(store.current);
-  syncCursorToBuildableCell(store.current);
+  syncCursorToTowerSpot(store.current);
   updateBattlefield(store.current, glideMs, fxEvents);
   announceWaveEnd(fxEvents);
   resetTurnAfterWave(previous, snapshot);
