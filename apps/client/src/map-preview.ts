@@ -9,38 +9,21 @@ export interface PreviewCell {
   isProtected: boolean;
 }
 
-// rows[y][x]. Buildable cells connected to the cave are the lane creatures walk; other buildable cells are tower pads;
-// everything unbuildable is blocked ground. Maze maps put the lane in corridors, so "buildable" alone would mislead.
+// rows[y][x]. Buildable cells are the road creatures walk, towerSpots are the only places for towers, and
+// everything else is plain grass ("blocked" here, since nothing can happen on it).
 export function classifyMapCells(map: GameMap): PreviewCell[][] {
   const rows: PreviewCell[][] = Array.from({ length: map.height }, () =>
     Array.from({ length: map.width }, () => ({ kind: "blocked" as PreviewCellKind, isProtected: false }))
   );
-  const buildable = new Set(map.cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
-  const lane = new Set<string>();
-  if (map.spawn) {
-    const start = `${map.spawn.x},${map.spawn.y}`;
-    const queue: Array<[number, number]> = [[map.spawn.x, map.spawn.y]];
-    lane.add(start);
-    while (queue.length > 0) {
-      const [x, y] = queue.pop() ?? [0, 0];
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-        const key = `${x + dx},${y + dy}`;
-        if (buildable.has(key) && !lane.has(key)) {
-          lane.add(key);
-          queue.push([x + dx, y + dy]);
-        }
-      }
-    }
-  }
   for (const cell of map.cells) {
     const row = rows[cell.y];
     if (!row || cell.x < 0 || cell.x >= map.width) {
       continue;
     }
-    const key = `${cell.x},${cell.y}`;
+    const isSpot = map.towerSpots.some((spot) => spot.x === cell.x && spot.y === cell.y);
     const isCave = map.spawn !== undefined && cell.x === map.spawn.x && cell.y === map.spawn.y;
     row[cell.x] = {
-      kind: isCave ? "cave" : lane.has(key) ? "lane" : cell.buildable ? "pad" : "blocked",
+      kind: isCave ? "cave" : isSpot ? "pad" : cell.buildable ? "lane" : "blocked",
       isProtected: isInSpawnProtection(map, cell.x, cell.y)
     };
   }
@@ -86,9 +69,9 @@ export function mountMapPreview(options: { root: HTMLElement; playerNumber(playe
       <div id="mapPreviewMeta" class="small"></div>
       <canvas id="mapPreviewCanvas" class="map-preview-canvas" role="img" aria-label="Overview of the generated map"></canvas>
       <ul class="map-preview-legend">
-        <li><i class="legend-swatch pad"></i> Tower pad (build here)</li>
-        <li><i class="legend-swatch lane"></i> Lane the creatures walk</li>
-        <li><i class="legend-swatch blocked"></i> Blocked ground</li>
+        <li><i class="legend-swatch pad"></i> Tower spot (build here)</li>
+        <li><i class="legend-swatch lane"></i> Road the creatures walk</li>
+        <li><i class="legend-swatch blocked"></i> Grass</li>
         <li><i class="legend-swatch cave"></i> Monster cave</li>
         <li><i class="legend-swatch protected"></i> Protected area (no building)</li>
       </ul>

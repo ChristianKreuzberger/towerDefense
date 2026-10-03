@@ -5,7 +5,9 @@ export interface MapCache {
   key: string;
   cells: MapCell[];
   byKey: Map<string, MapCell>;
-  buildable: MapCell[];
+  // Cells where towers may be placed (the map's towerSpots), in map order.
+  towerSpots: MapCell[];
+  towerSpotKeys: Set<string>;
   worn: MapCell[];
 }
 

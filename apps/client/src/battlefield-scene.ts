@@ -6,6 +6,7 @@ import {
   MAX_TOWER_LEVEL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
+  PATH_WIDTH,
   getTowerStats,
   getTowerStyleTier,
   TOWER_STYLE_TIER_SIZE,
@@ -31,6 +32,8 @@ const DEPTH_HOVER = 6;
 const DEPTH_FLASH = 7;
 
 const POP_DURATION_MS = 220;
+// Cells between the two lanes of the road; each lane sits half of this from the route centre.
+const LANE_SPACING = 0.5;
 const TERRAIN_TEXTURE_KEY = "terrain-base";
 const INV = 1 / SS;
 // Bounds the work one snapshot can cause even if a long batch (or a reconnect) delivers hundreds of events.
@@ -169,6 +172,7 @@ class BattlefieldScene extends Phaser.Scene {
   private cellsByKey = new Map<string, MapCell>();
   private spawn: MatchSnapshot["map"]["spawn"];
   private occupiedCells = new Set<string>();
+  private towerSpotKeys = new Set<string>();
   private hoverX: number | null = null;
   private hoverY: number | null = null;
   private hoverTowerId: string | null = null;
@@ -375,7 +379,7 @@ class BattlefieldScene extends Phaser.Scene {
       return false;
     }
     const cell = this.cellsByKey.get(`${x},${y}`);
-    if (!cell || !cell.buildable || isInSpawnProtection({ spawn: this.spawn }, x, y)) {
+    if (!cell || !this.towerSpotKeys.has(`${x},${y}`) || isInSpawnProtection({ spawn: this.spawn }, x, y)) {
       return false;
     }
     return !this.occupiedCells.has(`${x},${y}`);
@@ -658,6 +662,7 @@ class BattlefieldScene extends Phaser.Scene {
       cellsByKey.set(`${cell.x},${cell.y}`, cell);
     }
     this.cellsByKey = cellsByKey;
+    this.towerSpotKeys = new Set(map.towerSpots.map((spot) => `${spot.x},${spot.y}`));
     this.spawn = map.spawn;
 
     const pixelWidth = map.width * cellSize;
@@ -670,7 +675,7 @@ class BattlefieldScene extends Phaser.Scene {
     }
     const texture = this.textures.createCanvas(TERRAIN_TEXTURE_KEY, pixelWidth, pixelHeight);
     if (texture) {
-      paintTerrain(texture.context, map.cells, map.width, map.height, cellSize, map.seed, map.spawn);
+      paintTerrain(texture.context, map.cells, map.width, map.height, cellSize, map.seed, map.spawn, map.towerSpots);
       texture.refresh();
       this.terrainImage = this.add.image(0, 0, TERRAIN_TEXTURE_KEY).setOrigin(0, 0).setDepth(DEPTH_TERRAIN);
     }
@@ -995,8 +1000,11 @@ class BattlefieldScene extends Phaser.Scene {
 
       // pathProgressUnits (100 per cell) is the fraction travelled towards the next path cell.
       const progress = creature.pathProgressUnits / MOVEMENT_PROGRESS_UNITS_PER_CELL;
-      const targetX = creature.x + 0.5 + visual.dirX * progress;
-      const targetY = creature.y + 0.5 + visual.dirY * progress;
+      // The road is PATH_WIDTH cells wide but the route is one cell wide, so each lane is drawn to one side of the
+      // route, perpendicular to the walking direction. Purely visual: the simulation never reads the lane.
+      const laneShift = (creature.lane - (PATH_WIDTH - 1) / 2) * LANE_SPACING;
+      const targetX = creature.x + 0.5 + visual.dirX * progress - visual.dirY * laneShift;
+      const targetY = creature.y + 0.5 + visual.dirY * progress + visual.dirX * laneShift;
 
       if (isNew) {
         visual.fromX = targetX;

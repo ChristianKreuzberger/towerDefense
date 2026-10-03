@@ -61,3 +61,4 @@ Primary planning documents:
 - AI player option should exist in UI but stay disabled for MVP.
 - Procedural maps are required from the start.
 - Towers must never target other towers.
+- Towers are placed only on dedicated tower spots next to the road, never on the 2-cell-wide path creatures walk.

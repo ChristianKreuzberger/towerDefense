@@ -1,4 +1,4 @@
-import { getMapCell, isInSpawnProtection, type GameMap } from "./map-types.js";
+import { getMapCell, isInSpawnProtection, isTowerSpot, type GameMap } from "./map-types.js";
 import { DAMAGE_TYPES, TOWER_TARGET_MODES, UPGRADE_TRACKS, type DamageType, type Tower, type TowerTargetMode, type UpgradeTrack } from "./tower-types.js";
 import type { TowerPlacement, CommandRejectReason } from "./match-types.js";
 
@@ -263,12 +263,13 @@ export function isValidTowerPlacement(
     return { valid: false, reason: "out-of-bounds" };
   }
 
-  if (!cell.buildable) {
-    return { valid: false, reason: "cell-not-buildable" };
-  }
-
+  // Checked first so a click next to the cave explains the real reason instead of "not a tower spot".
   if (isInSpawnProtection(map, placement.x, placement.y)) {
     return { valid: false, reason: "spawn-protected" };
+  }
+
+  if (!isTowerSpot(map, placement.x, placement.y)) {
+    return { valid: false, reason: "not-tower-spot" };
   }
 
   const overlap = existingTowers.some((tower) => tower.x === placement.x && tower.y === placement.y);

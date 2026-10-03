@@ -96,10 +96,11 @@ Common rejection reasons:
 - TOWER_ALREADY_PLACED
 - TOWER_MOVE_NOT_ALLOWED
 - PATH_BLOCKED
+- NOT_TOWER_SPOT (cell is not one of the map's tower spots; wire code `not-tower-spot`)
 - SPAWN_PROTECTED (tower inside the monster cave's protected area; wire code `spawn-protected`)
 - INSUFFICIENT_POINTS
 - TOWER_MAX_LEVEL (upgrade track at max level; wire code `tower-max-level`)
-- Note: `move-tower` target cells are judged by the normal placement reasons (`cell-not-buildable`, `spawn-protected`, `tower-overlap`, `path-blocked`, `out-of-bounds`). `PlayerState.towerMoveAvailable` means "the free move is usable right now" (unlocked, unused, prep phase, not ready). `MatchSetup.map` (a prebuilt map) exists for the simulation and tests only; the host API does not read it from request bodies
+- Note: `move-tower` target cells are judged by the normal placement reasons (`not-tower-spot`, `spawn-protected`, `tower-overlap`, `path-blocked`, `out-of-bounds`). `PlayerState.towerMoveAvailable` means "the free move is usable right now" (unlocked, unused, prep phase, not ready). `MatchSetup.map` (a prebuilt map) exists for the simulation and tests only; the host API does not read it from request bodies
 - INVALID_UPGRADE_TRACK (wire code `invalid-upgrade-track`)
 - DAMAGE_TYPE_PHASE_NOT_ACTIVE, INVALID_DAMAGE_TYPE_TARGET, INVALID_DAMAGE_TYPE (wire codes `damage-type-phase-not-active`, `invalid-damage-type-target`, `invalid-damage-type`)
 - TOWER_MOVE_LOCKED, TOWER_MOVE_USED, MOVE_PHASE_NOT_ACTIVE, INVALID_MOVE_TARGET (wire codes `tower-move-locked`, `tower-move-used`, `move-phase-not-active`, `invalid-move-target`; the target cell itself is judged by the normal placement reasons)

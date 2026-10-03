@@ -1,5 +1,5 @@
 import type { MatchSnapshot } from "@tower-defense/shared";
-import { setMoveMode, syncCursorToBuildableCell, updateBattlefield } from "./board";
+import { setMoveMode, syncCursorToTowerSpot, updateBattlefield } from "./board";
 import { el } from "./dom";
 import { hideGuideOverlay, syncGuideOverlay } from "./guide";
 import { showTurnBanner } from "./phase";
@@ -35,7 +35,7 @@ export function applyActivePlayerChange(): void {
   }
   store.guideDismissedKey = null;
   hideGuideOverlay();
-  syncCursorToBuildableCell(store.current);
+  syncCursorToTowerSpot(store.current);
   updateBattlefield(store.current);
   syncGuideOverlay(store.current);
   renderToolbar(store.current);

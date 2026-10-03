@@ -44,6 +44,7 @@ import {
   WAVE_SPAWN_INTERVAL_TICKS,
   getDamageAgainst,
   isValidDamageType,
+  PATH_WIDTH,
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
@@ -664,6 +665,7 @@ export class MatchSimulation {
         height: this.state.map.height,
         seed: this.state.map.seed,
         cells: this.state.map.cells.map((cell) => ({ ...cell })),
+        towerSpots: this.state.map.towerSpots.map((spot) => ({ ...spot })),
         ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {}),
         ...(this.state.map.goal ? { goal: { ...this.state.map.goal } } : {})
       },
@@ -803,7 +805,9 @@ export class MatchSimulation {
       pathIndex: 0,
       pathProgressUnits: 0,
       spawnTick: this.state.waveTick,
-      targetTowerId: liveTowers[(spawnOrdinal - 1) % liveTowers.length]?.id ?? "tower-missing"
+      targetTowerId: liveTowers[(spawnOrdinal - 1) % liveTowers.length]?.id ?? "tower-missing",
+      // Alternates across the road width so neighbours in the queue are drawn side by side.
+      lane: (spawnOrdinal - 1) % PATH_WIDTH
     };
 
     this.currentWaveSpawned += 1;

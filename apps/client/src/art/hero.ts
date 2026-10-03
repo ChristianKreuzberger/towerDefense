@@ -34,12 +34,13 @@ export function paintHero(canvas: HTMLCanvasElement): void {
   const cells: MapCell[] = [];
   for (let y = 0; y < ROWS; y += 1) {
     for (let x = 0; x < COLS; x += 1) {
+      // Towers stand on grass pads beside the road, never on it (spec/05).
       const forced = TOWERS.some((tower) => tower.x === x && tower.y === y);
       const lane = y >= 3 && y <= 4;
-      cells.push({ x, y, buildable: forced || lane || hash3(SEED, x, y) < 0.5, pathWear: 0 });
+      cells.push({ x, y, buildable: !forced && (lane || hash3(SEED, x, y) < 0.5), pathWear: 0 });
     }
   }
-  paintTerrain(ctx, cells, COLS, ROWS, CELL, SEED);
+  paintTerrain(ctx, cells, COLS, ROWS, CELL, SEED, undefined, TOWERS.map(({ x, y }) => ({ x, y })));
 
   const draw = (size: number, cx: number, cy: number, angle: number, paint: (c: CanvasRenderingContext2D) => void): void => {
     const sprite = document.createElement("canvas");

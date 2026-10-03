@@ -1,11 +1,14 @@
 import {
-  BUILDABLE_CELL_THRESHOLD,
+  BASE_TOWER_RANGE,
   DEFAULT_MAP_HEIGHT,
   DEFAULT_MAP_WIDTH,
   MAP_SCHEMA_VERSION,
   MIN_TOWER_SITES,
-  SPAWN_PROTECTION_RADIUS,
-  findTowerSites,
+  PATH_WIDTH,
+  TOWER_SPOT_COUNT,
+  TOWER_SPOT_MAX_LANE_DISTANCE,
+  TOWER_SPOT_MIN_SPACING,
+  isInSpawnProtection,
   type GameMap,
   type MapCell,
 } from "@tower-defense/shared";
@@ -17,9 +20,9 @@ function hashCoordinates(seed: number, x: number, y: number): number {
   return value >>> 0;
 }
 
-// Corridors sit on a coarse grid every MAZE_PITCH cells, leaving walls MAZE_PITCH - 1 cells thick between them.
-// Thick walls leave room for tower pads that stay out of the creatures' way.
-const MAZE_PITCH = 4;
+// Corridors sit on a coarse grid every MAZE_PITCH cells and are PATH_WIDTH cells wide, so the walls between them are
+// MAZE_PITCH - PATH_WIDTH cells thick. That leaves room for tower spots beside the road without touching it.
+const MAZE_PITCH = 6;
 // Share of the walls between neighbouring corridors that are knocked through, so the maze has a few loops.
 const MAZE_LOOP_CHANCE = 0.08;
 
@@ -31,20 +34,22 @@ function carveLane(
   width: number,
   height: number,
 ): { lane: Set<string>; startY: number; exitY: number } {
-  const columns = Math.floor((width - 1) / MAZE_PITCH) + 1;
-  const rows = Math.floor((height - 1) / MAZE_PITCH) + 1;
+  // The last room's band must still fit inside the map.
+  const columns = Math.floor((width - PATH_WIDTH) / MAZE_PITCH) + 1;
+  const rows = Math.floor((height - PATH_WIDTH) / MAZE_PITCH) + 1;
   const lane = new Set<string>();
   const neighbours = new Map<string, string[]>();
 
   const link = (ax: number, ay: number, bx: number, by: number): void => {
+    // The rectangle covers both rooms' PATH_WIDTH-wide bands and the corridor between them.
     for (
       let x = Math.min(ax, bx) * MAZE_PITCH;
-      x <= Math.max(ax, bx) * MAZE_PITCH;
+      x <= Math.max(ax, bx) * MAZE_PITCH + PATH_WIDTH - 1;
       x += 1
     ) {
       for (
         let y = Math.min(ay, by) * MAZE_PITCH;
-        y <= Math.max(ay, by) * MAZE_PITCH;
+        y <= Math.max(ay, by) * MAZE_PITCH + PATH_WIDTH - 1;
         y += 1
       ) {
         lane.add(`${x},${y}`);
@@ -137,7 +142,9 @@ function carveLane(
   }
   // The last corridor column may stop short of the right edge when the width is not a multiple of the pitch.
   for (let x = (columns - 1) * MAZE_PITCH; x < width; x += 1) {
-    lane.add(`${x},${exitRow * MAZE_PITCH}`);
+    for (let y = exitRow * MAZE_PITCH; y < exitRow * MAZE_PITCH + PATH_WIDTH; y += 1) {
+      lane.add(`${x},${y}`);
+    }
   }
 
   return { lane, startY: startRow * MAZE_PITCH, exitY: exitRow * MAZE_PITCH };
@@ -150,22 +157,10 @@ export function generateMap(
 ): GameMap {
   const cells: MapCell[] = [];
   const { lane, startY, exitY } = carveLane(seed, width, height);
-  const spawn = { x: 0, y: startY };
-
-  // Noise cells next to the maze would open shortcuts through its walls, so they only appear away from the lane.
-  const touchesLane = (x: number, y: number): boolean =>
-    [`${x + 1},${y}`, `${x - 1},${y}`, `${x},${y + 1}`, `${x},${y - 1}`].some(
-      (key) => lane.has(key),
-    );
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const hash = hashCoordinates(seed, x, y);
-      const normalized = hash / 0xffffffff;
-      const buildable =
-        lane.has(`${x},${y}`) ||
-        (normalized < BUILDABLE_CELL_THRESHOLD && !touchesLane(x, y));
-      cells.push({ x, y, buildable, pathWear: 0 });
+      cells.push({ x, y, buildable: lane.has(`${x},${y}`), pathWear: 0 });
     }
   }
 
@@ -175,29 +170,160 @@ export function generateMap(
     height,
     seed,
     cells,
-    spawn,
+    towerSpots: [],
+    spawn: { x: 0, y: startY },
     goal: { x: width - 1, y: exitY },
   };
+  map.towerSpots = generateTowerSpots(map, seed);
+  return map;
+}
 
-  // Guarantee room for a full match: if the noise left too few tower pads, add pads at the lowest-hash cells that
-  // are off the lane and outside the cave's protected area. Maps that already have enough are left untouched.
-  const missing = MIN_TOWER_SITES - findTowerSites(map).length;
-  if (missing > 0) {
-    const candidates = cells
-      .filter(
-        (cell) =>
-          !cell.buildable &&
-          !touchesLane(cell.x, cell.y) &&
-          Math.hypot(cell.x - spawn.x, cell.y - spawn.y) > SPAWN_PROTECTION_RADIUS,
-      )
-      .sort(
-        (a, b) =>
-          hashCoordinates(seed, a.x, a.y) - hashCoordinates(seed, b.x, b.y) || a.y - b.y || a.x - b.x,
-      );
-    for (const cell of candidates.slice(0, missing)) {
-      cell.buildable = true;
+// Route cells a tower spot must have within the base tower range, so no spot is useless. Measured over 300 default
+// seeds (see map-generation.test.ts): the lowest coverage generated is 6, so this is the tightest floor that holds.
+export const TOWER_SPOT_MIN_ROUTE_COVERAGE = 6;
+
+type Point = { x: number; y: number };
+
+// The longest creature attack range (armored and tank), in cells.
+const CREATURE_REACH = 1.5;
+
+// Picks the tower spots for a map whose road (buildable cells) is already carved. Deterministic per seed.
+// Spots are spread along the creatures' route: its cells are cut into one segment per spot, and each segment gets the candidate with the best hash that stays clear of earlier spots.
+export function generateTowerSpots(map: GameMap, seed: number): Point[] {
+  const road = new Set<string>();
+  for (const cell of map.cells) {
+    if (cell.buildable) {
+      road.add(`${cell.x},${cell.y}`);
     }
   }
 
-  return map;
+  // The route creatures walk (same breadth-first search and neighbour order as the simulation, so the two agree).
+  // Spots are spread along it and measured against it; dead-end branches of the road never see a creature.
+  const order = new Map<string, number>();
+  if (map.spawn && road.has(`${map.spawn.x},${map.spawn.y}`)) {
+    const parent = new Map<string, string | undefined>([[`${map.spawn.x},${map.spawn.y}`, undefined]]);
+    const queue: Point[] = [map.spawn];
+    for (let index = 0; index < queue.length; index += 1) {
+      const current = queue[index];
+      if (!current) {
+        continue;
+      }
+      if (current.x === map.width - 1) {
+        const route: string[] = [];
+        for (let cursor: string | undefined = `${current.x},${current.y}`; cursor; cursor = parent.get(cursor)) {
+          route.unshift(cursor);
+        }
+        route.forEach((key, routeIndex) => order.set(key, routeIndex));
+        break;
+      }
+      for (const next of [
+        { x: current.x + 1, y: current.y },
+        { x: current.x, y: current.y + 1 },
+        { x: current.x, y: current.y - 1 },
+        { x: current.x - 1, y: current.y },
+      ]) {
+        const nextKey = `${next.x},${next.y}`;
+        if (road.has(nextKey) && !parent.has(nextKey)) {
+          parent.set(nextKey, `${current.x},${current.y}`);
+          queue.push(next);
+        }
+      }
+    }
+  }
+  const routeLength = order.size;
+  const segmentSize = Math.max(1, Math.ceil(routeLength / TOWER_SPOT_COUNT));
+
+  interface Candidate extends Point {
+    hash: number;
+    distance: number;
+    segment: number;
+    coverage: number;
+    // Within reach of creatures walking the route (they attack up to 1.5 cells away).
+    exposed: boolean;
+  }
+  const scan = Math.ceil(Math.max(BASE_TOWER_RANGE, TOWER_SPOT_MAX_LANE_DISTANCE));
+  const candidates: Candidate[] = [];
+  for (const cell of map.cells) {
+    const key = `${cell.x},${cell.y}`;
+    if (road.has(key) || isInSpawnProtection(map, cell.x, cell.y)) {
+      continue;
+    }
+    // Spots may sit right beside the road: creatures only attack towers within about one cell (spec/06), so a
+    // spot that is never within reach would make tower health, repair and ruins irrelevant.
+    let distance = Infinity;
+    let nearest = Infinity;
+    let coverage = 0;
+    for (let dy = -scan; dy <= scan; dy += 1) {
+      for (let dx = -scan; dx <= scan; dx += 1) {
+        const index = order.get(`${cell.x + dx},${cell.y + dy}`);
+        if (index === undefined) {
+          continue;
+        }
+        const d = Math.hypot(dx, dy);
+        if (d <= BASE_TOWER_RANGE) {
+          coverage += 1;
+        }
+        if (d < distance || (d === distance && index < nearest)) {
+          distance = d;
+          nearest = index;
+        }
+      }
+    }
+    if (nearest === Infinity || coverage < TOWER_SPOT_MIN_ROUTE_COVERAGE) {
+      continue;
+    }
+    candidates.push({
+      x: cell.x,
+      y: cell.y,
+      hash: hashCoordinates(seed, cell.x, cell.y),
+      distance,
+      segment: Math.floor(nearest / segmentSize),
+      coverage,
+      exposed: distance <= CREATURE_REACH,
+    });
+  }
+  candidates.sort((a, b) => a.hash - b.hash || a.y - b.y || a.x - b.x);
+
+  const chosen: Point[] = [];
+  const clear = (c: Point, spacing: number): boolean =>
+    chosen.every((spot) => Math.max(Math.abs(spot.x - c.x), Math.abs(spot.y - c.y)) >= spacing);
+  const pick = (pool: Candidate[], spacing: number): void => {
+    const segments = new Set(pool.map((c) => c.segment));
+    for (const segment of [...segments].sort((a, b) => a - b)) {
+      // Every other segment prefers a spot creatures can reach, so tower damage and repair stay in play.
+      const inSegment = (c: Candidate): boolean => c.segment === segment && clear(c, spacing);
+      const best = (segment % 2 === 0 ? pool.find((c) => inSegment(c) && c.exposed) : undefined) ?? pool.find(inSegment);
+      if (best) {
+        chosen.push(best);
+      }
+    }
+    // Fallback and top-up: global hash order.
+    for (const c of pool) {
+      if (chosen.length >= TOWER_SPOT_COUNT) {
+        return;
+      }
+      if (clear(c, spacing)) {
+        chosen.push(c);
+      }
+    }
+  };
+
+  // Small maps may not fit 8 spots at the usual spacing and distance, so relax spacing first, then the distance cap.
+  const attempts: Array<{ spacing: number; maxDistance: number }> = [
+    { spacing: TOWER_SPOT_MIN_SPACING, maxDistance: TOWER_SPOT_MAX_LANE_DISTANCE },
+    { spacing: TOWER_SPOT_MIN_SPACING - 1, maxDistance: TOWER_SPOT_MAX_LANE_DISTANCE },
+    { spacing: 1, maxDistance: TOWER_SPOT_MAX_LANE_DISTANCE },
+    { spacing: 1, maxDistance: scan },
+  ];
+  for (const [attempt, { spacing, maxDistance }] of attempts.entries()) {
+    chosen.length = 0;
+    pick(candidates.filter((c) => c.distance <= maxDistance), spacing);
+    if (chosen.length >= MIN_TOWER_SITES || attempt === attempts.length - 1) {
+      break;
+    }
+  }
+
+  return chosen
+    .map(({ x, y }) => ({ x, y }))
+    .sort((a, b) => a.y - b.y || a.x - b.x);
 }

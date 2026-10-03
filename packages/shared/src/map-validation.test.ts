@@ -2,26 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { MAP_SCHEMA_VERSION, type GameMap } from "./map-types.js";
-import { findTowerSites, validateGameMap } from "./map-validation.js";
+import { validateGameMap } from "./map-validation.js";
 
-// '.' is buildable, '#' is not.
+// '.' is road (buildable), '#' is grass, 'o' is grass with a tower spot.
 function mapFrom(rows: string[], overrides: Partial<GameMap> = {}): GameMap {
   const cells = rows.flatMap((row, y) =>
     [...row].map((char, x) => ({ x, y, buildable: char === ".", pathWear: 0 }))
   );
+  const towerSpots = rows.flatMap((row, y) =>
+    [...row].flatMap((char, x) => (char === "o" ? [{ x, y }] : []))
+  );
+  const width = rows[0]?.length ?? 0;
   return {
     schemaVersion: MAP_SCHEMA_VERSION,
-    width: rows[0]?.length ?? 0,
+    width,
     height: rows.length,
     seed: 1,
     cells,
+    towerSpots,
     spawn: { x: 0, y: 1 },
-    goal: { x: 4, y: 1 },
+    goal: { x: width - 1, y: 1 },
     ...overrides
   };
 }
 
-const VALID_ROWS = ["#####", ".....", "#####"];
+// Cave protection reaches x = 5 on the road row, so the eight spots start at x = 6.
+const VALID_ROWS = ["##############", "..............", "##############", "##############", "######oooooooo"];
+const SPOTS = "######oooooooo";
 
 function codes(map: GameMap): string[] {
   return validateGameMap(map).map((error) => error.code);
@@ -60,29 +67,37 @@ test("rejects a goal that is missing, off the right edge or not buildable", () =
   const withoutGoal: Partial<GameMap> = mapFrom(VALID_ROWS);
   delete withoutGoal.goal;
   assert.ok(codes(withoutGoal as GameMap).includes("goal-missing"));
-  assert.ok(codes(mapFrom(VALID_ROWS, { goal: { x: 3, y: 1 } })).includes("goal-not-on-right-edge"));
-  assert.ok(codes(mapFrom(VALID_ROWS, { goal: { x: 4, y: 0 } })).includes("goal-not-buildable"));
+  assert.ok(codes(mapFrom(VALID_ROWS, { goal: { x: 12, y: 1 } })).includes("goal-not-on-right-edge"));
+  assert.ok(codes(mapFrom(VALID_ROWS, { goal: { x: 13, y: 0 } })).includes("goal-not-buildable"));
 });
 
 test("rejects a goal that cannot be reached from the spawn", () => {
-  assert.deepEqual(codes(mapFrom([".....", "..#..", "....."], { spawn: { x: 0, y: 0 }, goal: { x: 4, y: 1 } })), []);
-  assert.deepEqual(codes(mapFrom(["..#..", "..#..", "..#.."], { spawn: { x: 0, y: 0 }, goal: { x: 4, y: 1 } })), [
-    "goal-unreachable"
-  ]);
+  const open = [".............."  , "......#.......", "..............", SPOTS];
+  assert.deepEqual(codes(mapFrom(open, { spawn: { x: 0, y: 0 }, goal: { x: 13, y: 1 } })), []);
+  const walled = ["......#.......", "......#.......", "......#.......", SPOTS];
+  assert.deepEqual(codes(mapFrom(walled, { spawn: { x: 0, y: 0 }, goal: { x: 13, y: 1 } })), ["goal-unreachable"]);
 });
 
-test("findTowerSites returns only pads that creatures cannot walk to, outside the cave area", () => {
-  const walls = "############";
-  const lane = "............";
-  const map = mapFrom([walls, lane, walls, ".....#.#...."], { spawn: { x: 0, y: 1 }, goal: { x: 11, y: 1 } });
-  // Cells x 0..4 of the last row are inside the cave's protected radius.
-  assert.deepEqual(
-    findTowerSites(map).map((cell) => `${cell.x},${cell.y}`),
-    ["6,3", "8,3", "9,3", "10,3", "11,3"]
-  );
+test("rejects a map without a tower spot list or with too few spots", () => {
+  const noList: Partial<GameMap> = mapFrom(VALID_ROWS);
+  delete noList.towerSpots;
+  assert.deepEqual(codes(noList as GameMap), ["missing-tower-spots"]);
+  const few = mapFrom(VALID_ROWS);
+  few.towerSpots = few.towerSpots.slice(0, 7);
+  assert.deepEqual(codes(few), ["too-few-tower-spots"]);
+});
 
-  // Open cells beside the lane are walkable, so they are not sites.
-  assert.deepEqual(findTowerSites(mapFrom([lane, lane, lane], { spawn: { x: 0, y: 1 }, goal: { x: 11, y: 1 } })), []);
+test("rejects tower spots on the road, inside the cave area, duplicated or out of bounds", () => {
+  const base = mapFrom(VALID_ROWS);
+  const spots = base.towerSpots;
+  assert.ok(codes({ ...base, towerSpots: [...spots, { x: 7, y: 1 }] }).includes("tower-spot-on-lane"));
+  assert.ok(codes({ ...base, towerSpots: [...spots, { x: 2, y: 3 }] }).includes("tower-spot-in-spawn-protection"));
+  assert.ok(codes({ ...base, towerSpots: [...spots, { ...spots[0]! }] }).includes("duplicate-tower-spot"));
+  assert.ok(codes({ ...base, towerSpots: [...spots, { x: 40, y: 3 }] }).includes("tower-spot-out-of-bounds"));
+});
+
+test("rejects a version 1 map, which has no tower spots", () => {
+  assert.ok(codes(mapFrom(VALID_ROWS, { schemaVersion: 1 })).includes("unsupported-schema-version"));
 });
 
 test("rejects fractional cell coordinates", () => {

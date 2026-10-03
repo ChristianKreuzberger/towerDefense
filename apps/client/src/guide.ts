@@ -54,7 +54,7 @@ export function computeGuideState(snapshot: MatchSnapshot | null): GuideState | 
         key: `place-${activePlayer.id}`,
         tone: "place",
         title: `${activePlayer.name}, it's your turn: claim the opening tower`,
-        body: "Click a buildable tile on the battlefield to place your tower there.",
+        body: "Click a marked tower spot next to the road to place your tower there.",
         actionLabel: "Place Tower Now",
         action: "place-tower"
       };
