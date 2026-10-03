@@ -77,17 +77,18 @@ label .hint {
   visibility: hidden;
 }
 
-/* Its own wrapping strip, so a long wave list never widens the layout. */
+/* One fixed-height line (an empty line keeps its height), so a long or changing wave list never moves the board. */
 .wave-preview {
-  padding: 4px 12px;
+  flex: none;
+  height: 24px;
+  line-height: 24px;
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 600;
   color: var(--gold);
-  overflow-wrap: anywhere;
-}
-
-.wave-preview:empty {
-  display: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tour-modal {

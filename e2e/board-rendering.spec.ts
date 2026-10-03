@@ -123,7 +123,9 @@ test("tile clicks stay accurate when CSS scales the canvas down", async ({ page 
 });
 
 test("board renders 20% larger by default and clicks stay accurate", async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 1000 });
+  // The page no longer scrolls (spec 11, Mobile layout), so the board is only shown at full size when the viewport
+  // is tall enough to hold it beside the HUD rows.
+  await page.setViewportSize({ width: 1600, height: 1400 });
   await startMatch(page, "/");
 
   const canvas = page.locator("#board canvas");

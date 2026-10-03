@@ -1,24 +1,36 @@
 /* ---------------------------------------------------------------- game layout */
 
+/* Every row above the board has a fixed height, so text changing in them can never move the board. */
 .game-screen {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   padding: 12px;
-  align-items: start;
+  overflow: hidden;
+}
+
+/* Debug view adds the snapshot panel below; only then may the screen scroll. */
+.game-screen:has(.snapshot-panel:not(.hidden)) {
+  overflow: auto;
 }
 
 .stage {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   min-width: 0;
+  min-height: 0;
 }
 
 .topbar {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 46px;
+  height: 48px;
   padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);

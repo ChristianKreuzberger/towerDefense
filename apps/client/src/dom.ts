@@ -75,5 +75,13 @@ export const el = {
   feedbackQueue: must<HTMLElement>("feedbackQueue"),
   board: must<HTMLElement>("board"),
   snapshot: must<HTMLTextAreaElement>("snapshot"),
-  battlefieldMeta: must<HTMLElement>("battlefieldMeta")
+  battlefieldMeta: must<HTMLElement>("battlefieldMeta"),
+  towerMenu: must<HTMLElement>("towerMenu"),
+  towerMenuTitle: must<HTMLElement>("towerMenuTitle"),
+  towerMenuClose: must<HTMLButtonElement>("towerMenuClose"),
+  zoomInBtn: must<HTMLButtonElement>("zoomInBtn"),
+  zoomOutBtn: must<HTMLButtonElement>("zoomOutBtn"),
+  zoomFitBtn: must<HTMLButtonElement>("zoomFitBtn"),
+  mobileMoreBtn: must<HTMLButtonElement>("mobileMoreBtn"),
+  controlPanel: must<HTMLElement>("controlPanel")
 };

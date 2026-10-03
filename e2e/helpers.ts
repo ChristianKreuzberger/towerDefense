@@ -8,6 +8,7 @@ declare global {
       cellToPixel(x: number, y: number): { x: number; y: number };
       creaturePositions(): Array<{ id: string; x: number; y: number }>;
       playback(): { playing: boolean; speed: number };
+      zoom(): number;
     };
   }
 }

@@ -4,6 +4,7 @@ import { setMoveMode } from "./board";
 import { el } from "./dom";
 import { store } from "./state";
 import { getToolbarState } from "./toolbar-state";
+import { syncTowerMenu } from "./tower-menu";
 
 // Costs come from the shared cost functions so the UI can never drift from what the simulation charges.
 // Dimmed and aria-disabled: still clickable (so a press explains itself), but hotkeys skip it. After the match
@@ -60,4 +61,5 @@ export function renderToolbar(snapshot: MatchSnapshot | null): void {
     el.mode.value = tower.targetMode;
     el.damageType.value = tower.damageType;
   }
+  syncTowerMenu(snapshot, tower, state, points);
 }

@@ -1,15 +1,19 @@
 /* ---------------------------------------------------------------- board */
 
 .battlefield {
-  display: grid;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   min-width: 0;
 }
 
+/* Takes whatever the HUD rows leave; the canvas is fitted inside, never the other way round. */
 .board-frame {
   position: relative;
-  display: grid;
-  place-items: center;
+  flex: 1 1 0;
+  min-height: 0;
   padding: 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -17,27 +21,133 @@
 }
 
 .board-grid {
-  position: relative;
+  position: absolute;
+  inset: 8px;
   display: grid;
+  /* A definite track, so the canvas percentage limits resolve against the board area. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
-  width: 100%;
 }
 
-/* The canvas keeps its internal resolution; CSS fits it to the container and the viewport height. */
+/* The canvas keeps its internal resolution; CSS fits it to the board area, keeping the aspect ratio. */
 .board-grid canvas {
   display: block;
   width: auto !important;
   height: auto !important;
   max-width: 100%;
-  max-height: calc(120vh - 204px);
+  max-height: 100%;
   aspect-ratio: 1 / 1;
   border-radius: 8px;
   box-shadow: 0 0 0 3px var(--ink), 0 12px 30px rgba(0, 0, 0, 0.5);
-  touch-action: manipulation;
+  /* Drags and pinches on the board belong to the game (zoom and pan), not to the browser. */
+  touch-action: none;
 }
 
 .battlefield-meta {
+  flex: none;
+  height: 16px;
+  line-height: 16px;
   padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zoom-controls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 6;
+  display: grid;
+  gap: 4px;
+}
+
+.zoom-controls button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: rgba(29, 34, 44, 0.85);
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.zoom-controls button:disabled:hover {
+  transform: none;
+}
+
+/* Upgrade popover: the scene's tooltip rules do not apply, the scene positions it with left/top. */
+.tower-menu {
+  position: absolute;
+  z-index: 7;
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(21, 18, 26, 0.96);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+  transform: translate(-50%, -100%);
+}
+
+.tower-menu.below {
+  transform: translate(-50%, 0);
+}
+
+.tower-menu[hidden] {
+  display: none;
+}
+
+.tower-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.tower-menu-close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  line-height: 1;
+  background: transparent;
+  color: var(--muted);
+}
+
+.tower-menu-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.tower-menu-btn {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 7px 4px;
+  font-size: 12px;
+}
+
+.tower-menu-btn.dim {
+  opacity: 0.55;
+}
+
+.tower-menu-level,
+.tower-menu-cost {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower-menu-cost.short {
+  color: var(--bad);
 }
 
 /* Sits above the hovered tower; the scene sets left/top. */

@@ -1,9 +1,17 @@
 /* ---------------------------------------------------------------- dock */
 
+.panel-more {
+  display: grid;
+  gap: 12px;
+}
+
 .control-panel {
   display: grid;
   gap: 12px;
   align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius);

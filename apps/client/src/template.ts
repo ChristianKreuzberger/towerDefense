@@ -72,7 +72,26 @@ export const APP_TEMPLATE = `
 
       <section class="battlefield">
         <div class="board-frame">
-          <div id="board" class="board-grid"></div>
+          <div id="board" class="board-grid">
+            <div id="towerMenu" class="tower-menu" role="group" aria-label="Upgrade tower" hidden>
+              <div class="tower-menu-head">
+                <strong id="towerMenuTitle" class="tower-menu-title"></strong>
+                <button id="towerMenuClose" data-sfx="none" class="tower-menu-close" aria-label="Close upgrades" title="Close upgrades (Esc)">&times;</button>
+              </div>
+              <div class="tower-menu-buttons">
+                ${["range", "damage", "accuracy"]
+                  .map(
+                    (track) => `<button data-track="${track}" data-sfx="none" class="tower-menu-btn"><span class="tower-menu-name"></span><span class="tower-menu-level"></span><span class="tower-menu-cost"></span></button>`
+                  )
+                  .join("")}
+              </div>
+            </div>
+          </div>
+          <div class="zoom-controls" role="group" aria-label="Zoom">
+            <button id="zoomInBtn" data-sfx="none" aria-label="Zoom in" title="Zoom in (+)">+</button>
+            <button id="zoomOutBtn" data-sfx="none" aria-label="Zoom out" title="Zoom out (-)">&minus;</button>
+            <button id="zoomFitBtn" data-sfx="none" aria-label="Fit board" title="Fit board (0)">Fit</button>
+          </div>
           <div id="waveBanner" class="wave-banner" aria-live="polite"><strong></strong><span></span></div>
           <div id="turnBanner" class="turn-banner" aria-live="polite"><strong></strong><span></span></div>
         </div>
@@ -80,15 +99,15 @@ export const APP_TEMPLATE = `
       </section>
     </div>
 
-    <aside class="control-panel">
+    <aside class="control-panel" id="controlPanel">
       <div class="hud-chip-row" id="playerCards" aria-label="Scoreboard"></div>
 
-      <div class="panel-block">
+      <div class="panel-block desktop-only">
         <label for="playerId">Active Player <span class="hint">(1-8)</span></label>
         <select id="playerId"></select>
       </div>
 
-      <div class="grid2 debug-only">
+      <div class="grid2 debug-only desktop-only">
         <div>
           <label for="x">Tile X</label>
           <input id="x" type="number" value="0" />
@@ -118,8 +137,12 @@ export const APP_TEMPLATE = `
         <button id="readyBtn" data-sfx="none" class="tool good" title="Lock in your setup (R)">
           <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tool-label">Ready For Wave</span><span class="tool-cost">&nbsp;</span><kbd>R</kbd>
         </button>
+        <button id="mobileMoreBtn" data-sfx="none" class="tool mobile-only" aria-expanded="false" aria-controls="panelMore" title="More options">
+          <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg><span class="tool-label">More</span><span class="tool-cost">&nbsp;</span>
+        </button>
       </div>
 
+      <div class="panel-more" id="panelMore">
       <div class="panel-block">
         <label for="mode">Target Mode</label>
         <select id="mode">
@@ -153,6 +176,7 @@ export const APP_TEMPLATE = `
         <button id="tourBtn" class="ghost">How to play</button>
         <button id="settingsBtn" class="ghost">Settings</button>
       </div>
+      </div>
     </aside>
 
     <section class="snapshot-panel debug-only">
@@ -162,7 +186,7 @@ export const APP_TEMPLATE = `
   </section>
 
   <footer class="shortcuts-bar" id="shortcutBar">
-    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>V</kbd> move tower <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>Arrows</kbd> move cursor</div>
+    <div><kbd>R</kbd> ready <kbd>T</kbd> tower <kbd>V</kbd> move tower <kbd>U</kbd>/<kbd>I</kbd>/<kbd>O</kbd> upgrade range/damage/accuracy <kbd>1</kbd>-<kbd>8</kbd> switch player <kbd>P</kbd> pause <kbd>M</kbd> mute <kbd>+</kbd>/<kbd>-</kbd>/<kbd>0</kbd> zoom <kbd>Arrows</kbd> move cursor</div>
   </footer>
 
   <div id="settingsRoot"></div>

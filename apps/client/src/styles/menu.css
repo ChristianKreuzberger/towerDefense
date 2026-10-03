@@ -1,13 +1,21 @@
 /* ---------------------------------------------------------------- menu */
 
+/* The menu card scrolls inside the screen when a small phone cannot fit it; the page itself never scrolls. */
 .menu-screen {
-  min-height: calc(100vh - 44px);
-  display: grid;
-  place-items: center;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
   padding: 24px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.menu-screen::-webkit-scrollbar {
+  display: none;
 }
 
 .menu-card {
+  margin: auto;
   width: min(760px, 100%);
   border: 1px solid var(--line);
   border-radius: 18px;

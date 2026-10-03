@@ -22,6 +22,8 @@ import { cellCenter } from "./scene/geometry";
 import { drawHoverAndGhost, isHoverValid } from "./scene/placement-overlay";
 import type { OverlayEnv, OverlayState } from "./scene/placement-overlay";
 import type { CreatureVisual, PendingDeath, PlacementContext, RuinVisual, TowerVisual } from "./scene/types";
+import { FIT_VIEW, GestureTracker, clampView, panBy, screenToWorld, stepZoom, wheelZoomFactor, worldToScreen, zoomAt } from "./viewport";
+import type { GestureAction, View } from "./viewport";
 
 export type { PlacementContext } from "./scene/types";
 
@@ -95,6 +97,12 @@ class BattlefieldScene extends Phaser.Scene {
   private cursorY: number | null = null;
   private pendingCursor: { x: number; y: number } | null = null;
   private onCellClick: ((x: number, y: number) => void) | undefined;
+  private onViewChange: (() => void) | undefined;
+  private view: View = FIT_VIEW;
+  private worldWidth = 1;
+  private worldHeight = 1;
+  private gestures = new GestureTracker();
+  private lastClient: { x: number; y: number } | null = null;
   private overlay: OverlayState = {
     placementContext: undefined,
     cellsByKey: new Map<string, MapCell>(),
@@ -127,9 +135,15 @@ class BattlefieldScene extends Phaser.Scene {
     this.linkGraphics = this.add.graphics().setDepth(DEPTH_HOVER);
     this.overlay.ghostBase = this.add.image(0, 0, KEY.towerBase(0)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
     this.overlay.ghostTurret = this.add.image(0, 0, KEY.turret(0, 1)).setDepth(DEPTH_HOVER).setVisible(false).setScale(INV).setAlpha(0.75);
-    this.input.on("pointerdown", this.handlePointerDown, this);
     this.input.on("pointermove", this.handlePointerMove, this);
-    this.game.canvas.addEventListener("pointerleave", this.handlePointerLeave);
+    const canvas = this.game.canvas;
+    canvas.addEventListener("pointerleave", this.handlePointerLeave);
+    // Taps, drags and pinches are told apart natively: a click must wait for pointer-up so a pinch never places a tower.
+    canvas.addEventListener("pointerdown", this.handleGestureDown);
+    canvas.addEventListener("pointermove", this.handleGestureMove);
+    canvas.addEventListener("pointerup", this.handleGestureUp);
+    canvas.addEventListener("pointercancel", this.handleGestureCancel);
+    canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     this.overlay.tooltip = document.createElement("div");
     this.overlay.tooltip.className = "tower-tooltip";
     this.overlay.tooltip.hidden = true;
@@ -168,7 +182,129 @@ class BattlefieldScene extends Phaser.Scene {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width > 0 ? rect.width / canvas.width : 1;
     const scaleY = canvas.height > 0 ? rect.height / canvas.height : 1;
-    return { x: (x + 0.5) * this.cellSize * scaleX, y: (y + 0.5) * this.cellSize * scaleY };
+    const screen = worldToScreen(this.view, (x + 0.5) * this.cellSize, (y + 0.5) * this.cellSize);
+    return { x: screen.x * scaleX, y: screen.y * scaleY };
+  }
+
+  getView(): View {
+    return this.view;
+  }
+
+  setOnViewChange(callback: (() => void) | undefined): void {
+    this.onViewChange = callback;
+  }
+
+  resetView(): void {
+    this.setView(FIT_VIEW);
+  }
+
+  // Zooms around the canvas centre (buttons, keys) or a canvas-pixel anchor.
+  zoomTo(zoom: number, anchor?: { x: number; y: number }): void {
+    const ax = anchor?.x ?? this.worldWidth / 2;
+    const ay = anchor?.y ?? this.worldHeight / 2;
+    this.setView(zoomAt(this.view, zoom, ax, ay, this.world()));
+  }
+
+  zoomStep(direction: 1 | -1): void {
+    this.zoomTo(stepZoom(this.view.zoom, direction));
+  }
+
+  private world(): { width: number; height: number } {
+    return { width: this.worldWidth, height: this.worldHeight };
+  }
+
+  // The Phaser camera zooms around its centre, so convert the top-left based view to a scroll position.
+  private setView(next: View): void {
+    this.view = clampView(next, this.world());
+    const camera = this.cameras?.main;
+    if (camera) {
+      const { zoom, x, y } = this.view;
+      camera.setZoom(zoom);
+      camera.setScroll(x - this.worldWidth / 2 + this.worldWidth / (2 * zoom), y - this.worldHeight / 2 + this.worldHeight / (2 * zoom));
+    }
+    this.refreshHover();
+    this.onViewChange?.();
+  }
+
+  // The cell under a resting pointer changes when the view moves under it.
+  private refreshHover(): void {
+    if (!this.lastClient || !this.overlay.cellsByKey.size) {
+      return;
+    }
+    const { x, y } = this.cellFromClient(this.lastClient.x, this.lastClient.y);
+    this.overlay.hoverX = x;
+    this.overlay.hoverY = y;
+    this.overlay.hoverTowerId = this.towerAtCell.get(`${x},${y}`) ?? null;
+    this.overlay.hoverRuinId = this.ruinAtCell.get(`${x},${y}`) ?? null;
+    drawHoverAndGhost(this.overlay, this.overlayEnv());
+  }
+
+  // Client (viewport) pixels to canvas pixels, whatever CSS scaling is applied.
+  private clientToCanvas(clientX: number, clientY: number): { x: number; y: number } | null {
+    const canvas = this.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+    return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+  }
+
+  private cssToCanvasScale(): number {
+    const rect = this.game.canvas.getBoundingClientRect();
+    return rect.width > 0 ? this.game.canvas.width / rect.width : 1;
+  }
+
+  private cellFromClient(clientX: number, clientY: number): { x: number; y: number } {
+    const local = this.clientToCanvas(clientX, clientY);
+    if (!local) {
+      return { x: -1, y: -1 };
+    }
+    const world = screenToWorld(this.view, local.x, local.y);
+    return { x: Math.floor(world.x / this.cellSize), y: Math.floor(world.y / this.cellSize) };
+  }
+
+  private handleGestureDown = (event: PointerEvent): void => {
+    try {
+      this.game.canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Capture is optional: a synthetic or already-released pointer simply keeps the default behaviour.
+    }
+    this.gestures.down(event.pointerId, event.clientX, event.clientY);
+  };
+
+  private handleGestureMove = (event: PointerEvent): void => {
+    this.lastClient = { x: event.clientX, y: event.clientY };
+    this.applyGesture(this.gestures.move(event.pointerId, event.clientX, event.clientY));
+  };
+
+  private handleGestureUp = (event: PointerEvent): void => {
+    this.applyGesture(this.gestures.up(event.pointerId));
+  };
+
+  private handleGestureCancel = (): void => {
+    this.gestures.cancel();
+  };
+
+  private handleWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    const anchor = this.clientToCanvas(event.clientX, event.clientY);
+    this.lastClient = { x: event.clientX, y: event.clientY };
+    this.zoomTo(this.view.zoom * wheelZoomFactor(event.deltaY, event.deltaMode, event.ctrlKey), anchor ?? undefined);
+  };
+
+  private applyGesture(actions: GestureAction[]): void {
+    const k = this.cssToCanvasScale();
+    for (const action of actions) {
+      if (action.type === "tap") {
+        this.handleTap(action.x, action.y);
+      } else if (action.type === "pan") {
+        this.setView(panBy(this.view, action.dx * k, action.dy * k, this.world()));
+      } else {
+        const anchor = this.clientToCanvas(action.x, action.y);
+        const zoomed = anchor ? zoomAt(this.view, this.view.zoom * action.factor, anchor.x, anchor.y, this.world()) : this.view;
+        this.setView(panBy(zoomed, action.dx * k, action.dy * k, this.world()));
+      }
+    }
   }
 
   getCellSize(): number {
@@ -244,6 +380,7 @@ class BattlefieldScene extends Phaser.Scene {
       ruinVisuals: this.ruinVisuals,
       // Lazy: the scene can be asked to redraw before Phaser has attached `game`, and only the tooltip needs the canvas.
       getCanvas: () => this.game.canvas,
+      getView: () => this.view,
       cellSize: this.cellSize
     };
   }
@@ -280,21 +417,21 @@ class BattlefieldScene extends Phaser.Scene {
   }
 
   // Phaser 4 caches the canvas position, so pointer.x/y drift when the page layout shifts after setup.
-  // Measuring the canvas at event time keeps cell hit-testing correct, including under CSS scaling.
+  // Measuring the canvas at event time keeps cell hit-testing correct, including under CSS scaling and zoom.
   private cellFromPointer(pointer: Phaser.Input.Pointer): { x: number; y: number } {
-    const rect = this.game.canvas.getBoundingClientRect();
     const source = pointer.event as MouseEvent | TouchEvent | undefined;
     // Touch events carry coordinates on the touch point, not on the event itself.
     const point = source && "changedTouches" in source ? source.changedTouches[0] : (source as MouseEvent | undefined);
-    const clientX = point?.clientX;
-    const clientY = point?.clientY;
-    const localX = clientX !== undefined && rect.width > 0 ? (clientX - rect.left) * (this.game.canvas.width / rect.width) : pointer.x;
-    const localY = clientY !== undefined && rect.height > 0 ? (clientY - rect.top) * (this.game.canvas.height / rect.height) : pointer.y;
-    return { x: Math.floor(localX / this.cellSize), y: Math.floor(localY / this.cellSize) };
+    if (point?.clientX !== undefined) {
+      this.lastClient = { x: point.clientX, y: point.clientY };
+      return this.cellFromClient(point.clientX, point.clientY);
+    }
+    const world = screenToWorld(this.view, pointer.x, pointer.y);
+    return { x: Math.floor(world.x / this.cellSize), y: Math.floor(world.y / this.cellSize) };
   }
 
-  private handlePointerDown(pointer: Phaser.Input.Pointer): void {
-    const { x, y } = this.cellFromPointer(pointer);
+  private handleTap(clientX: number, clientY: number): void {
+    const { x, y } = this.cellFromClient(clientX, clientY);
     if (!isHoverValid(this.overlay, x, y) && !this.towerAtCell.has(`${x},${y}`)) {
       this.playInvalidClickFlash(x, y);
     }
@@ -323,8 +460,13 @@ class BattlefieldScene extends Phaser.Scene {
   // Everything the scene attached outside Phaser's own object tree: the canvas listener, the input
   // handlers and the tooltip element. Call before game.destroy(), which removes the canvas.
   removeListeners(): void {
-    this.game?.canvas?.removeEventListener("pointerleave", this.handlePointerLeave);
-    this.input?.off("pointerdown", this.handlePointerDown, this);
+    const canvas = this.game?.canvas;
+    canvas?.removeEventListener("pointerleave", this.handlePointerLeave);
+    canvas?.removeEventListener("pointerdown", this.handleGestureDown);
+    canvas?.removeEventListener("pointermove", this.handleGestureMove);
+    canvas?.removeEventListener("pointerup", this.handleGestureUp);
+    canvas?.removeEventListener("pointercancel", this.handleGestureCancel);
+    canvas?.removeEventListener("wheel", this.handleWheel);
     this.input?.off("pointermove", this.handlePointerMove, this);
     this.overlay.tooltip?.remove();
   }
@@ -507,6 +649,10 @@ class BattlefieldScene extends Phaser.Scene {
 
     this.wearSignature = -1;
     this.game.scale.resize(pixelWidth, pixelHeight);
+    this.worldWidth = pixelWidth;
+    this.worldHeight = pixelHeight;
+    // A new map always starts fitted; within one map the zoom stays across waves.
+    this.setView(FIT_VIEW);
     this.drawCursor();
   }
 
@@ -845,6 +991,8 @@ class BattlefieldScene extends Phaser.Scene {
 
 export interface BattlefieldMountOptions {
   onCellClick?: (x: number, y: number) => void;
+  // Fired when zoom or pan changes, so anything pinned to a cell (the tower popover) can follow.
+  onViewChange?: () => void;
 }
 
 export interface BattlefieldMount {
@@ -854,6 +1002,9 @@ export interface BattlefieldMount {
   cellSize(): number;
   setCursor(x: number, y: number): void;
   setPlacementContext(context: PlacementContext): void;
+  zoomStep(direction: 1 | -1): void;
+  resetView(): void;
+  zoom(): number;
   destroy(): void;
 }
 
@@ -871,6 +1022,7 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
   let destroyed = false;
   const scene = new BattlefieldScene();
   scene.setOnCellClick(options.onCellClick);
+  scene.setOnViewChange(options.onViewChange);
   game.scene.add("battlefield", scene, true);
 
   return {
@@ -891,6 +1043,15 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
     },
     setPlacementContext(context: PlacementContext): void {
       scene?.setPlacementContext(context);
+    },
+    zoomStep(direction: 1 | -1): void {
+      scene.zoomStep(direction);
+    },
+    resetView(): void {
+      scene.resetView();
+    },
+    zoom(): number {
+      return scene.getView().zoom;
     },
     destroy(): void {
       if (destroyed) {

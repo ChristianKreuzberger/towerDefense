@@ -11,6 +11,7 @@ interface TestBoardHook {
   cellToPixel(x: number, y: number): { x: number; y: number };
   creaturePositions(): Array<{ id: string; x: number; y: number }>;
   playback(): { playing: boolean; speed: number };
+  zoom(): number;
 }
 
 declare global {
@@ -49,6 +50,9 @@ export function installTestHooks(): void {
     },
     playback(): { playing: boolean; speed: number } {
       return { playing: store.playing, speed: store.playbackSpeed };
+    },
+    zoom(): number {
+      return battlefieldMount.zoom();
     },
     ...(DEBUG ? { demo } : {})
   };
