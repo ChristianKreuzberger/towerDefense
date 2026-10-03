@@ -76,12 +76,6 @@ export function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnaps
       continue;
     }
 
-    if (event.type === "wall-repaired") {
-      const playerName = playerNames.get(event.playerId) ?? event.playerId;
-      addFeedback("info", `${playerName} wall repaired +${event.repairAmount} HP (${event.remainingHp})`);
-      continue;
-    }
-
     if (event.type === "path-repaired") {
       addFeedback("info", `Path wear repaired on ${event.repairs.length} cell${event.repairs.length === 1 ? "" : "s"}`);
       continue;

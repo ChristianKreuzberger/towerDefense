@@ -50,7 +50,7 @@ export function announceWaveEnd(events: MatchEvent[]): void {
 export function phaseSubText(snapshot: MatchSnapshot): string {
   if (snapshot.phase === "placement") {
     const repairEvents = snapshot.events.filter(
-      (event) => event.type === "tower-repaired" || event.type === "wall-repaired" || event.type === "path-repaired"
+      (event) => event.type === "tower-repaired" || event.type === "path-repaired"
     );
     const latestRepairWave = repairEvents.at(-1)?.wave;
     if (latestRepairWave !== undefined && latestRepairWave === snapshot.wave - 1) {
@@ -69,7 +69,7 @@ export function phaseSubText(snapshot: MatchSnapshot): string {
   }
 
   if (snapshot.phase === "wave") {
-    return "Combat is live. Use walls and target modes to hold the lane.";
+    return "Combat is live. Use target modes to hold the lane.";
   }
 
   if (snapshot.phase === "ended") {

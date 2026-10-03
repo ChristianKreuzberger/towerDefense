@@ -15,8 +15,7 @@ import {
   paintSpark,
   paintTowerBadge,
   paintTowerBase,
-  paintTurret,
-  paintWall
+  paintTurret
 } from "./paint";
 
 // Sprites are baked at 2x and displayed at 1/SS so they stay crisp when the board is scaled up.
@@ -31,7 +30,6 @@ export const KEY = {
   badge: (player: number): string => `badge-${player}`,
   pips: (count: number): string => `pips-${Math.min(Math.max(count, 1), 5)}`,
   creature: (archetype: CreatureArchetype): string => `creature-${archetype}`,
-  wall: (player: number, crack: number): string => `wall-${player}-${crack}`,
   ruin: (player: number): string => `ruin-${player}`,
   rut: "rut",
   shadow: "fx-shadow",
@@ -78,10 +76,6 @@ export function ensureTextures(scene: Phaser.Scene, cs: number): void {
     bake(textures, KEY.ruin(index), towerPx, towerPx, (ctx) => paintRuin(ctx, towerPx, color));
     const badgePx = Math.round(cs * 0.62 * SS);
     bake(textures, KEY.badge(index), badgePx, badgePx, (ctx) => paintTowerBadge(ctx, badgePx, String(index + 1)));
-    for (let crack = 0; crack < 3; crack += 1) {
-      const wallPx = Math.round(cs * SS);
-      bake(textures, KEY.wall(index, crack), wallPx, wallPx, (ctx) => paintWall(ctx, wallPx, color, crack));
-    }
   });
 
   for (let count = 1; count <= 5; count += 1) {

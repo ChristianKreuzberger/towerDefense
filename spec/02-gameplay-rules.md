@@ -14,19 +14,19 @@
 ## Shared objectives
 
 - Keep all player towers alive
-- Optimize tower upgrades and wall placement
+- Optimize tower upgrades
 - Score points efficiently by killing creatures
 
 ## Tower placement rules
 
 - Towers can only be placed on buildable cells
 - Placement cannot overlap existing towers
-- Towers and walls cannot be placed within 5 cells of the monster cave where creatures spawn (see spec/05)
+- Towers cannot be placed within 5 cells of the monster cave where creatures spawn (see spec/05)
 - Placement cannot make all enemy paths invalid
-- Placement must not cut off any live tower that creatures could reach before it (same per-tower rule as wall placement)
+- Placement must not cut off any live tower that creatures could reach before it
 - Each player places one tower at match start
-- Every player starts with `STARTING_POINTS` = 100 (spec/06), which can be spent on upgrades or walls in the opening prep, so a player who places later (and gets a worse spot) can offset it with range, damage or accuracy
-- Once placed, a tower cannot be sold. It cannot be moved either, with one exception: after the first 5 completed rounds (`TOWER_MOVE_AFTER_WAVES` = 5, so from the prep before wave 6) every player has one free move for their tower (a reward, not an upgrade track). The move follows the placement rules (buildable cell, outside the cave's protected area, no overlap with towers or walls, no blocked route), keeps the tower's level, upgrades, target mode and health, and like upgrades it is only possible during prep before the player is ready. Using it spends the token; a second move is rejected (`tower-move-used`), and before round 5 is done it is rejected with `tower-move-locked`
+- Every player starts with `STARTING_POINTS` = 100 (spec/06), which can be spent on upgrades in the opening prep, so a player who places later (and gets a worse spot) can offset it with range, damage or accuracy
+- Once placed, a tower cannot be sold. It cannot be moved either, with one exception: after the first 5 completed rounds (`TOWER_MOVE_AFTER_WAVES` = 5, so from the prep before wave 6) every player has one free move for their tower (a reward, not an upgrade track). The move follows the placement rules (buildable cell, outside the cave's protected area, no overlap with other towers, no blocked route), keeps the tower's level, upgrades, target mode and health, and like upgrades it is only possible during prep before the player is ready. Using it spends the token; a second move is rejected (`tower-move-used`), and before round 5 is done it is rejected with `tower-move-locked`
 
 ## Tower lifecycle
 
@@ -41,19 +41,11 @@
 - Takes damage from creature attacks
 - Auto-repaired between rounds (must be clearly shown in UI)
 
-## Walls
-
-- Players can spend points to place walls
-- Walls block creature movement and alter pathing
-- Wall placement must preserve at least one valid path to each live tower
-- Walls are persistent once placed for MVP
-
 ## Enemy model
 
-- All creatures walk one shared lane (spec/05, Creature route). The route treats every live tower and wall as an obstacle and is recomputed when one is destroyed; it never depends on which tower is first in the list. Each creature is assigned a live tower as its preferred target (round robin by spawn order), but it only attacks it once it is in range.
-- Creatures attempt to attack towers. They keep walking the lane and only damage a tower or wall that is within their attack range; with nothing in range they have no target and just keep moving
-- Attack range: a short per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower or wall cell, and inclusive (a target exactly at range can be hit)
-- Creatures cannot move through walls
+- All creatures walk one shared lane (spec/05, Creature route). The route treats every live tower as an obstacle and is recomputed when one is destroyed; it never depends on which tower is first in the list. Each creature is assigned a live tower as its preferred target (round robin by spawn order), but it only attacks it once it is in range.
+- Creatures attempt to attack towers. They keep walking the lane and only damage a tower that is within their attack range; with nothing in range they have no target and just keep moving
+- Attack range: a short per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower cell, and inclusive (a target exactly at range can be hit)
 - Archetypes: runner, tank, armored, swarm
 - Wave size and composition are fixed and public: wave N has N + 2 creatures, spawned one every 2 ticks, cycling runner, swarm, armored, tank in that order (so wave 1 is runner, swarm, armored; wave 2 adds a tank). The same rule gives the composition shown in the next-wave preview. The snapshot carries `creaturesToSpawn`, the number of creatures of the current wave that have not spawned yet
 - Spawn protection: a creature is untargetable and takes no damage for its first 1 second (`CREATURE_SPAWN_PROTECTION_SECONDS`, 5 simulation ticks at the client's 5 ticks per second) after it appears at the monster cave. It still moves and can attack normally; towers just skip it until the protection ends
@@ -62,7 +54,7 @@
 ## Damage and targeting
 
 - Targeting modes: first, last, strongest, nearest
-- Target mode can be changed by its owner during prep (placement phase, also after readying) and during the wave; it is rejected only when the match has ended, the player is eliminated, or the tower is not the player's own. Rejections use their own reasons (`invalid-target-mode-target`, `invalid-target-mode`), never a wall reason
+- Target mode can be changed by its owner during prep (placement phase, also after readying) and during the wave; it is rejected only when the match has ended, the player is eliminated, or the tower is not the player's own. Rejections use their own reasons (`invalid-target-mode-target`, `invalid-target-mode`), never a placement reason
 - Damage types: `physical`, `explosive`, `magic` (`DamageType` in `packages/shared`)
 - Every tower has one damage type, `physical` by default. The owner changes it with `set-damage-type` during prep only and only before readying (the same window as upgrades). It is free. Rejections use their own reasons: `damage-type-phase-not-active` (not prep), `player-already-ready-for-wave`, `invalid-damage-type-target` (not the player's own tower), `invalid-damage-type` (unknown type). The next-wave preview (public wave composition) lets players pick the type each prep, so resistance shifts matter
 - Every creature archetype has a multiplier per damage type, defined in data (`CREATURE_DAMAGE_MULTIPLIERS` in `packages/shared/src/creature-types.ts`). Multipliers are 0.5 (resists), 1 (neutral) or 1.5 (weak). Each archetype has exactly one weakness and one resistance:
@@ -80,8 +72,8 @@
 ## Scoring and economy
 
 - Killing a creature gives points to the responsible player (or shared split if configured)
-- Points are spent on tower upgrades and wall placement
-- Upgrade and wall costs scale over time to preserve challenge
+- Points are spent on tower upgrades
+- Upgrade costs scale with the track level to preserve challenge
 - Anti-snowball (spec/06): trailing players get a catch-up bonus at wave end, and each player's points from swarm kills are capped per wave
 
 ## Win and lose conditions

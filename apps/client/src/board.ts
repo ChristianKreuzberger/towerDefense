@@ -7,7 +7,7 @@ import { clampCoord, coordValue } from "./coord";
 import { el } from "./dom";
 import { store } from "./state";
 
-// Battlefield (Phaser) wiring: map rendering, placement cursor, wall and move modes.
+// Battlefield (Phaser) wiring: map rendering, placement cursor, move mode.
 
 // Tile clicks are routed to a handler that is plugged in at startup, so the board never imports the command code.
 let cellClickHandler: (x: number, y: number) => void = () => {};
@@ -55,9 +55,8 @@ export function updateBattlefield(snapshot: MatchSnapshot | null, transitionMs =
   }
 
   const creatureLabel = snapshot.creatures.length === 1 ? "creature" : "creatures";
-  const wallHint = store.wallMode ? " • Wall mode: click a buildable tile (Esc to leave)" : "";
   const toSpawn = snapshot.phase === "wave" ? ` • ${snapshot.creaturesToSpawn} still to spawn` : "";
-  el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active${toSpawn}${wallHint}`;
+  el.battlefieldMeta.textContent = `Wave ${snapshot.wave} • Tick ${snapshot.waveTick} • ${snapshot.creatures.length} ${creatureLabel} active${toSpawn}`;
 }
 
 export function syncPlacementContext(snapshot: MatchSnapshot | null): void {
@@ -69,7 +68,6 @@ export function syncPlacementContext(snapshot: MatchSnapshot | null): void {
     phase: snapshot.phase,
     playerId,
     hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId),
-    wallMode: store.wallMode,
     moveMode: store.moveMode
   });
 }
@@ -87,9 +85,6 @@ export function occupiedCellKeys(snapshot: MatchSnapshot): Set<string> {
   const occupied = new Set<string>();
   for (const tower of snapshot.towers) {
     occupied.add(`${tower.x},${tower.y}`);
-  }
-  for (const wall of snapshot.walls) {
-    occupied.add(`${wall.x},${wall.y}`);
   }
   return occupied;
 }
@@ -136,9 +131,6 @@ export function adjustCoord(dx: number, dy: number): void {
 }
 
 export function setMoveMode(next: boolean): void {
-  if (next && store.wallMode) {
-    setWallMode(false);
-  }
   store.moveMode = next;
   el.moveTowerBtn.setAttribute("aria-pressed", String(next));
   el.moveTowerBtn.classList.toggle("active", next);
@@ -148,15 +140,3 @@ export function setMoveMode(next: boolean): void {
   }
 }
 
-export function setWallMode(next: boolean): void {
-  if (next && store.moveMode) {
-    setMoveMode(false);
-  }
-  store.wallMode = next;
-  el.placeWallBtn.setAttribute("aria-pressed", String(next));
-  el.placeWallBtn.classList.toggle("active", next);
-  el.battlefieldMeta.classList.toggle("wall-mode", next);
-  if (store.current) {
-    updateBattlefield(store.current);
-  }
-}

@@ -19,7 +19,6 @@ test("repeated match restarts preserve fresh deterministic state", () => {
     assert.equal(snapshot.phase, "placement");
     assert.equal(snapshot.wave, 1);
     assert.equal(snapshot.towers.length, 0);
-    assert.equal(snapshot.walls.length, 0);
     assert.equal(snapshot.players[0]?.points, STARTING_POINTS);
 
     const previousSignature = mapsBySeed.get(seed);

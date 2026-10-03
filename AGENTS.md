@@ -8,7 +8,7 @@ Core concept:
 - 1 to 8 human players in one match
 - Each player places one tower at match start
 - Towers defend against invading creatures
-- Players earn points from creature kills and spend points on upgrades and walls
+- Players earn points from creature kills and spend points on upgrades
 - First player to 1000 points wins
 
 ## Current Status
@@ -43,7 +43,7 @@ Primary planning documents:
 
 1. Read spec/README.md and 02-gameplay-rules.md before proposing changes.
 2. Keep MVP offline-first. Do not implement online networking yet.
-3. Preserve game constraints from specs (for example fixed tower placement, wall/path rules, and 1000-point win condition).
+3. Preserve game constraints from specs (for example fixed tower placement, path rules, and 1000-point win condition).
 4. When changing behavior, update the relevant spec file first, then code.
 5. Keep architecture transport-agnostic so online mode can be added later.
 6. Add or update tests for simulation rules and deterministic outcomes.
@@ -52,7 +52,7 @@ Primary planning documents:
 
 1. Foundation: monorepo structure, shared types, simulation core interfaces
 2. Core gameplay: menu, player setup, tower placement, creatures, scoring
-3. Systems: upgrades, walls, pathfinding validation, round auto-repair
+3. Systems: upgrades, pathfinding validation, round auto-repair
 4. Quality: tests, balancing passes, performance checks for 8 players
 5. Future patch: online transport adapter and room synchronization
 

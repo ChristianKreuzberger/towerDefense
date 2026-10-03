@@ -17,10 +17,8 @@ export const REJECT_REASON_TEXT: Record<string, string> = {
   "insufficient-points": "not enough points",
   "cell-not-buildable": "that tile is not buildable",
   "tower-overlap": "a tower is already there",
-  "wall-overlap": "a wall is already there",
   "path-blocked": "that would block the path",
   "spawn-protected": "too close to the monster cave",
-  "wall-phase-not-active": "walls can only be placed during combat",
   "upgrade-phase-not-active": "upgrades can only be bought during prep, before you ready",
   "tower-move-locked": "moving your tower unlocks after round 5",
   "tower-move-used": "you already used your free move",
@@ -43,7 +41,6 @@ export const REJECT_REASON_TEXT: Record<string, string> = {
 };
 
 export const COMMAND_LABEL: Partial<Record<SimulationCommand["type"], string>> = {
-  "place-wall": "Wall",
   "place-tower": "Tower",
   "upgrade-tower": "Upgrade",
   "move-tower": "Move",

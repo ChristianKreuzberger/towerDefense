@@ -6,14 +6,12 @@ import {
   DEFAULT_DAMAGE_TYPE,
   DEFAULT_TOWER_TARGET_MODE,
   DEFAULT_TOWER_HEALTH,
-  DEFAULT_WALL_HEALTH,
   GAME_RULES,
   PATH_CELL_MAX_WEAR,
   BETWEEN_WAVE_PATH_WEAR_REPAIR,
   PATH_WEAR_PER_TRAVERSAL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   getBetweenWaveTowerRepairAmount,
-  getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
   BASE_TOWER_UPGRADES,
   getTowerAccuracy,
@@ -34,11 +32,8 @@ import {
   type SimulationCommand,
   type TelemetryKillsByArchetype,
   type WaveTelemetrySnapshot,
-  type CreatureWallTargetAssignment,
   type TowerTargetAssignment,
   type Tower,
-  type Wall,
-  getWallCost,
   getTowerUpgradeCost,
   getWaveClearBonus,
   getCatchUpBonus,
@@ -55,7 +50,6 @@ import {
   isValidUpgradeTrack,
   MAX_TOWER_LEVEL,
   TOWER_MOVE_AFTER_WAVES,
-  isValidWallPlacement,
   WIN_SCORE,
   STARTING_POINTS,
   validateGameMap,
@@ -70,17 +64,14 @@ interface InternalMatchState {
   waveTick: number;
   map: GameMap;
   towers: Tower[];
-  walls: Wall[];
   creatures: Creature[];
   targetAssignments: TowerTargetAssignment[];
   players: PlayerState[];
   telemetry: MatchTelemetrySnapshot;
   balanceAnalysisExports: BalanceAnalysisSnapshot[];
   playerAwardedPointsTotal: Record<string, number>;
-  playerSpentOnWallsTotal: Record<string, number>;
   playerSpentOnUpgradesTotal: Record<string, number>;
   playerAwardedPointsCurrentWave: Record<string, number>;
-  playerSpentOnWallsCurrentWave: Record<string, number>;
   playerSpentOnUpgradesCurrentWave: Record<string, number>;
   playerWaveClearBonusTotal: Record<string, number>;
   playerWaveClearBonusCurrentWave: Record<string, number>;
@@ -120,9 +111,7 @@ function createWaveTelemetrySnapshot(wave: number, tick: number): WaveTelemetryS
     killsByArchetype: createEmptyKillsByArchetype(),
     towerDamageDealt: 0,
     towerDamageIntake: 0,
-    wallDamageIntake: 0,
     towerRepairApplied: 0,
-    wallRepairApplied: 0,
     waveClearBonusAwarded: 0,
     catchUpBonusAwarded: 0,
     swarmIncomeCapped: 0
@@ -147,9 +136,7 @@ function createEmptyCumulativeTelemetrySnapshot(): CumulativeTelemetrySnapshot {
     killsByArchetype: createEmptyKillsByArchetype(),
     towerDamageDealt: 0,
     towerDamageIntake: 0,
-    wallDamageIntake: 0,
     towerRepairApplied: 0,
-    wallRepairApplied: 0,
     waveClearBonusAwarded: 0,
     catchUpBonusAwarded: 0,
     swarmIncomeCapped: 0
@@ -172,9 +159,7 @@ function accumulateWaveTelemetry(
   target.killsByArchetype.tank += waveTelemetry.killsByArchetype.tank;
   target.towerDamageDealt += waveTelemetry.towerDamageDealt;
   target.towerDamageIntake += waveTelemetry.towerDamageIntake;
-  target.wallDamageIntake += waveTelemetry.wallDamageIntake;
   target.towerRepairApplied += waveTelemetry.towerRepairApplied;
-  target.wallRepairApplied += waveTelemetry.wallRepairApplied;
   target.waveClearBonusAwarded += waveTelemetry.waveClearBonusAwarded;
   target.catchUpBonusAwarded += waveTelemetry.catchUpBonusAwarded;
   target.swarmIncomeCapped += waveTelemetry.swarmIncomeCapped;
@@ -195,14 +180,11 @@ function toCellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-// One shared lane: every live tower and wall is an obstacle, so the route cannot depend on the order of the towers.
-function getOpenPathForCreatures(map: GameMap, towers: Tower[], walls: Wall[]): Array<{ x: number; y: number }> {
+// One shared lane: every live tower is an obstacle, so the route cannot depend on the order of the towers.
+function getOpenPathForCreatures(map: GameMap, towers: Tower[]): Array<{ x: number; y: number }> {
   const blocked = new Set<string>();
   for (const tower of towers) {
     blocked.add(toCellKey(tower.x, tower.y));
-  }
-  for (const wall of walls) {
-    blocked.add(toCellKey(wall.x, wall.y));
   }
 
   const buildable = new Set<string>();
@@ -312,7 +294,6 @@ export class MatchSimulation {
       waveTick: 0,
       map,
       towers: [],
-      walls: [],
       creatures: [],
       targetAssignments: [],
       telemetry: {
@@ -321,10 +302,8 @@ export class MatchSimulation {
       },
       balanceAnalysisExports: [],
       playerAwardedPointsTotal: createPlayerCounterMap(setup.players),
-      playerSpentOnWallsTotal: createPlayerCounterMap(setup.players),
       playerSpentOnUpgradesTotal: createPlayerCounterMap(setup.players),
       playerAwardedPointsCurrentWave: createPlayerCounterMap(setup.players),
-      playerSpentOnWallsCurrentWave: createPlayerCounterMap(setup.players),
       playerSpentOnUpgradesCurrentWave: createPlayerCounterMap(setup.players),
       playerWaveClearBonusTotal: createPlayerCounterMap(setup.players),
       playerWaveClearBonusCurrentWave: createPlayerCounterMap(setup.players),
@@ -369,7 +348,7 @@ export class MatchSimulation {
         return { accepted: false, reason: "tower-already-placed" };
       }
 
-      const validation = isValidTowerPlacement(command, this.state.towers, this.state.map, this.state.walls);
+      const validation = isValidTowerPlacement(command, this.state.towers, this.state.map);
       if (!validation.valid) {
         return validation.reason
           ? { accepted: false, reason: validation.reason }
@@ -440,7 +419,6 @@ export class MatchSimulation {
       this.spawnCreaturesForCurrentTick();
       this.selectTargetsForCurrentTick();
       this.resolveCombatForCurrentTick();
-      this.resolveCreatureWallAttacksForCurrentTick();
       this.resolveCreatureAttacksForCurrentTick();
 
       if (this.state.endReason) {
@@ -450,49 +428,6 @@ export class MatchSimulation {
       if (this.isWaveComplete()) {
         this.endWave();
       }
-
-      return { accepted: true };
-    }
-
-    if (command.type === "place-wall") {
-      if (this.state.phase !== "wave") {
-        return { accepted: false, reason: "wall-phase-not-active" };
-      }
-
-      const player = this.state.players.find((entry) => entry.id === command.playerId);
-      if (!player) {
-        return { accepted: false, reason: "unknown-player" };
-      }
-
-      if (player.eliminated) {
-        return { accepted: false, reason: "player-eliminated" };
-      }
-
-      const wallCost = getWallCost(this.state.walls.length);
-      if (player.points < wallCost) {
-        return { accepted: false, reason: "insufficient-points" };
-      }
-
-      const validation = isValidWallPlacement(command, this.state.walls, this.state.towers, this.state.map);
-      if (!validation.valid) {
-        return validation.reason
-          ? { accepted: false, reason: validation.reason }
-          : { accepted: false };
-      }
-
-      player.points -= wallCost;
-      this.state.playerSpentOnWallsTotal[command.playerId] =
-        (this.state.playerSpentOnWallsTotal[command.playerId] ?? 0) + wallCost;
-      this.state.playerSpentOnWallsCurrentWave[command.playerId] =
-        (this.state.playerSpentOnWallsCurrentWave[command.playerId] ?? 0) + wallCost;
-      this.state.walls.push({
-        id: `wall-${this.state.walls.length + 1}`,
-        playerId: command.playerId,
-        x: command.x,
-        y: command.y,
-        health: DEFAULT_WALL_HEALTH,
-        maxHealth: DEFAULT_WALL_HEALTH
-      });
 
       return { accepted: true };
     }
@@ -535,7 +470,7 @@ export class MatchSimulation {
       }
 
       const others = this.state.towers.filter((entry) => entry.id !== tower.id);
-      const validation = isValidTowerPlacement({ playerId: command.playerId, x: command.x, y: command.y }, others, this.state.map, this.state.walls);
+      const validation = isValidTowerPlacement({ playerId: command.playerId, x: command.x, y: command.y }, others, this.state.map);
       if (!validation.valid) {
         return validation.reason ? { accepted: false, reason: validation.reason } : { accepted: false };
       }
@@ -733,7 +668,6 @@ export class MatchSimulation {
         ...(this.state.map.goal ? { goal: { ...this.state.map.goal } } : {})
       },
       towers: this.state.towers.map((tower) => ({ ...tower, upgrades: { ...tower.upgrades } })),
-      walls: this.state.walls.map((wall) => ({ ...wall })),
       creatures: this.state.creatures.map((creature) => ({ ...creature })),
       targetAssignments: this.state.targetAssignments.map((assignment) => ({ ...assignment })),
       players: this.state.players.map((player) => ({
@@ -752,7 +686,6 @@ export class MatchSimulation {
     this.state.telemetry.currentWave = createWaveTelemetrySnapshot(this.state.wave, this.state.waveTick);
     for (const player of this.state.players) {
       this.state.playerAwardedPointsCurrentWave[player.id] = 0;
-      this.state.playerSpentOnWallsCurrentWave[player.id] = 0;
       this.state.playerWaveClearBonusCurrentWave[player.id] = 0;
       this.state.playerCatchUpBonusCurrentWave[player.id] = 0;
       this.state.playerSwarmIncomeCurrentWave[player.id] = 0;
@@ -770,7 +703,7 @@ export class MatchSimulation {
 
   private refreshCreatureRoute(): void {
     this.currentWavePath.length = 0;
-    this.currentWavePath.push(...getOpenPathForCreatures(this.state.map, this.state.towers, this.state.walls));
+    this.currentWavePath.push(...getOpenPathForCreatures(this.state.map, this.state.towers));
     // Creatures keep their cell when the route changes. One that is no longer on the route moves to the closest route
     // cell by walking distance (not straight-line: in the maze that picks a neighbouring corridor), ties to the earlier cell.
     const routeIndexByCell = new Map<string, number>();
@@ -805,9 +738,6 @@ export class MatchSimulation {
     }
     for (const tower of this.state.towers) {
       walkable.delete(toCellKey(tower.x, tower.y));
-    }
-    for (const wall of this.state.walls) {
-      walkable.delete(toCellKey(wall.x, wall.y));
     }
     const seen = new Set<string>([toCellKey(from.x, from.y)]);
     let level = [{ x: from.x, y: from.y }];
@@ -1196,75 +1126,6 @@ export class MatchSimulation {
     this.checkFailStateAfterTowerDestruction();
   }
 
-  private resolveCreatureWallAttacksForCurrentTick(): void {
-    if (this.state.creatures.length === 0 || this.state.walls.length === 0) {
-      return;
-    }
-
-    const wallsById = new Map<string, Wall>(this.state.walls.map((wall) => [wall.id, { ...wall }]));
-    const assignments = this.computeCreatureWallTargetAssignments(wallsById);
-    this.state.events.push({
-      type: "creature-wall-targets-selected",
-      wave: this.state.wave,
-      tick: this.state.waveTick,
-      assignments: assignments.map((assignment) => ({ ...assignment }))
-    });
-
-    const sortedAssignments = [...assignments].sort((a, b) => a.creatureId.localeCompare(b.creatureId));
-    let destroyedWall = false;
-
-    for (const assignment of sortedAssignments) {
-      if (!assignment.targetWallId) {
-        continue;
-      }
-
-      const creature = this.state.creatures.find((entry) => entry.id === assignment.creatureId);
-      if (!creature || creature.hp <= 0) {
-        continue;
-      }
-
-      const wall = wallsById.get(assignment.targetWallId);
-      if (!wall || wall.health <= 0) {
-        continue;
-      }
-
-      const damage = this.getCreatureAttackDamage(creature);
-      wall.health -= damage;
-      this.state.telemetry.currentWave.wallDamageIntake += damage;
-      this.updateCurrentWaveTelemetryTick();
-      this.state.events.push({
-        type: "wall-hit",
-        wave: this.state.wave,
-        tick: this.state.waveTick,
-        creatureId: creature.id,
-        targetWallId: wall.id,
-        damage,
-        remainingHp: Math.max(0, wall.health)
-      });
-
-      if (wall.health <= 0) {
-        wallsById.delete(wall.id);
-        destroyedWall = true;
-        this.state.events.push({
-          type: "wall-destroyed",
-          wave: this.state.wave,
-          tick: this.state.waveTick,
-          wallId: wall.id,
-          playerId: wall.playerId,
-          destroyedByCreatureId: creature.id
-        });
-      } else {
-        wallsById.set(wall.id, wall);
-      }
-    }
-
-    this.state.walls = [...wallsById.values()].sort((a, b) => a.id.localeCompare(b.id));
-
-    if (destroyedWall) {
-      this.refreshCreatureRoute();
-    }
-  }
-
   private computeTargetAssignments(): TowerTargetAssignment[] {
     const towers = [...this.state.towers].sort((a, b) => a.id.localeCompare(b.id));
     return towers.map((tower) => ({
@@ -1400,16 +1261,6 @@ export class MatchSimulation {
     }));
   }
 
-  private computeCreatureWallTargetAssignments(
-    wallsById: Map<string, Wall>
-  ): CreatureWallTargetAssignment[] {
-    const creatures = [...this.state.creatures].sort((a, b) => a.id.localeCompare(b.id));
-    return creatures.map((creature) => ({
-      creatureId: creature.id,
-      targetWallId: this.selectWallTargetForCreature(creature, wallsById)?.id ?? null
-    }));
-  }
-
   private selectTowerTargetForCreature(creature: Creature, towersById: Map<string, Tower>): Tower | undefined {
     // A sticky target only counts while it is still in reach: creatures keep walking the lane, so the target
     // they were assigned at spawn is usually out of range.
@@ -1438,45 +1289,9 @@ export class MatchSimulation {
     return best;
   }
 
-  private selectWallTargetForCreature(creature: Creature, wallsById: Map<string, Wall>): Wall | undefined {
-    const candidates = [...wallsById.values()]
-      .filter((wall) => this.isWallInCreatureRange(creature, wall))
-      .sort((a, b) => a.id.localeCompare(b.id));
-    if (candidates.length === 0) {
-      return undefined;
-    }
-
-    let best = candidates[0];
-    if (!best) {
-      return undefined;
-    }
-
-    for (const candidate of candidates.slice(1)) {
-      if (this.isWallBetterCreatureTarget(creature, candidate, best)) {
-        best = candidate;
-      }
-    }
-
-    return best;
-  }
-
   private isTowerBetterCreatureTarget(creature: Creature, candidate: Tower, current: Tower): boolean {
     const candidateDistance = this.getSquaredTowerDistanceForCreature(creature, candidate);
     const currentDistance = this.getSquaredTowerDistanceForCreature(creature, current);
-    if (candidateDistance !== currentDistance) {
-      return candidateDistance < currentDistance;
-    }
-
-    if (candidate.health !== current.health) {
-      return candidate.health < current.health;
-    }
-
-    return candidate.id.localeCompare(current.id) < 0;
-  }
-
-  private isWallBetterCreatureTarget(creature: Creature, candidate: Wall, current: Wall): boolean {
-    const candidateDistance = this.getSquaredWallDistanceForCreature(creature, candidate);
-    const currentDistance = this.getSquaredWallDistanceForCreature(creature, current);
     if (candidateDistance !== currentDistance) {
       return candidateDistance < currentDistance;
     }
@@ -1492,19 +1307,9 @@ export class MatchSimulation {
     return isWithinCreatureAttackRange(creature.archetype, creature, tower);
   }
 
-  private isWallInCreatureRange(creature: Creature, wall: Wall): boolean {
-    return isWithinCreatureAttackRange(creature.archetype, creature, wall);
-  }
-
   private getSquaredTowerDistanceForCreature(creature: Creature, tower: Tower): number {
     const dx = creature.x - tower.x;
     const dy = creature.y - tower.y;
-    return (dx * dx) + (dy * dy);
-  }
-
-  private getSquaredWallDistanceForCreature(creature: Creature, wall: Wall): number {
-    const dx = creature.x - wall.x;
-    const dy = creature.y - wall.y;
     return (dx * dx) + (dy * dy);
   }
 
@@ -1558,7 +1363,6 @@ export class MatchSimulation {
   private endWave(): void {
     const waveCleared = this.isWaveCleared();
     this.repairTowersBetweenWaves();
-    this.repairWallsBetweenWaves();
     this.repairPathWearBetweenWaves();
     this.awardWaveClearBonus(waveCleared);
     this.awardCatchUpBonus();
@@ -1747,52 +1551,6 @@ export class MatchSimulation {
     this.state.towers = towers;
   }
 
-  private repairWallsBetweenWaves(): void {
-    const walls = [...this.state.walls].sort((a, b) => a.id.localeCompare(b.id));
-
-    for (const wall of walls) {
-      if (wall.health <= 0) {
-        continue;
-      }
-
-      const player = this.state.players.find((entry) => entry.id === wall.playerId);
-      if (!player || player.eliminated) {
-        continue;
-      }
-
-      // Every wall takes deterministic structural strain each wave before repair.
-      wall.health = Math.max(0, wall.health - 1);
-
-      if (wall.health >= wall.maxHealth) {
-        continue;
-      }
-
-      const repairAmount = Math.min(
-        getBetweenWaveWallRepairAmount(wall.maxHealth),
-        wall.maxHealth - wall.health
-      );
-
-      if (repairAmount <= 0) {
-        continue;
-      }
-
-      wall.health += repairAmount;
-      this.state.telemetry.currentWave.wallRepairApplied += repairAmount;
-      this.updateCurrentWaveTelemetryTick();
-      this.state.events.push({
-        type: "wall-repaired",
-        wave: this.state.wave,
-        tick: this.state.waveTick,
-        wallId: wall.id,
-        playerId: wall.playerId,
-        repairAmount,
-        remainingHp: wall.health
-      });
-    }
-
-    this.state.walls = walls;
-  }
-
   private repairPathWearBetweenWaves(): void {
     const repairs: Array<{ x: number; y: number; wearBefore: number; wearAfter: number }> = [];
 
@@ -1843,12 +1601,9 @@ export class MatchSimulation {
       .sort((a, b) => a.id.localeCompare(b.id))
       .map((player) => {
         const tower = this.state.towers.find((entry) => entry.playerId === player.id);
-        const playerWalls = this.state.walls.filter((wall) => wall.playerId === player.id);
         const awardedTotal = this.state.playerAwardedPointsTotal[player.id] ?? 0;
-        const spentWallsTotal = this.state.playerSpentOnWallsTotal[player.id] ?? 0;
         const spentUpgradesTotal = this.state.playerSpentOnUpgradesTotal[player.id] ?? 0;
         const awardedThisWave = this.state.playerAwardedPointsCurrentWave[player.id] ?? 0;
-        const spentWallsThisWave = this.state.playerSpentOnWallsCurrentWave[player.id] ?? 0;
         const spentUpgradesThisWave = this.state.playerSpentOnUpgradesCurrentWave[player.id] ?? 0;
         const waveClearBonusThisWave = this.state.playerWaveClearBonusCurrentWave[player.id] ?? 0;
         const waveClearBonusTotal = this.state.playerWaveClearBonusTotal[player.id] ?? 0;
@@ -1856,19 +1611,17 @@ export class MatchSimulation {
         const catchUpBonusTotal = this.state.playerCatchUpBonusTotal[player.id] ?? 0;
         const swarmIncomeCappedThisWave = this.state.playerSwarmIncomeCappedCurrentWave[player.id] ?? 0;
         const swarmIncomeCappedTotal = this.state.playerSwarmIncomeCappedTotal[player.id] ?? 0;
-        const netThisWave = awardedThisWave - spentWallsThisWave - spentUpgradesThisWave;
-        const netTotal = awardedTotal - spentWallsTotal - spentUpgradesTotal;
+        const netThisWave = awardedThisWave - spentUpgradesThisWave;
+        const netTotal = awardedTotal - spentUpgradesTotal;
 
         return {
           playerId: player.id,
           playerName: player.name,
           eliminated: player.eliminated,
           awardedPointsThisWave: awardedThisWave,
-          spentOnWallsThisWave: spentWallsThisWave,
           spentOnUpgradesThisWave: spentUpgradesThisWave,
           netPointsDeltaThisWave: netThisWave,
           awardedPointsTotal: awardedTotal,
-          spentOnWallsTotal: spentWallsTotal,
           spentOnUpgradesTotal: spentUpgradesTotal,
           netPointsTotal: netTotal,
           endingPoints: player.points,
@@ -1879,19 +1632,15 @@ export class MatchSimulation {
           swarmIncomeCappedThisWave,
           swarmIncomeCappedTotal,
           towerLevel: tower?.level ?? 0,
-          towerHealth: tower?.health ?? 0,
-          wallCount: playerWalls.length,
-          wallHealthTotal: playerWalls.reduce((total, wall) => total + wall.health, 0)
+          towerHealth: tower?.health ?? 0
         };
       });
 
     const totals = {
       awardedPointsThisWave: players.reduce((total, player) => total + player.awardedPointsThisWave, 0),
-      spentOnWallsThisWave: players.reduce((total, player) => total + player.spentOnWallsThisWave, 0),
       spentOnUpgradesThisWave: players.reduce((total, player) => total + player.spentOnUpgradesThisWave, 0),
       netPointsDeltaThisWave: players.reduce((total, player) => total + player.netPointsDeltaThisWave, 0),
       awardedPointsTotal: players.reduce((total, player) => total + player.awardedPointsTotal, 0),
-      spentOnWallsTotal: players.reduce((total, player) => total + player.spentOnWallsTotal, 0),
       spentOnUpgradesTotal: players.reduce((total, player) => total + player.spentOnUpgradesTotal, 0),
       netPointsTotal: players.reduce((total, player) => total + player.netPointsTotal, 0),
       endingPoints: players.reduce((total, player) => total + player.endingPoints, 0),
@@ -1902,9 +1651,7 @@ export class MatchSimulation {
       swarmIncomeCappedThisWave: players.reduce((total, player) => total + player.swarmIncomeCappedThisWave, 0),
       swarmIncomeCappedTotal: players.reduce((total, player) => total + player.swarmIncomeCappedTotal, 0),
       livingTowers: this.state.towers.filter((tower) => tower.health > 0).length,
-      livingWalls: this.state.walls.filter((wall) => wall.health > 0).length,
       totalTowerHealth: this.state.towers.reduce((total, tower) => total + Math.max(0, tower.health), 0),
-      totalWallHealth: this.state.walls.reduce((total, wall) => total + Math.max(0, wall.health), 0),
       mapPathWearTotal: this.state.map.cells.reduce((total, cell) => total + cell.pathWear, 0)
     };
 

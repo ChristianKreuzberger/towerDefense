@@ -146,12 +146,12 @@ test("running context plays and master gain follows the squared volume", () => {
 test("per-id interval throttles, and later play is allowed", () => {
   const { fake, engine, advance } = setup();
   engine.unlock();
-  engine.play({ id: "wall-hit" });
+  engine.play({ id: "tower-damaged" });
   const first = voices(fake.created);
-  engine.play({ id: "wall-hit" });
+  engine.play({ id: "tower-damaged" });
   assert.equal(voices(fake.created), first);
   advance(500);
-  engine.play({ id: "wall-hit" });
+  engine.play({ id: "tower-damaged" });
   assert.equal(voices(fake.created), first * 2);
 });
 
@@ -175,8 +175,8 @@ test("playCues spreads cues over the glide time", () => {
 test("an immediate cue after a single delayed cue is not throttled by it", () => {
   const { fake, engine } = setup();
   engine.unlock();
-  engine.play({ id: "wall-hit" }, 500);
-  engine.play({ id: "wall-hit" });
+  engine.play({ id: "creature-kill" }, 500);
+  engine.play({ id: "creature-kill" });
   assert.equal(voices(fake.created), 2);
 });
 
@@ -206,7 +206,7 @@ test("a scheduled but not yet started voice does not block an earlier cue", () =
 test("the global voice cap drops non-priority sounds but not priority ones", () => {
   const { fake, engine } = setup();
   engine.unlock();
-  const ids = ["tower-shot", "creature-kill", "tower-damaged", "wall-hit", "wall-destroyed", "repair", "place-tower", "place-wall", "upgrade", "ready", "rejected", "wave-clear-bonus", "wave-start", "tower-destroyed"] as const;
+  const ids = ["tower-shot", "creature-kill", "tower-damaged", "repair", "place-tower", "upgrade", "ready", "rejected", "wave-clear-bonus", "wave-start", "tower-destroyed"] as const;
   // Spacing beyond every per-id interval but inside the longer sounds, so voices overlap.
   for (let step = 0; step < 6; step += 1) {
     for (const id of ids) {

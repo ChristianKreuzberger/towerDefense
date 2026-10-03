@@ -22,7 +22,7 @@ function ids(events: MatchEvent[], opts: { previous?: MatchSnapshot | null; next
 }
 
 test("returns nothing without a previous snapshot or when suppressed", () => {
-  const events = [ev({ type: "wall-hit" })];
+  const events = [ev({ type: "tower-destroyed", playerId: "p1" })];
   assert.deepEqual(ids(events, { previous: null }), []);
   assert.deepEqual(ids(events, { suppress: true }), []);
 });
@@ -32,8 +32,6 @@ test("maps each event to its sound", () => {
   assert.deepEqual(ids([ev({ type: "creature-defeated", playerId: "p1" })]), ["creature-kill"]);
   assert.deepEqual(ids([ev({ type: "creature-attack", targetTowerId: "tower-p2" })]), ["tower-damaged"]);
   assert.deepEqual(ids([ev({ type: "tower-destroyed", playerId: "p1" })]), ["tower-destroyed"]);
-  assert.deepEqual(ids([ev({ type: "wall-hit" })]), ["wall-hit"]);
-  assert.deepEqual(ids([ev({ type: "wall-destroyed" })]), ["wall-destroyed"]);
   assert.deepEqual(ids([ev({ type: "wave-end" })]), ["wave-clear", "wave-clear-bonus"]);
   assert.deepEqual(ids([ev({ type: "tower-repaired" })]), ["repair"]);
 });
@@ -94,10 +92,9 @@ test("win and lose fire on the transition into ended only", () => {
 
 test("command results map to feedback sounds", () => {
   assert.deepEqual(cueForCommandResult("place-tower", true), { id: "place-tower" });
-  assert.deepEqual(cueForCommandResult("place-wall", true), { id: "place-wall" });
   assert.deepEqual(cueForCommandResult("upgrade-tower", true), { id: "upgrade" });
   assert.deepEqual(cueForCommandResult("ready-for-wave", true), { id: "ready" });
-  assert.deepEqual(cueForCommandResult("place-wall", false), { id: "rejected" });
+  assert.deepEqual(cueForCommandResult("place-tower", false), { id: "rejected" });
   assert.equal(cueForCommandResult("advance-wave", true), null);
   assert.equal(cueForCommandResult("advance-wave", false), null);
   assert.equal(cueForCommandResult("set-target-mode", true), null);

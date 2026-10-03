@@ -197,7 +197,7 @@ export function paintTerrain(
   }
 }
 
-// Faint warning tint over the cells where towers and walls are not allowed (see SPAWN_PROTECTION_RADIUS).
+// Faint warning tint over the cells where towers are not allowed (see SPAWN_PROTECTION_RADIUS).
 function paintSpawnZone(ctx: Ctx, spawn: { x: number; y: number }, cs: number): void {
   const cx = (spawn.x + 0.5) * cs;
   const cy = (spawn.y + 0.5) * cs;
@@ -490,58 +490,6 @@ export function paintCreature(ctx: Ctx, archetype: CreatureArchetype, s: number)
       outline(ctx, accent, lw * 0.7);
       break;
     }
-  }
-}
-
-// ---------------------------------------------------------------- walls
-
-// crack: 0 intact, 1 cracked, 2 badly cracked.
-export function paintWall(ctx: Ctx, cs: number, color: number, crack: number): void {
-  const lw = Math.max(1.5, cs * 0.07);
-  roundRect(ctx, lw / 2, lw / 2, cs - lw, cs - lw, cs * 0.12);
-  outline(ctx, 0xa59e91, lw);
-  // lit top/left bevel
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.lineWidth = lw * 0.8;
-  ctx.beginPath();
-  ctx.moveTo(cs * 0.16, cs * 0.14);
-  ctx.lineTo(cs * 0.84, cs * 0.14);
-  ctx.stroke();
-  // mortar lines
-  ctx.strokeStyle = "rgba(60, 54, 48, 0.45)";
-  ctx.lineWidth = Math.max(1, cs * 0.04);
-  ctx.beginPath();
-  ctx.moveTo(cs * 0.1, cs * 0.5);
-  ctx.lineTo(cs * 0.9, cs * 0.5);
-  ctx.moveTo(cs * 0.5, cs * 0.26);
-  ctx.lineTo(cs * 0.5, cs * 0.5);
-  ctx.moveTo(cs * 0.3, cs * 0.5);
-  ctx.lineTo(cs * 0.3, cs * 0.76);
-  ctx.moveTo(cs * 0.72, cs * 0.5);
-  ctx.lineTo(cs * 0.72, cs * 0.76);
-  ctx.stroke();
-  // owner cap
-  roundRect(ctx, cs * 0.14, cs * 0.17, cs * 0.72, cs * 0.17, cs * 0.05);
-  outline(ctx, color, Math.max(1, cs * 0.04), shade(color, 0.5));
-  if (crack > 0) {
-    ctx.strokeStyle = hex(INK);
-    ctx.lineWidth = Math.max(1.3, cs * 0.06);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.beginPath();
-    ctx.moveTo(cs * 0.58, cs * 0.12);
-    ctx.lineTo(cs * 0.46, cs * 0.36);
-    ctx.lineTo(cs * 0.6, cs * 0.52);
-    ctx.lineTo(cs * 0.44, cs * 0.76);
-    if (crack > 1) {
-      ctx.moveTo(cs * 0.46, cs * 0.36);
-      ctx.lineTo(cs * 0.22, cs * 0.44);
-      ctx.moveTo(cs * 0.6, cs * 0.52);
-      ctx.lineTo(cs * 0.84, cs * 0.6);
-      ctx.moveTo(cs * 0.44, cs * 0.76);
-      ctx.lineTo(cs * 0.3, cs * 0.92);
-    }
-    ctx.stroke();
   }
 }
 

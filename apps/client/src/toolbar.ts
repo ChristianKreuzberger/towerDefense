@@ -1,6 +1,6 @@
-import { UPGRADE_TRACKS, getTowerUpgradeCost, getWallCost } from "@tower-defense/shared";
+import { UPGRADE_TRACKS, getTowerUpgradeCost } from "@tower-defense/shared";
 import type { MatchSnapshot } from "@tower-defense/shared";
-import { setMoveMode, setWallMode } from "./board";
+import { setMoveMode } from "./board";
 import { el } from "./dom";
 import { store } from "./state";
 import { getToolbarState } from "./toolbar-state";
@@ -26,9 +26,6 @@ export function renderToolbar(snapshot: MatchSnapshot | null): void {
   const player = snapshot.players.find((entry) => entry.id === playerId);
   const tower = snapshot.towers.find((entry) => entry.playerId === playerId);
   const points = player?.points ?? 0;
-  const wallCost = getWallCost(snapshot.walls.length);
-  el.wallCost.textContent = `${wallCost}`;
-  el.wallCost.classList.toggle("short", points < wallCost);
   const state = getToolbarState({
     phase: snapshot.phase,
     upgrades: tower?.upgrades ?? null,
@@ -47,15 +44,9 @@ export function renderToolbar(snapshot: MatchSnapshot | null): void {
     button.classList.toggle("dim", !state.upgrades[track].enabled);
     button.setAttribute("aria-disabled", String(!state.upgrades[track].enabled));
   }
-  // The wall button stays clickable so a press explains why it is off (see the click handler) instead of failing silently.
-  el.placeWallBtn.classList.toggle("dim", !state.wallEnabled);
-  el.placeWallBtn.setAttribute("aria-disabled", String(!state.wallEnabled));
-  if (!state.wallEnabled && store.wallMode) {
-    setWallMode(false);
-  }
   setAvailability(el.placeTowerBtn, state.placeTowerEnabled, snapshot.phase === "ended");
   setAvailability(el.readyBtn, state.readyEnabled, snapshot.phase === "ended");
-  // Stays clickable like the wall button, so a press can explain why it is off.
+  // Stays clickable so a press can explain why it is off (see the click handler).
   el.moveTowerBtn.classList.toggle("dim", !state.moveEnabled);
   el.moveTowerBtn.setAttribute("aria-disabled", String(!state.moveEnabled));
   el.moveTowerCost.textContent = state.moveLabel;

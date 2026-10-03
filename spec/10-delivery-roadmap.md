@@ -15,7 +15,7 @@ Exit criteria:
 - Procedural map generation
 - Enemy spawning and tower HP combat
 - 1 to 8 player setup with names and mandatory initial tower placement
-- Point economy, tower upgrades, and wall placement
+- Point economy, and tower upgrades
 
 Exit criteria:
 - Four players can complete a match loop and score points correctly

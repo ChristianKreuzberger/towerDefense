@@ -81,13 +81,6 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
     const base: MatchSnapshot = { ...live, towers: live.towers.map((tower, index) => ({ ...tower, level: Math.min(13, tower.level + index * 3), upgrades: { range: 1 + index, damage: 1 + index * 2, accuracy: 1 } })) };
     stop();
     const path = findLane(base.map);
-    // Showcase wall art at three damage levels on the lane (presentation only).
-    const demoWalls = [14, 18, 22].flatMap((index, i) => {
-      const cell = path[index];
-      const player = base.players[i % base.players.length]?.id;
-      return cell && player ? [{ id: `demo-wall-${i}`, playerId: player, x: cell.x, y: cell.y, health: [60, 34, 12][i] ?? 60, maxHealth: 60 }] : [];
-    });
-    const wallAtIndex = new Map(demoWalls.map((wall, i) => [[14, 18, 22][i] ?? 0, wall]));
     const creatures: DemoCreature[] = [];
     const towerHealth = new Map(base.towers.map((tower) => [tower.id, tower.health]));
     const points = new Map(base.players.map((player) => [player.id, player.points]));
@@ -151,14 +144,6 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
         }
       }
 
-      if (tick % 4 === 0) {
-        const hitter = creatures.find((creature) => wallAtIndex.has(creature.index));
-        const wall = hitter ? wallAtIndex.get(hitter.index) : undefined;
-        if (hitter && wall) {
-          events.push({ type: "wall-hit", wave, tick, creatureId: hitter.id, targetWallId: wall.id, damage: 1, remainingHp: wall.health });
-        }
-      }
-
       if (tick % 3 === 0) {
         for (const creature of creatures) {
           const cell = path[Math.min(creature.index, path.length - 1)];
@@ -204,7 +189,6 @@ export function createDemo(deps: DemoDeps): { start(): boolean; stop(): void; ru
         waveTick: tick,
         creatures: liveCreatures,
         targetAssignments: assignments,
-        walls: base.walls.length > 0 ? base.walls : demoWalls,
         towers: base.towers
           .filter((tower) => !(falling && base.towers.length > 1 && tower.id === falling.id))
           .map((tower) => ({ ...tower, health: towerHealth.get(tower.id) ?? tower.health })),

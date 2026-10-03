@@ -27,9 +27,7 @@
                 },
                 "towerDamageDealt": 30,
                 "towerDamageIntake": 8,
-                "wallDamageIntake": 5,
-                "towerRepairApplied": 2,
-                "wallRepairApplied": 3
+                "towerRepairApplied": 2
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 2,
@@ -46,9 +44,7 @@
                 },
                 "towerDamageDealt": 55,
                 "towerDamageIntake": 12,
-                "wallDamageIntake": 9,
-                "towerRepairApplied": 3,
-                "wallRepairApplied": 4
+                "towerRepairApplied": 3
               },
               "players": [
                 {
@@ -56,52 +52,40 @@
                   "playerName": "Beta",
                   "eliminated": true,
                   "awardedPointsThisWave": 4,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 11,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 5,
                   "endingPoints": 5,
                   "towerLevel": 1,
-                  "towerHealth": 0,
-                  "wallCount": 0,
-                  "wallHealthTotal": 0
+                  "towerHealth": 0
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 8,
-                  "spentOnWallsThisWave": 2,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 5,
                   "awardedPointsTotal": 20,
-                  "spentOnWallsTotal": 6,
                   "spentOnUpgradesTotal": 3,
                   "netPointsTotal": 11,
                   "endingPoints": 11,
                   "towerLevel": 2,
-                  "towerHealth": 88,
-                  "wallCount": 1,
-                  "wallHealthTotal": 13
+                  "towerHealth": 88
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 12,
-                "spentOnWallsThisWave": 3,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 8,
                 "awardedPointsTotal": 31,
-                "spentOnWallsTotal": 10,
                 "spentOnUpgradesTotal": 5,
                 "netPointsTotal": 16,
                 "endingPoints": 16,
                 "livingTowers": 1,
-                "livingWalls": 1,
                 "totalTowerHealth": 88,
-                "totalWallHealth": 13,
                 "mapPathWearTotal": 6
               }
             },
@@ -127,9 +111,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 1,
@@ -146,9 +128,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "players": [
                 {
@@ -156,52 +136,40 @@
                   "playerName": "Beta",
                   "eliminated": false,
                   "awardedPointsThisWave": 3,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 2,
                   "awardedPointsTotal": 7,
-                  "spentOnWallsTotal": 3,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 2,
                   "endingPoints": 2,
                   "towerLevel": 1,
-                  "towerHealth": 71,
-                  "wallCount": 1,
-                  "wallHealthTotal": 10
+                  "towerHealth": 71
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 5,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 12,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 6,
                   "endingPoints": 6,
                   "towerLevel": 1,
-                  "towerHealth": 94,
-                  "wallCount": 1,
-                  "wallHealthTotal": 12
+                  "towerHealth": 94
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 8,
-                "spentOnWallsThisWave": 2,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 5,
                 "awardedPointsTotal": 19,
-                "spentOnWallsTotal": 7,
                 "spentOnUpgradesTotal": 4,
                 "netPointsTotal": 8,
                 "endingPoints": 8,
                 "livingTowers": 2,
-                "livingWalls": 2,
                 "totalTowerHealth": 165,
-                "totalWallHealth": 22,
                 "mapPathWearTotal": 4
               }
             }
@@ -235,9 +203,7 @@
                 },
                 "towerDamageDealt": 30,
                 "towerDamageIntake": 8,
-                "wallDamageIntake": 5,
-                "towerRepairApplied": 2,
-                "wallRepairApplied": 3
+                "towerRepairApplied": 2
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 2,
@@ -254,9 +220,7 @@
                 },
                 "towerDamageDealt": 55,
                 "towerDamageIntake": 12,
-                "wallDamageIntake": 9,
-                "towerRepairApplied": 3,
-                "wallRepairApplied": 4
+                "towerRepairApplied": 3
               },
               "players": [
                 {
@@ -264,52 +228,40 @@
                   "playerName": "Beta",
                   "eliminated": true,
                   "awardedPointsThisWave": 4,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 11,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 5,
                   "endingPoints": 5,
                   "towerLevel": 1,
-                  "towerHealth": 0,
-                  "wallCount": 0,
-                  "wallHealthTotal": 0
+                  "towerHealth": 0
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 8,
-                  "spentOnWallsThisWave": 2,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 5,
                   "awardedPointsTotal": 20,
-                  "spentOnWallsTotal": 6,
                   "spentOnUpgradesTotal": 3,
                   "netPointsTotal": 11,
                   "endingPoints": 11,
                   "towerLevel": 2,
-                  "towerHealth": 88,
-                  "wallCount": 1,
-                  "wallHealthTotal": 13
+                  "towerHealth": 88
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 12,
-                "spentOnWallsThisWave": 3,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 8,
                 "awardedPointsTotal": 31,
-                "spentOnWallsTotal": 10,
                 "spentOnUpgradesTotal": 5,
                 "netPointsTotal": 16,
                 "endingPoints": 16,
                 "livingTowers": 1,
-                "livingWalls": 1,
                 "totalTowerHealth": 88,
-                "totalWallHealth": 13,
                 "mapPathWearTotal": 6
               }
             },
@@ -335,9 +287,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 1,
@@ -354,9 +304,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "players": [
                 {
@@ -364,52 +312,40 @@
                   "playerName": "Beta",
                   "eliminated": false,
                   "awardedPointsThisWave": 3,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 2,
                   "awardedPointsTotal": 7,
-                  "spentOnWallsTotal": 3,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 2,
                   "endingPoints": 2,
                   "towerLevel": 1,
-                  "towerHealth": 71,
-                  "wallCount": 1,
-                  "wallHealthTotal": 10
+                  "towerHealth": 71
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 5,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 12,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 6,
                   "endingPoints": 6,
                   "towerLevel": 1,
-                  "towerHealth": 94,
-                  "wallCount": 1,
-                  "wallHealthTotal": 12
+                  "towerHealth": 94
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 8,
-                "spentOnWallsThisWave": 2,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 5,
                 "awardedPointsTotal": 19,
-                "spentOnWallsTotal": 7,
                 "spentOnUpgradesTotal": 4,
                 "netPointsTotal": 8,
                 "endingPoints": 8,
                 "livingTowers": 2,
-                "livingWalls": 2,
                 "totalTowerHealth": 165,
-                "totalWallHealth": 22,
                 "mapPathWearTotal": 4
               }
             }
@@ -447,9 +383,7 @@
                 },
                 "towerDamageDealt": 30,
                 "towerDamageIntake": 8,
-                "wallDamageIntake": 5,
-                "towerRepairApplied": 2,
-                "wallRepairApplied": 3
+                "towerRepairApplied": 2
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 2,
@@ -466,9 +400,7 @@
                 },
                 "towerDamageDealt": 55,
                 "towerDamageIntake": 12,
-                "wallDamageIntake": 9,
-                "towerRepairApplied": 3,
-                "wallRepairApplied": 4
+                "towerRepairApplied": 3
               },
               "players": [
                 {
@@ -476,52 +408,40 @@
                   "playerName": "Beta",
                   "eliminated": true,
                   "awardedPointsThisWave": 4,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 11,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 5,
                   "endingPoints": 5,
                   "towerLevel": 1,
-                  "towerHealth": 0,
-                  "wallCount": 0,
-                  "wallHealthTotal": 0
+                  "towerHealth": 0
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 8,
-                  "spentOnWallsThisWave": 2,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 5,
                   "awardedPointsTotal": 20,
-                  "spentOnWallsTotal": 6,
                   "spentOnUpgradesTotal": 3,
                   "netPointsTotal": 11,
                   "endingPoints": 11,
                   "towerLevel": 2,
-                  "towerHealth": 88,
-                  "wallCount": 1,
-                  "wallHealthTotal": 13
+                  "towerHealth": 88
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 12,
-                "spentOnWallsThisWave": 3,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 8,
                 "awardedPointsTotal": 31,
-                "spentOnWallsTotal": 10,
                 "spentOnUpgradesTotal": 5,
                 "netPointsTotal": 16,
                 "endingPoints": 16,
                 "livingTowers": 1,
-                "livingWalls": 1,
                 "totalTowerHealth": 88,
-                "totalWallHealth": 13,
                 "mapPathWearTotal": 6
               }
             },
@@ -547,9 +467,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 1,
@@ -566,9 +484,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "players": [
                 {
@@ -576,52 +492,40 @@
                   "playerName": "Beta",
                   "eliminated": false,
                   "awardedPointsThisWave": 3,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 2,
                   "awardedPointsTotal": 7,
-                  "spentOnWallsTotal": 3,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 2,
                   "endingPoints": 2,
                   "towerLevel": 1,
-                  "towerHealth": 71,
-                  "wallCount": 1,
-                  "wallHealthTotal": 10
+                  "towerHealth": 71
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 5,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 12,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 6,
                   "endingPoints": 6,
                   "towerLevel": 1,
-                  "towerHealth": 94,
-                  "wallCount": 1,
-                  "wallHealthTotal": 12
+                  "towerHealth": 94
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 8,
-                "spentOnWallsThisWave": 2,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 5,
                 "awardedPointsTotal": 19,
-                "spentOnWallsTotal": 7,
                 "spentOnUpgradesTotal": 4,
                 "netPointsTotal": 8,
                 "endingPoints": 8,
                 "livingTowers": 2,
-                "livingWalls": 2,
                 "totalTowerHealth": 165,
-                "totalWallHealth": 22,
                 "mapPathWearTotal": 4
               }
             }
@@ -655,9 +559,7 @@
                 },
                 "towerDamageDealt": 30,
                 "towerDamageIntake": 8,
-                "wallDamageIntake": 5,
-                "towerRepairApplied": 2,
-                "wallRepairApplied": 3
+                "towerRepairApplied": 2
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 2,
@@ -674,9 +576,7 @@
                 },
                 "towerDamageDealt": 55,
                 "towerDamageIntake": 12,
-                "wallDamageIntake": 9,
-                "towerRepairApplied": 3,
-                "wallRepairApplied": 4
+                "towerRepairApplied": 3
               },
               "players": [
                 {
@@ -684,52 +584,40 @@
                   "playerName": "Beta",
                   "eliminated": true,
                   "awardedPointsThisWave": 4,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 11,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 5,
                   "endingPoints": 5,
                   "towerLevel": 1,
-                  "towerHealth": 0,
-                  "wallCount": 0,
-                  "wallHealthTotal": 0
+                  "towerHealth": 0
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 8,
-                  "spentOnWallsThisWave": 2,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 5,
                   "awardedPointsTotal": 20,
-                  "spentOnWallsTotal": 6,
                   "spentOnUpgradesTotal": 3,
                   "netPointsTotal": 11,
                   "endingPoints": 11,
                   "towerLevel": 2,
-                  "towerHealth": 88,
-                  "wallCount": 1,
-                  "wallHealthTotal": 13
+                  "towerHealth": 88
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 12,
-                "spentOnWallsThisWave": 3,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 8,
                 "awardedPointsTotal": 31,
-                "spentOnWallsTotal": 10,
                 "spentOnUpgradesTotal": 5,
                 "netPointsTotal": 16,
                 "endingPoints": 16,
                 "livingTowers": 1,
-                "livingWalls": 1,
                 "totalTowerHealth": 88,
-                "totalWallHealth": 13,
                 "mapPathWearTotal": 6
               }
             },
@@ -755,9 +643,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "cumulativeTelemetry": {
                 "completedWaveCount": 1,
@@ -774,9 +660,7 @@
                 },
                 "towerDamageDealt": 25,
                 "towerDamageIntake": 4,
-                "wallDamageIntake": 4,
-                "towerRepairApplied": 1,
-                "wallRepairApplied": 1
+                "towerRepairApplied": 1
               },
               "players": [
                 {
@@ -784,52 +668,40 @@
                   "playerName": "Beta",
                   "eliminated": false,
                   "awardedPointsThisWave": 3,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 0,
                   "netPointsDeltaThisWave": 2,
                   "awardedPointsTotal": 7,
-                  "spentOnWallsTotal": 3,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 2,
                   "endingPoints": 2,
                   "towerLevel": 1,
-                  "towerHealth": 71,
-                  "wallCount": 1,
-                  "wallHealthTotal": 10
+                  "towerHealth": 71
                 },
                 {
                   "playerId": "p1",
                   "playerName": "Alpha",
                   "eliminated": false,
                   "awardedPointsThisWave": 5,
-                  "spentOnWallsThisWave": 1,
                   "spentOnUpgradesThisWave": 1,
                   "netPointsDeltaThisWave": 3,
                   "awardedPointsTotal": 12,
-                  "spentOnWallsTotal": 4,
                   "spentOnUpgradesTotal": 2,
                   "netPointsTotal": 6,
                   "endingPoints": 6,
                   "towerLevel": 1,
-                  "towerHealth": 94,
-                  "wallCount": 1,
-                  "wallHealthTotal": 12
+                  "towerHealth": 94
                 }
               ],
               "totals": {
                 "awardedPointsThisWave": 8,
-                "spentOnWallsThisWave": 2,
                 "spentOnUpgradesThisWave": 1,
                 "netPointsDeltaThisWave": 5,
                 "awardedPointsTotal": 19,
-                "spentOnWallsTotal": 7,
                 "spentOnUpgradesTotal": 4,
                 "netPointsTotal": 8,
                 "endingPoints": 8,
                 "livingTowers": 2,
-                "livingWalls": 2,
                 "totalTowerHealth": 165,
-                "totalWallHealth": 22,
                 "mapPathWearTotal": 4
               }
             }

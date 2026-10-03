@@ -608,10 +608,6 @@ kbd {
   padding: 0 4px;
 }
 
-.battlefield-meta.wall-mode {
-  color: var(--gold);
-}
-
 /* Sits above the hovered tower; the scene sets left/top. */
 .tower-tooltip {
   position: absolute;

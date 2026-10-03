@@ -144,7 +144,7 @@ function parseCommand(body: unknown): SimulationCommand {
     return value;
   };
 
-  if (type === "place-tower" || type === "place-wall" || type === "move-tower") {
+  if (type === "place-tower" || type === "move-tower") {
     const { x, y } = commandSource;
     // Whether the cell lies inside the map is the simulation's call (reason "out-of-bounds").
     if (typeof x !== "number" || !Number.isInteger(x) || typeof y !== "number" || !Number.isInteger(y)) {

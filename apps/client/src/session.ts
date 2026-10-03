@@ -3,7 +3,7 @@ import { getJson, postJson } from "./api";
 import type { ApiAdvanceManyPayload, ApiCommandPayload, ApiStartPayload, WireSnapshot } from "./api";
 import { applyWireSnapshot } from "./apply";
 import { cueForCommandResult } from "./audio/index";
-import { rebuildBattlefield, setMoveMode, setWallMode } from "./board";
+import { rebuildBattlefield, setMoveMode } from "./board";
 import { MAX_PLAYBACK_ERRORS } from "./constants";
 import { el } from "./dom";
 import { closeOverlay } from "./end-overlay";
@@ -78,7 +78,6 @@ export function startFreshMatch(wire: WireSnapshot): void {
   store.guideDismissedKey = null;
   store.playing = true;
   syncPlaybackControls();
-  setWallMode(false);
   setMoveMode(false);
   applyWireSnapshot(wire, ++store.requestSeq);
   // A new match (menu Start or Rematch) opens with the preview; a reconnect never reaches this function.
@@ -180,9 +179,7 @@ export async function sendCommand(command: SimulationCommand): Promise<void> {
       addFeedback("rejected", "Command rejected", command.type, result?.reason);
     } else {
       setStatus("accepted");
-      if (command.type === "place-wall") {
-        addFeedback("accepted", "Wall placed");
-      } else if (command.type === "move-tower") {
+      if (command.type === "move-tower") {
         addFeedback("accepted", "Tower moved");
         setMoveMode(false);
       } else if (command.type === "upgrade-tower") {

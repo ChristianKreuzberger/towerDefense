@@ -1,5 +1,5 @@
 import { placeTowerForSelectedPlayer } from "./actions";
-import { adjustCoord, setMoveMode, setWallMode } from "./board";
+import { adjustCoord, setMoveMode } from "./board";
 import { DEBUG } from "./constants";
 import { el, must } from "./dom";
 import { closeOverlay, isEndOverlayOpen } from "./end-overlay";
@@ -102,14 +102,6 @@ export function installHotkeys(): () => void {
       return;
     }
 
-    if (key === "w") {
-      event.preventDefault();
-      if (isActionAvailable(el.placeWallBtn)) {
-        el.placeWallBtn.click();
-      }
-      return;
-    }
-
     if (key === "v") {
       event.preventDefault();
       if (isActionAvailable(el.moveTowerBtn)) {
@@ -126,11 +118,6 @@ export function installHotkeys(): () => void {
 
     if (event.key === "Escape" && store.moveMode) {
       setMoveMode(false);
-      return;
-    }
-
-    if (event.key === "Escape" && store.wallMode) {
-      setWallMode(false);
       return;
     }
 

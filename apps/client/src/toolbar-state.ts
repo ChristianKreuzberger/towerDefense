@@ -17,7 +17,6 @@ export interface UpgradeButtonState {
 
 export interface ToolbarState {
   upgrades: Record<UpgradeTrack, UpgradeButtonState>;
-  wallEnabled: boolean;
   targetModeEnabled: boolean;
   damageTypeEnabled: boolean;
   readyEnabled: boolean;
@@ -57,7 +56,6 @@ export function getToolbarState(input: ToolbarInput): ToolbarState {
   }
   return {
     upgrades,
-    wallEnabled: !input.eliminated && input.phase === "wave",
     targetModeEnabled: hasLivingTower && input.phase !== "ended",
     // Same window as upgrades: the simulation only accepts set-damage-type in prep before the player is ready.
     damageTypeEnabled: canBuyNow,

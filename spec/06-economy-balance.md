@@ -14,7 +14,6 @@ Point economy with per-player score tracking.
 ## Spend sinks
 
 - Tower upgrades
-- Wall placement
 - Optional tower repair boosts later (auto-repair remains baseline)
 
 ## Balance principles
@@ -28,7 +27,6 @@ Point economy with per-player score tracking.
 
 - Starting points: `STARTING_POINTS` = 100 per player. A tower close to the cave is in more danger but also has the advantage, and whoever places later gets the worse spots, so everyone can buy a first upgrade in the opening prep, after placing a tower and before readying. 100 buys one damage upgrade (96), one range upgrade (64) or one accuracy upgrade (45), so a late placer can offset a weak spot with range or damage. A default chosen by the implementer; tune with the balance reports
 - Win threshold: 1000 points
-- Wall cost scaling: baseWallCost * 1.2^placedWalls
 - Upgrade cost per track: floor(baseCost * growth^currentTrackLevel). Range: base 40, growth 1.6 (64, 102, 163, 262; 591 for the whole track). Damage: base 60, growth 1.6 (96, 153, 245, 393; 887). Accuracy: base 30, growth 1.5 (45, 67, 101, 151; 364). Damage is the strongest and so the most expensive; accuracy is the cheapest. Buying every track completely costs 1842 points, more than the 1000 needed to win, so players must choose. These are defaults chosen by the implementer (issue #60 left them open) and should be tuned with the balance reports
 - Max level: `MAX_TOWER_LEVEL = 5` applies to each upgrade track separately (it started as a single tower level cap in #20). A tower's overall `level` (used for art and the level pips) is 1 + the number of upgrades bought across all tracks
 - Tower range (grid cells): baseTowerRange + (rangeLevel - 1) * towerRangePerLevel, with baseTowerRange = 6 and towerRangePerLevel = 1.5 (range level 1 = 6, level 2 = 7.5, level 3 = 9, level 5 = 12). Creatures now have a short attack range too (see below), so the short base range is a deliberate trade-off: towers must be placed close to the lane and upgrades matter
@@ -36,7 +34,7 @@ Point economy with per-player score tracking.
 - Tower damage per shot: damageLevel (1 to 5). Tower accuracy: 0.70 + (accuracyLevel - 1) * 0.075 (70%, 77.5%, 85%, 92.5%, 100%). Expected damage per tick is accuracy x damage, so level-1 towers deal 0.7 per tick against the new creature hit points
 - Spawn protection: `CREATURE_SPAWN_PROTECTION_SECONDS = 1`, expressed in simulation ticks as `SPAWN_PROTECTION_TICKS = 5` because the client runs 5 ticks per second at 1x. Protected creatures cannot be targeted or damaged, so every creature gets at least 5 ticks of travel before it can be shot (balance note: this slightly lowers early kill rates; separate from `SPAWN_PROTECTION_RADIUS`, which is about tower placement)
 - Creature hitpoints: swarm 2, runner 3, armored 5, tank 8 (raised from 1/2/3/5). A level 1 tower cannot one-shot a runner, armored or tank, but an explosive level 1 shot does round(1 x 1.5) = 2 to a swarm creature, which is its full HP, so it one-shots a swarm; and a damage level 2 physical shot does round(2 x 1.5) = 3 to a runner, which one-shots it. The type multipliers (spec/02) decide who one-shots what, so matching the type matters; a level 3+ tower can one-shot a swarm or runner on purpose
-- Creature attack range (grid cells, Euclidean, inclusive, from the creature's current cell): runner 1, swarm 1, armored 1.5, tank 1.5. A creature only damages a tower or wall within its range and keeps walking otherwise. Balance note: towers placed far from the lane are now safe, and a tower beside the lane is only hurt while creatures pass close by, so tower damage intake drops sharply versus the old "hit from anywhere" behaviour
+- Creature attack range (grid cells, Euclidean, inclusive, from the creature's current cell): runner 1, swarm 1, armored 1.5, tank 1.5. A creature only damages a tower within its range and keeps walking otherwise. Balance note: towers placed far from the lane are now safe, and a tower beside the lane is only hurt while creatures pass close by, so tower damage intake drops sharply versus the old "hit from anywhere" behaviour
 - The base range is short relative to the 50x50 map (it was 12 before), so a lone level 1 tower only covers a small stretch of the lane and range upgrades are a real choice
 
 ## Anti-snowball controls
@@ -54,7 +52,7 @@ There is no base, so "trailing" is measured in points. Both levers are driven by
 ## Constraints
 
 - Towers cannot be sold. They cannot be relocated either, except for the one free move per player that unlocks after 5 completed rounds (see spec/02); the move costs no points
-- Spending points is limited to upgrades and wall construction at MVP
+- Spending points is limited to tower upgrades at MVP (there are no walls; they were removed from the game)
 
 ## Data storage
 
