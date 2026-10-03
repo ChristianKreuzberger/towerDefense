@@ -14,7 +14,8 @@ permissions:
   contents: read
   actions: write
 jobs:
-  quality-checks:
+  # Build comes first in every job: projects reference each other's dist declarations.
+  static:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -38,12 +39,55 @@ jobs:
       - name: Lint
         run: npm run lint
 
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
       - name: Unit tests
         run: npm test
 
       - name: Performance check
         run: npm run test:perf
 
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # Still needed on a cache hit: it installs the OS libraries (fast when the browser is cached).
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
