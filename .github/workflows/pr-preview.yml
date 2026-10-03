@@ -10,44 +10,73 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
-  preview:
+  # Runs PR code (npm install scripts, Vite plugins), so it gets a read-only token
+  # and never persists credentials. Publishing happens in the separate job below.
+  build:
     # Fork PRs get a read-only token, so they cannot push to gh-pages.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
-        if: github.event.action != 'closed'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install
-        if: github.event.action != 'closed'
         run: npm ci
 
       - name: Build libraries
-        if: github.event.action != 'closed'
         run: npm run build -w @tower-defense/shared -w @tower-defense/simulation -w @tower-defense/transport
 
       # Same static build as deploy.yml, served from a per-PR sub-path.
       - name: Build client
-        if: github.event.action != 'closed'
         working-directory: apps/client
         env:
           VITE_BASE_PATH: /${{ github.event.repository.name }}/pr-preview/pr-${{ github.event.number }}/
           VITE_IN_BROWSER_SERVER: "true"
         run: npm run build
 
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-dist
+          path: apps/client/dist
+
+  # Holds the write token but runs no PR code: it only handles the built files.
+  preview:
+    needs: build
+    # build is skipped on close, so always() lets the cleanup run.
+    if: >-
+      always()
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && (github.event.action == 'closed' || needs.build.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      # The deploy action pushes from a git checkout.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build
+        if: github.event.action != 'closed'
+        uses: actions/download-artifact@v4
+        with:
+          name: preview-dist
+          path: preview-dist
+
       # Publishes to gh-pages/pr-preview/pr-N on open/push, removes it on close, and comments the URL.
       - name: Deploy preview
-        uses: rossjrw/pr-preview-action@v1
+        uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1
         with:
-          source-dir: apps/client/dist
+          source-dir: preview-dist
