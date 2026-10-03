@@ -1,0 +1,117 @@
+/* ---------------------------------------------------------------- dock */
+
+.control-panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stack {
+  display: grid;
+  gap: 8px;
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tool {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  padding: 10px 10px 9px;
+  text-align: left;
+}
+
+.tool-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--gold);
+}
+
+.tool.good .tool-icon {
+  color: var(--good);
+}
+
+.tool-label {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tool-cost {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tool-cost.short {
+  color: var(--bad);
+}
+
+.tool kbd {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.tool.dim {
+  opacity: 0.55;
+}
+
+.tool[aria-pressed="true"] {
+  background: rgba(242, 184, 75, 0.16);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(242, 184, 75, 0.25);
+}
+
+.status {
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.session-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.session-row button {
+  padding: 7px;
+  font-size: 12px;
+}
+
+.snapshot-panel {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.snapshot-panel textarea {
+  min-height: 140px;
+  font-size: 12px;
+  font-family: var(--mono);
+}
+

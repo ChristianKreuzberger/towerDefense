@@ -1,0 +1,185 @@
+/* ---------------------------------------------------------------- scoreboard */
+
+.hud-chip-row {
+  display: grid;
+  gap: 6px;
+}
+
+.player-chip {
+  position: relative;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 10px 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.player-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--chip, var(--line));
+}
+
+.player-chip.p1 { --chip: var(--p1); }
+.player-chip.p2 { --chip: var(--p2); }
+.player-chip.p3 { --chip: var(--p3); }
+.player-chip.p4 { --chip: var(--p4); }
+.player-chip.p5 { --chip: var(--p5); }
+.player-chip.p6 { --chip: var(--p6); }
+.player-chip.p7 { --chip: var(--p7); }
+.player-chip.p8 { --chip: var(--p8); }
+
+.player-chip .chip-swatch {
+  background: var(--chip, var(--panel-2));
+}
+
+.player-chip {
+  cursor: pointer;
+}
+
+.player-chip:hover {
+  border-color: var(--chip, var(--line));
+}
+
+.player-chip-name:focus-visible {
+  outline: 2px solid var(--chip, var(--ink));
+  outline-offset: 2px;
+}
+
+.player-chip.active {
+  border-color: var(--chip, var(--line));
+  box-shadow: 0 0 0 1px var(--chip, var(--line)), 0 0 14px -2px var(--chip, var(--line));
+}
+
+/* Marker besides the glow so the active player is not identified by colour alone. */
+.player-chip.active .player-chip-name::before {
+  content: "\25B6\00a0";
+}
+
+.player-chip.ready {
+  border-color: rgba(95, 191, 143, 0.55);
+}
+
+.player-chip.eliminated {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+.chip-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.chip-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.player-chip-name {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip-state {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.player-chip.ready .chip-state {
+  color: var(--good);
+}
+
+.chip-score {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chip-points {
+  min-width: 46px;
+  font-weight: 800;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-bar,
+.tower-hp-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.goal-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #c58f2e, var(--gold));
+  transition: width 300ms ease;
+}
+
+.tower-hp-bar {
+  flex: none;
+  width: 100%;
+  height: 5px;
+}
+
+.tower-hp-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: #7fd08a;
+  transition: width 150ms ease, background 150ms ease;
+}
+
+.tower-hp-bar[data-level="mid"] i {
+  background: var(--gold);
+}
+
+.tower-hp-bar[data-level="low"] i {
+  background: var(--bad);
+}
+
+.tower-hp-bar.repair-pulse {
+  animation: hp-refill 650ms ease-out;
+}
+
+@keyframes hp-refill {
+  0% {
+    box-shadow: 0 0 0 2px rgba(255, 241, 118, 0.85), 0 0 12px rgba(255, 230, 120, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(255, 241, 118, 0);
+  }
+}
+
+.player-chip-meta {
+  font-size: 10px;
+  color: var(--muted);
+}
+
