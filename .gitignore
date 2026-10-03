@@ -6,3 +6,4 @@ packages/simulation/artifacts/baselines/balance/baseline-diff.result.json
 npm-debug.log*
 test-results/
 playwright-report/
+.claude/worktrees/
