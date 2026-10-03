@@ -54,6 +54,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The deploy action pushes from a git checkout; without one it fails with "not in a git directory".
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download build
         uses: actions/download-artifact@v4
         with:
