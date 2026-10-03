@@ -23,6 +23,8 @@ Point economy with per-player score tracking.
 - Late waves force adaptation to armor/resistance shifts
 - Path wear (spec/05) is a soft brake on busy lanes: it is bounded by the minimum creature speed, and between-wave repair keeps it from building up forever
 
+- Wave size is ceil(1.5 x (N + 2)) creatures (see spec/02). Bigger waves mean more kills and points per wave, more tower wear, and longer waves; the swarm income cap per wave (80) and rewards are unchanged, so watch the balance baselines for drift in pacing before retuning
+
 ## Example tuning parameters
 
 - Starting points: `STARTING_POINTS` = 100 per player. A tower close to the cave is in more danger but also has the advantage, and whoever places later gets the worse spots, so everyone can buy a first upgrade in the opening prep, after placing a tower and before readying. 100 buys one damage upgrade (96), one range upgrade (64) or one accuracy upgrade (45), so a late placer can offset a weak spot with range or damage. A default chosen by the implementer; tune with the balance reports
