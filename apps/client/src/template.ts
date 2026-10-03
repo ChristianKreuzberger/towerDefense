@@ -15,8 +15,8 @@ export const APP_TEMPLATE = `
           <div class="menu-field">
             <label for="menuPlayerCount">Players</label>
             <select id="menuPlayerCount">
-              ${Array.from({ length: 8 }, (_, index) => {
-                const count = index + 1;
+              ${Array.from({ length: 9 }, (_, index) => {
+                const count = index;
                 const selected = count === 2 ? "selected" : "";
                 return `<option value="${count}" ${selected}>${count}</option>`;
               }).join("")}
@@ -24,8 +24,9 @@ export const APP_TEMPLATE = `
           </div>
           <div class="menu-field">
             <label for="menuAiPlayers">AI Players</label>
-            <input id="menuAiPlayers" type="number" value="0" disabled />
-            <span class="menu-hint">Coming later</span>
+            <select id="menuAiPlayers">
+              ${Array.from({ length: 9 }, (_, count) => `<option value="${count}">${count}</option>`).join("")}
+            </select>
           </div>
         </div>
         <div id="menuPlayerNames" class="menu-player-names"></div>

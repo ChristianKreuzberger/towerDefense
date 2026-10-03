@@ -8,8 +8,8 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
 
   await expect(page.locator("#menuScreen")).toBeVisible();
   await expect(page.locator("#menuAiPlayers")).toHaveValue("0");
-  await expect(page.locator("#menuAiPlayers")).toBeDisabled();
-  await expect(page.locator(".menu-hint")).toContainText("Coming later");
+  await expect(page.locator("#menuAiPlayers")).toBeEnabled();
+  await expect(page.locator(".menu-hint")).toHaveCount(0);
   await page.locator("#menuSeed").fill("43");
   await expect(page.locator("#menuPlayerName1")).toHaveAttribute("maxlength", "24");
   await page.locator("#menuPlayerName1").fill("Alpha");

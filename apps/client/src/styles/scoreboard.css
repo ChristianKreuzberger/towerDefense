@@ -183,3 +183,14 @@
   color: var(--muted);
 }
 
+
+.chip-bot {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: var(--gold);
+}

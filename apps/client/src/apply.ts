@@ -17,6 +17,13 @@ import { store } from "./state";
 import { renderToolbar } from "./toolbar";
 import { resetTurnAfterWave } from "./turns";
 
+// Lets later layers (bot pacing) react to a new snapshot without apply.ts importing them.
+let afterApplyHandler: () => void = () => {};
+
+export function onSnapshotApplied(handler: () => void): void {
+  afterApplyHandler = handler;
+}
+
 // Applies a host response unless a newer one was already applied. Returns false when a full refetch is needed.
 export function applyWireSnapshot(wire: WireSnapshot, seq: number): boolean {
   if (seq < store.appliedSeq) {
@@ -63,6 +70,7 @@ export function applySnapshotInner(snapshot: MatchSnapshot, newEvents: MatchEven
   renderEndOverlay(store.current);
   renderSnapshot(store.current);
   syncGuideOverlay(store.current);
+  afterApplyHandler();
 }
 
 export function announceRepairEvents(snapshot: MatchSnapshot, events: MatchSnapshot["events"]): void {

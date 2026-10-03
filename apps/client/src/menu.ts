@@ -1,5 +1,6 @@
-import { MAX_PLAYER_NAME_LENGTH } from "@tower-defense/shared";
-import type { MatchSetup } from "@tower-defense/shared";
+import { AI_DIFFICULTIES, MAX_PLAYER_NAME_LENGTH, MAX_PLAYERS, isValidAiDifficulty } from "@tower-defense/shared";
+import type { AiDifficulty, MatchSetup } from "@tower-defense/shared";
+import { botName, clampPlayerCounts, seatsToSetupPlayers, type MenuSeat } from "./bot-text";
 import { el, must } from "./dom";
 import { hideGuideOverlay } from "./guide";
 import { stopPlayback } from "./playback";
@@ -23,13 +24,45 @@ export function showGameScreen(): void {
   el.gameScreen.classList.remove("hidden");
 }
 
+const DEFAULT_BOT_DIFFICULTY: AiDifficulty = "medium";
+
+function difficultyLabel(difficulty: AiDifficulty): string {
+  return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+}
+
+// The two count selects share the 8-seat limit: options that would exceed it are disabled.
+function syncCountOptions(humans: number, bots: number): void {
+  el.menuPlayerCount.value = String(humans);
+  el.menuAiPlayers.value = String(bots);
+  for (const option of el.menuPlayerCount.options) {
+    option.disabled = Number(option.value) > MAX_PLAYERS - bots;
+  }
+  for (const option of el.menuAiPlayers.options) {
+    option.disabled = Number(option.value) > MAX_PLAYERS - humans;
+  }
+}
+
 export function renderMenuPlayerInputs(): void {
-  const count = Number(el.menuPlayerCount.value);
-  store.menuPlayers = Array.from({ length: count }, (_, index) => ({
-    id: `p${index + 1}`,
-    inputId: `menuPlayerName${index + 1}`,
-    defaultName: `Player ${index + 1}`
-  }));
+  // Re-rendering keeps what was already typed or chosen for the seats that stay.
+  const kept = new Map<string, string>();
+  for (const player of store.menuPlayers) {
+    const value = document.getElementById(player.botSelectId ?? player.inputId);
+    if (value instanceof HTMLInputElement || value instanceof HTMLSelectElement) {
+      kept.set(player.botSelectId ?? player.inputId, value.value);
+    }
+  }
+
+  const { humans, bots } = clampPlayerCounts(Number(el.menuPlayerCount.value), Number(el.menuAiPlayers.value));
+  syncCountOptions(humans, bots);
+  store.menuPlayers = Array.from({ length: humans + bots }, (_, index) => {
+    const isBot = index >= humans;
+    return {
+      id: `p${index + 1}`,
+      inputId: `menuPlayerName${index + 1}`,
+      defaultName: isBot ? botName(index - humans + 1) : `Player ${index + 1}`,
+      ...(isBot ? { botSelectId: `menuBotDifficulty${index + 1}` } : {})
+    };
+  });
 
   el.menuPlayerNames.replaceChildren(...store.menuPlayers.map((player, index) => {
     const row = document.createElement("div");
@@ -40,24 +73,42 @@ export function renderMenuPlayerInputs(): void {
     swatch.textContent = String(index + 1);
     const label = document.createElement("label");
     label.className = "sr-only";
+    if (player.botSelectId) {
+      label.htmlFor = player.botSelectId;
+      label.textContent = `${player.defaultName} difficulty`;
+      const name = document.createElement("span");
+      name.className = "menu-bot-name";
+      name.textContent = player.defaultName;
+      const select = document.createElement("select");
+      select.id = player.botSelectId;
+      for (const difficulty of AI_DIFFICULTIES) {
+        const option = document.createElement("option");
+        option.value = difficulty;
+        option.textContent = difficultyLabel(difficulty);
+        select.append(option);
+      }
+      const previous = kept.get(player.botSelectId);
+      select.value = isValidAiDifficulty(previous) ? previous : DEFAULT_BOT_DIFFICULTY;
+      row.append(swatch, label, name, select);
+      return row;
+    }
     label.htmlFor = player.inputId;
     label.textContent = `${player.id.toUpperCase()} Name`;
     const input = document.createElement("input");
     input.id = player.inputId;
     input.maxLength = MAX_PLAYER_NAME_LENGTH;
-    input.value = player.defaultName;
+    input.value = kept.get(player.inputId) ?? player.defaultName;
     row.append(swatch, label, input);
     return row;
   }));
 }
 
 export function menuPlayersToSetupPlayers(): MatchSetup["players"] {
-  return store.menuPlayers.map((player, index) => {
-    const element = must<HTMLInputElement>(player.inputId);
-    const name = element.value.trim().slice(0, MAX_PLAYER_NAME_LENGTH);
-    return {
-      id: `p${index + 1}`,
-      name: name.length > 0 ? name : player.defaultName
-    };
-  });
+  return seatsToSetupPlayers(store.menuPlayers.map((player): MenuSeat => {
+    if (player.botSelectId) {
+      const value = must<HTMLSelectElement>(player.botSelectId).value;
+      return { kind: "bot", ai: isValidAiDifficulty(value) ? value : DEFAULT_BOT_DIFFICULTY };
+    }
+    return { kind: "human", name: must<HTMLInputElement>(player.inputId).value, defaultName: player.defaultName };
+  }));
 }

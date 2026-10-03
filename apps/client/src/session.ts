@@ -14,6 +14,7 @@ import { el } from "./dom";
 import { closeOverlay } from "./end-overlay";
 import { addFeedback, setMenuMessage, setStatus } from "./feedback";
 import { resetMatchCaches } from "./hydrate";
+import { snapshotToSetupPlayers } from "./bot-text";
 import { menuPlayersToSetupPlayers } from "./menu";
 import { setPlaying, syncPlaybackControls } from "./playback";
 import { mapPreview, soundEngine, tour, tourStore } from "./services";
@@ -146,7 +147,7 @@ export async function rematchWithSamePlayers(): Promise<void> {
     return;
   }
 
-  const players = store.current.players.map((player) => ({ id: player.id, name: player.name }));
+  const players = snapshotToSetupPlayers(store.current.players);
   const payload: MatchSetup = {
     seed: store.current.map.seed + 1,
     players
@@ -176,6 +177,11 @@ export async function rematchWithSamePlayers(): Promise<void> {
 }
 
 export async function sendCommand(command: SimulationCommand): Promise<void> {
+  // Bots are driven by the host (see bots.ts); a click on a bot's tower or controls must never act for it.
+  if ("playerId" in command && store.current?.players.some((player) => player.id === command.playerId && player.ai)) {
+    addFeedback("info", "Bots play on their own");
+    return;
+  }
   const seq = ++store.requestSeq;
   try {
     const data = await postJson<ApiCommandPayload>("/api/command", { command, lite: true, eventsSince: store.eventCursor });

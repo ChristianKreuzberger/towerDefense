@@ -21,7 +21,7 @@ export const el = {
   gameScreen: must<HTMLElement>("gameScreen"),
   menuSeed: must<HTMLInputElement>("menuSeed"),
   menuPlayerCount: must<HTMLSelectElement>("menuPlayerCount"),
-  menuAiPlayers: must<HTMLInputElement>("menuAiPlayers"),
+  menuAiPlayers: must<HTMLSelectElement>("menuAiPlayers"),
   menuPlayerNames: must<HTMLElement>("menuPlayerNames"),
   menuMessage: must<HTMLElement>("menuMessage"),
   menuSettingsBtn: must<HTMLButtonElement>("menuSettingsBtn"),

@@ -93,3 +93,13 @@ test("the move button explains why it is off, from state", () => {
   assert.equal(getToolbarState({ ...prep, wave: 6, towerMoveAvailable: true }).moveHint, "");
   assert.match(getToolbarState({ ...prep, phase: "wave" }).moveHint, /during prep/);
 });
+
+test("a bot's controls are all off", () => {
+  const state = getToolbarState({ ...prep, bot: true });
+  assert.deepEqual(state.upgrades, { range: none, damage: none, accuracy: none });
+  assert.equal(state.targetModeEnabled, false);
+  assert.equal(state.damageTypeEnabled, false);
+  assert.equal(state.readyEnabled, false);
+  assert.equal(state.moveEnabled, false);
+  assert.equal(getToolbarState({ ...prep, upgrades: null, bot: true }).placeTowerEnabled, false);
+});

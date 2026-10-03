@@ -32,7 +32,8 @@ export function renderToolbar(snapshot: MatchSnapshot | null): void {
     eliminated: Boolean(player?.eliminated),
     readyForWave: Boolean(player?.readyForWave),
     towerMoveAvailable: Boolean(player?.towerMoveAvailable),
-    wave: snapshot.wave
+    wave: snapshot.wave,
+    bot: Boolean(player?.ai)
   });
   for (const track of UPGRADE_TRACKS) {
     const button = el.upgradeBtns[track];

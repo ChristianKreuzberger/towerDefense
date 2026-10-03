@@ -133,3 +133,8 @@
   color: var(--muted);
 }
 
+
+.menu-bot-name {
+  flex: 1;
+  font-weight: 700;
+}

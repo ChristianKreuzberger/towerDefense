@@ -140,7 +140,7 @@ export function mountMapPreview(options: { root: HTMLElement; playerNumber(playe
           swatch.textContent = String(number);
           swatch.setAttribute("aria-hidden", "true");
           const name = document.createElement("span");
-          name.textContent = `Player ${number}: ${player.name}`;
+          name.textContent = `Player ${number}: ${player.name}${player.ai ? ` (${player.ai} bot)` : ""}`;
           row.append(swatch, name);
           return row;
         })

@@ -8,6 +8,8 @@ export interface ToolbarInput {
   // `towerMoveAvailable` from the snapshot (token unused, unlocked, prep phase) and the wave number for the label.
   towerMoveAvailable: boolean;
   wave: number;
+  // A bot's controls belong to the AI, never to the table.
+  bot?: boolean;
 }
 
 export interface UpgradeButtonState {
@@ -47,7 +49,7 @@ function moveInfo(input: ToolbarInput): { label: string; hint: string } {
 
 // Mirrors what the simulation accepts, so a control looks usable only when its command would be accepted.
 export function getToolbarState(input: ToolbarInput): ToolbarState {
-  const hasLivingTower = input.upgrades !== null && !input.eliminated;
+  const hasLivingTower = input.upgrades !== null && !input.eliminated && !input.bot;
   const canBuyNow = hasLivingTower && input.phase === "placement" && !input.readyForWave;
   const upgrades = {} as Record<UpgradeTrack, UpgradeButtonState>;
   for (const track of UPGRADE_TRACKS) {
@@ -60,7 +62,7 @@ export function getToolbarState(input: ToolbarInput): ToolbarState {
     // Same window as upgrades: the simulation only accepts set-damage-type in prep before the player is ready.
     damageTypeEnabled: canBuyNow,
     readyEnabled: canBuyNow,
-    placeTowerEnabled: input.upgrades === null && !input.eliminated && input.phase === "placement",
+    placeTowerEnabled: input.upgrades === null && !input.eliminated && !input.bot && input.phase === "placement",
     moveEnabled: input.towerMoveAvailable && canBuyNow,
     moveLabel: moveInfo(input).label,
     moveHint: moveInfo(input).hint
