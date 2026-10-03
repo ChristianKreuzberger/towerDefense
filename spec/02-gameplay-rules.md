@@ -2,7 +2,7 @@
 
 ## Match loop
 
-1. Menu setup: choose number of human players (1 to 8), enter each player name, show disabled AI player option
+1. Menu setup: choose number of human players (0 to 8) and AI players (0 to 8) with 1 to 8 players in total, enter each human player name, pick a difficulty (easy, medium, hard) for each AI player
 2. Procedural map generation and pre-round placement phase
 3. Mandatory placement: each player places exactly one tower
 4. Wave combat phase
@@ -10,6 +10,16 @@
 6. Repeat until a player reaches 1000 points
 
 - Wave start: only non-eliminated players need to place a tower and ready up; eliminated players never block the next wave
+
+## AI players (bots)
+
+- A bot is a normal player (id `p{n}`, name "Bot N", not editable) with a difficulty. It uses the same commands as a human (place-tower, upgrade-tower, set-damage-type, set-target-mode, move-tower, ready-for-wave), so every rule and rejection applies to it. It reads only the snapshot a human sees
+- Bots act in prep only. They place their tower after all human players have placed theirs (immediately when there are no humans), then spend points, pick a damage type and target mode, and ready up. Bots can win at 1000 points like anyone else
+- Decisions are a pure function of the snapshot and the match seed (no `Math.random`, no `Date`), so the same setup gives the same match. The pause between bot actions is pacing done by the client and never changes outcomes
+- Easy: seeded random valid tower spot, buys a seeded random affordable track and sometimes saves instead, keeps physical damage and target `first`
+- Medium: places by lane coverage, buys accuracy, then damage, then range whenever affordable, picks the damage type that is strongest against the next wave
+- Hard: like medium, but weighs tower danger and the upgrade with the best expected damage per point, matches damage type to the whole next wave, switches target mode (strongest against tanks), and uses the free tower move when a clearly better spot exists
+- A match with zero humans runs on its own: no placement prompt, the player only watches
 
 ## Shared objectives
 
