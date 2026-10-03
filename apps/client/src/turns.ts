@@ -6,6 +6,7 @@ import { showTurnBanner } from "./phase";
 import { selectedPlayerId } from "./player-util";
 import { renderPlayerCards } from "./scoreboard";
 import { store } from "./state";
+import { resetTouchSelection } from "./touch-selection";
 import { renderToolbar } from "./toolbar";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 
@@ -63,5 +64,6 @@ export function setActivePlayer(playerId: string): void {
     return;
   }
   el.playerId.value = playerId;
+  resetTouchSelection();
   applyActivePlayerChange();
 }

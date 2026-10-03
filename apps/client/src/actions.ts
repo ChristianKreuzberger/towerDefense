@@ -11,27 +11,12 @@ import { fetchSnapshot, sendCommand } from "./session";
 import { closeTowerMenu, openTowerMenu } from "./tower-menu";
 import { renderToolbar } from "./toolbar";
 import { setActivePlayer } from "./turns";
+import { getSelectedSpot, isTouchMode, setSelectedSpot } from "./touch-selection";
 import { store } from "./state";
 
 // User intents that become host commands: tile clicks, the tower placement shortcut and guide buttons.
 
 // Touch placement is select, then confirm (spec/11). Compact layout or a coarse pointer means a finger.
-const touchQuery = "(max-width: 1040px), (pointer: coarse)";
-let selectedSpot: { x: number; y: number } | null = null;
-
-function isTouchMode(): boolean {
-  return typeof window.matchMedia === "function" && window.matchMedia(touchQuery).matches;
-}
-
-function setSelectedSpot(spot: { x: number; y: number } | null): void {
-  selectedSpot = spot;
-  battlefieldMount.previewCell(spot?.x ?? null, spot?.y ?? null);
-  const label = el.placeTowerBtn.querySelector(".tool-label");
-  if (label) {
-    label.textContent = spot ? "Place here" : "Place Tower";
-  }
-}
-
 export function handleCellSelected(tappedX: number, tappedY: number): void {
   let x = tappedX;
   let y = tappedY;
@@ -89,7 +74,7 @@ export function handleCellSelected(tappedX: number, tappedY: number): void {
     return;
   }
 
-  if (touch && !isTouchConfirm(selectedSpot, { x, y })) {
+  if (touch && !isTouchConfirm(getSelectedSpot(), { x, y })) {
     setSelectedSpot({ x, y });
     return;
   }

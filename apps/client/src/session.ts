@@ -19,6 +19,7 @@ import { menuPlayersToSetupPlayers } from "./menu";
 import { setPlaying, syncPlaybackControls } from "./playback";
 import { mapPreview, soundEngine, tour, tourStore } from "./services";
 import { store } from "./state";
+import { resetTouchSelection } from "./touch-selection";
 import { passTurnAfterReady } from "./turns";
 
 // Everything that talks to the host: fetching snapshots, starting matches, sending commands.
@@ -81,6 +82,7 @@ export function startFreshMatch(wire: WireSnapshot): void {
   store.current = null;
   rebuildBattlefield();
   store.cursorChosen = false;
+  resetTouchSelection();
   store.guideDismissedKey = null;
   store.playing = true;
   syncPlaybackControls();
