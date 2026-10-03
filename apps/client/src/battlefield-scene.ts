@@ -111,6 +111,8 @@ class BattlefieldScene extends Phaser.Scene {
     towerSpotKeys: new Set<string>(),
     hoverX: null,
     hoverY: null,
+    previewX: null,
+    previewY: null,
     hoverTowerId: null,
     hoverRuinId: null
   };
@@ -409,6 +411,12 @@ class BattlefieldScene extends Phaser.Scene {
     this.cursorX = x;
     this.cursorY = y;
     this.drawCursor();
+  }
+
+  setPreviewCell(x: number | null, y: number | null): void {
+    this.overlay.previewX = x;
+    this.overlay.previewY = y;
+    drawHoverAndGhost(this.overlay, this.overlayEnv());
   }
 
   setPlacementContext(context: PlacementContext): void {
@@ -1001,6 +1009,8 @@ export interface BattlefieldMount {
   cellToCss(x: number, y: number): { x: number; y: number };
   cellSize(): number;
   setCursor(x: number, y: number): void;
+  // Shows the placement preview (pad, ghost, range) for a touch-selected spot; null clears it.
+  previewCell(x: number | null, y: number | null): void;
   setPlacementContext(context: PlacementContext): void;
   zoomStep(direction: 1 | -1): void;
   resetView(): void;
@@ -1040,6 +1050,9 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
     },
     setCursor(x: number, y: number): void {
       scene?.setCursor(x, y);
+    },
+    previewCell(x: number | null, y: number | null): void {
+      scene?.setPreviewCell(x, y);
     },
     setPlacementContext(context: PlacementContext): void {
       scene?.setPlacementContext(context);

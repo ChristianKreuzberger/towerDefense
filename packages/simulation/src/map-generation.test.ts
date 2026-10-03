@@ -7,6 +7,7 @@ import {
   MIN_TOWER_SITES,
   PATH_WIDTH,
   TOWER_SPOT_COUNT,
+  TOWER_SPOT_TOTAL,
   TOWER_SPOT_MAX_LANE_DISTANCE,
   isInSpawnProtection,
   validateGameMap,
@@ -29,6 +30,8 @@ function nearestRoadDistance(map: GameMap, road: Set<string>, x: number, y: numb
   return best;
 }
 
+const TOWER_SPOT_MIN_COUNT_300_SEEDS = 22;
+
 test("generated maps carry the schema version and a goal on the right edge", () => {
   const map = generateMap(42);
   assert.equal(map.schemaVersion, MAP_SCHEMA_VERSION);
@@ -43,7 +46,9 @@ test("every generated map passes validation and has tower spots near the road", 
     const road = roadOf(map);
     assert.deepEqual(validateGameMap(map), [], `seed ${seed} is invalid`);
     assert.ok(map.towerSpots.length >= MIN_TOWER_SITES, `seed ${seed} has too few tower spots`);
-    assert.ok(map.towerSpots.length <= TOWER_SPOT_COUNT, `seed ${seed} has too many tower spots`);
+    // Crowded seeds run out of room at spacing 3; the lowest count over these 300 seeds is 22.
+    assert.ok(map.towerSpots.length >= TOWER_SPOT_MIN_COUNT_300_SEEDS, `seed ${seed} has only ${map.towerSpots.length} tower spots`);
+    assert.ok(map.towerSpots.length <= TOWER_SPOT_TOTAL, `seed ${seed} has too many tower spots`);
     for (const spot of map.towerSpots) {
       const label = `seed ${seed} spot ${spot.x},${spot.y}`;
       assert.ok(!road.has(`${spot.x},${spot.y}`), `${label} is on the road`);
@@ -97,6 +102,20 @@ test("tower spots keep their distance from each other on the default map", () =>
       }
     }
   }
+});
+
+test("the base spots stay first in the list and extras are appended, each group sorted by row then column", () => {
+  for (let seed = 1; seed <= 300; seed += 1) {
+    const { towerSpots } = generateMap(seed);
+    const sorted = (spots: typeof towerSpots) =>
+      spots.every((spot, index) => index === 0 || spots[index - 1]!.y < spot.y || (spots[index - 1]!.y === spot.y && spots[index - 1]!.x < spot.x));
+    assert.ok(sorted(towerSpots.slice(0, TOWER_SPOT_COUNT)), `seed ${seed} base spots are not in the original order`);
+    assert.ok(sorted(towerSpots.slice(TOWER_SPOT_COUNT)), `seed ${seed} extra spots are not sorted`);
+  }
+});
+
+test("tower spots are deterministic per seed", () => {
+  assert.deepEqual(generateMap(77).towerSpots, generateMap(77).towerSpots);
 });
 
 test("the road is two cells wide: every road cell has a road partner across it", () => {
