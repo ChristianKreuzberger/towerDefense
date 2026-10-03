@@ -5,7 +5,7 @@ import { el, must } from "./dom";
 import { closeOverlay, isEndOverlayOpen } from "./end-overlay";
 import { hideGuideOverlay } from "./guide";
 import { playerNumber } from "./player-util";
-import { mapPreview, settingsDialog, settingsStore } from "./services";
+import { mapPreview, settingsDialog, settingsStore, tour } from "./services";
 import { store } from "./state";
 import { isActionAvailable } from "./toolbar";
 import { setActivePlayer } from "./turns";
@@ -22,6 +22,15 @@ function isFormField(target: EventTarget | null): boolean {
 // Returns a function that removes the listener again.
 export function installHotkeys(): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
+    if (tour.isOpen()) {
+      // The dialog handles Esc itself, but not after a backdrop click moved focus out of it.
+      if (event.key === "Escape") {
+        event.preventDefault();
+        tour.close();
+      }
+      return;
+    }
+
     if (mapPreview.isOpen()) {
       // Game hotkeys stay off while it is open. Esc also works after a backdrop click moved focus out of the dialog.
       if (event.key === "Escape") {

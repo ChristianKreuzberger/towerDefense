@@ -11,7 +11,7 @@ import { addFeedback, setMenuMessage, setStatus } from "./feedback";
 import { resetMatchCaches } from "./hydrate";
 import { menuPlayersToSetupPlayers } from "./menu";
 import { setPlaying, syncPlaybackControls } from "./playback";
-import { mapPreview, soundEngine } from "./services";
+import { mapPreview, soundEngine, tour, tourStore } from "./services";
 import { store } from "./state";
 import { passTurnAfterReady } from "./turns";
 
@@ -84,7 +84,12 @@ export function startFreshMatch(wire: WireSnapshot): void {
   // Re-read through a copy of the store reference: TypeScript still narrows store.current to null after the reset above.
   const fresh = (store as { current: MatchSnapshot | null }).current;
   if (fresh && fresh.phase === "placement") {
-    mapPreview.open(fresh);
+    // First match in this browser: the how-to-play tour comes first, then the map preview.
+    if (tourStore.hasSeen()) {
+      mapPreview.open(fresh);
+    } else {
+      tour.open({ onClose: () => mapPreview.open(fresh) });
+    }
   }
 }
 

@@ -33,6 +33,7 @@ export const APP_TEMPLATE = `
           <button id="menuStartBtn" class="primary">Start Match</button>
           <button id="menuResumeBtn" class="primary hidden">Resume Match</button>
           <button id="menuRefreshBtn" class="ghost">Refresh Existing Match</button>
+          <button id="menuTourBtn" class="ghost">How to play</button>
           <button id="menuSettingsBtn" class="ghost menu-settings">Settings</button>
         </div>
         <div id="menuMessage" class="menu-message"></div>
@@ -149,6 +150,7 @@ export const APP_TEMPLATE = `
       <div class="session-row">
         <button id="refreshBtn" class="ghost">Refresh Snapshot</button>
         <button id="backToMenuBtn" class="ghost">Back To Menu</button>
+        <button id="tourBtn" class="ghost">How to play</button>
         <button id="settingsBtn" class="ghost">Settings</button>
       </div>
     </aside>
@@ -165,6 +167,7 @@ export const APP_TEMPLATE = `
 
   <div id="settingsRoot"></div>
   <div id="mapPreviewRoot"></div>
+  <div id="tourRoot"></div>
 
   <div id="feedbackQueue" class="toasts" role="status" aria-live="polite"></div>
 
