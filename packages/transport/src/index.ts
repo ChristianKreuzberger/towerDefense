@@ -14,3 +14,4 @@ export class LocalTransportAdapter implements TransportAdapter {
 }
 
 export * from "./game-api.js";
+export * from "./http-client.js";

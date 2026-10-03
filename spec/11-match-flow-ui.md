@@ -16,6 +16,13 @@
 3. Ask each player to place exactly one tower
 4. Prevent wave start until all required towers are placed
 
+Map preview step
+- Shown as a dialog over the board right after a new match (menu Start Match or Rematch) has been generated. It is not shown when the client reconnects to a running match
+- Content: a small overview of the generated map (tower pads, the lane creatures walk, blocked ground, the monster cave and its protected no-build area, with a legend). The lane is the set of buildable cells connected to the cave; other buildable cells are tower pads, the seed and size, and the player list with each player's colour/number and name
+- A "Continue" button (focused when the dialog opens) closes it and starts placement for the first player; Esc does the same. It follows the match-end modal pattern: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside
+- While it is open no tower can be placed and game hotkeys are ignored
+- The overview is drawn from the snapshot's map cells only, so it shows whatever the map contains
+
 ## In-round HUD requirements
 
 - Compact scoreboard, one chip per player: colour swatch with the player number, name, points with a bar toward the 1000-point goal, tower HP bar
@@ -28,7 +35,7 @@
 - Turn banner: a big, centered banner (separate from the wave banner so both can show after a wave ends) with the player's name and "it's your turn". The text uses the player's colour, at least 40px on desktop (scaled down with the viewport on phones, never below 28px, wrapping instead of overflowing), and stays visible for about 3.5 seconds. It is `aria-live="polite"`, does not take pointer events, and under `prefers-reduced-motion` it appears without animation. It is only shown when more than one player is in the match. Generic action toasts are unchanged
 - The guide card title is larger (18px) so the turn message is readable from across the table
 - Show active wave and remaining creatures
-- Action toolbar (tower, wall, upgrade, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; the Upgrade button is enabled only in prep for a player who has not readied and whose tower is below max level (it then shows "MAX" instead of a cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
+- Action toolbar (tower, wall, move, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); the Wall button is enabled only during combat (leaving combat also leaves wall mode); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
 ## Real-time playback
@@ -73,7 +80,9 @@ Terrain
 
 Towers
 - Base ring in the player colour, a rotating turret, upgrade level visible as turret size, barrels and level pips, HP bar above the tower
-- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. Accuracy is always 100% today because towers do not miss. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
+- Tower style tiers: every 3rd upgrade (counted across all tracks, so by the tower's overall `level`) switches the tower to a new look. Tier = floor((level - 1) / 3), tiers 0 to 4 (level 13 is the highest). Each tier has its own turret art and its shots look different (longer, thicker bolts with a brighter muzzle flash from tier 2, a white core from tier 3). The level pips under the tower show progress to the next tier (0 to 2 pips)
+- Level-up: when an upgrade is bought the tower plays a short shine (gold ring, sparkles, a small pulse and a floating "Level up"); when the purchase starts a new tier it is bigger and says "New style!". Nothing plays on first render or reconnect, and with reduced motion only the floating text shows
+- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, the level of each upgrade track (range, damage, accuracy), health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. The tooltip also names the tower's damage type. Accuracy is the shared `getTowerAccuracy` value. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
 Ruins
 - A destroyed tower leaves ruins on its cell (broken base in the owner's colour, rubble, scorch mark) for the rest of the match. They are presentation only: they do not block placement, targeting or paths
@@ -111,6 +120,36 @@ Settings dialog
 - `M` toggles mute from anywhere except form fields (key repeat is ignored). It is listed in the shortcut bar
 - Settings persist in `localStorage` (see 08-data-persistence.md) and apply immediately
 
+Next-wave preview and HUD
+- During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic), 1x Tank (weak: physical)" (each archetype's weaknesses are the damage types whose multiplier is above 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
+- The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
+- The ended status text names the winner (never the raw id)
+
+Damage type selector
+- A "Damage" select sits next to the Target Mode select with Physical, Explosive and Magic. It is enabled only when the simulation would accept `set-damage-type` (player has a living tower, prep phase, not ready; `damageTypeEnabled` in the toolbar state) and shows the tower's current type from the snapshot. Rejections show a toast with their own text
+
+Move tower
+- A "Move Tower" button (hotkey `V`, cost shown as "free") appears in the toolbar. It is available only when the simulation would accept a move (`towerMoveAvailable` for the player, prep phase, not ready); before the unlock it is dimmed and a press explains "unlocks after round 5"
+- Pressing it enters move mode (like wall mode: the button shows pressed, Esc or pressing again leaves it); the next click on a tile sends the move. Move mode also ends when the move is accepted, the phase changes or the active player changes
+- The tower glides to its new tile with a short pop
+- Cost-slot label (from state, never from DOM text): `free` (move available), `after R5` (locked, wave 5 or earlier), `used` (unlocked, not ready, token spent), `ready` (unlocked and the player is ready; the snapshot cannot tell a spent token from an unspent one, so the hint is hedged: "You can only move your tower before you ready up (if you have not used your free move yet)"), and `-` outside prep, with no living tower or when eliminated. The `ready` check comes before the token check because the simulation reports `towerMoveAvailable: false` for a ready player
+
+Match lifecycle and hotkeys
+- "Back To Menu" leaves the match running on the host and stops playback. While a match that has not ended exists, the menu shows a "Resume Match" button that returns to it
+- "Start Match" asks for confirmation ("Replace the running match?") when a match that has not ended exists; cancelling leaves it untouched
+- Guide "Place Tower" and the `T` key place the tower on the tile the player chose (the board cursor, which a click also sets), not the first free tile
+- Hotkeys R, T, W, V, U, I and O do nothing when their action is not available (wrong phase, already ready, tower already placed, match ended) and while any dialog is open. Esc dismisses the guide card
+- When the match has ended the Ready and Place Tower buttons are disabled, so closing the end modal never leaves live controls behind
+- On page load the menu and game screens stay hidden until the reconnect check has answered (at most about a second), so a running match does not flash the menu first
+
+Match-end modal
+- Same pattern as the settings dialog: `role="dialog"`, `aria-modal="true"`, labelled by its "Match Ended" title
+- Focus moves to the Rematch button when it opens and the rest of the page is `inert` (no Tab or pointer access behind it)
+- Esc or the Close button dismisses it; focus returns to the element that had it before (or the Settings button if that is gone). Once dismissed it does not reopen on later snapshot refreshes of the same ended match; a new match or rematch resets that
+- While it is open game hotkeys are ignored
+- The guide's close button is a "×" with an accessible name and a `title` tooltip ("Dismiss guidance")
+- The shortcut bar lists exactly the hotkeys that exist: R, T, W, V, U/I/O, 1-8 (switch player), P, M and the arrow keys
+
 Engine rules
 - The `AudioContext` is created lazily, never at import time, and unlocked (resumed) on the first `pointerdown`, `keydown` or `touchend`; the listeners are removed once the context is running and re-armed if the context later leaves the running state (for example Safari interruptions)
 - If Web Audio is unavailable or throws, audio is a permanent no-op and nothing else is affected
@@ -123,7 +162,7 @@ Engine rules
 Event to sound table
 | Source | Sound id | Notes |
 | --- | --- | --- |
-| `tower-hit` | `tower-shot` | at most one per tower id, at most 4 per snapshot |
+| `tower-hit`, `tower-miss` | `tower-shot` | at most one per tower id, at most 4 per snapshot; a miss draws the shot flying past the creature with a floating "miss" |
 | `creature-defeated` | `creature-kill` | at most 3 per snapshot |
 | `creature-attack` | `tower-damaged` | |
 | `tower-destroyed` | `tower-destroyed` | priority |

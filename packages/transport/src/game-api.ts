@@ -5,6 +5,10 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   PROJECT_NAME,
+  DAMAGE_TYPES,
+  UPGRADE_TRACKS,
+  isValidDamageType,
+  isValidUpgradeTrack,
   type MatchSetup,
   type MatchSnapshot,
   type TowerTargetMode,
@@ -140,17 +144,24 @@ function parseCommand(body: unknown): SimulationCommand {
     return value;
   };
 
-  if (type === "place-tower" || type === "place-wall") {
+  if (type === "place-tower" || type === "place-wall" || type === "move-tower") {
     const { x, y } = commandSource;
     // Whether the cell lies inside the map is the simulation's call (reason "out-of-bounds").
     if (typeof x !== "number" || !Number.isInteger(x) || typeof y !== "number" || !Number.isInteger(y)) {
       throw new GameApiError("invalid-coordinates", `${type}: x and y must be finite integers`);
     }
+    if (type === "move-tower") {
+      return { type, playerId: text("playerId"), towerId: text("towerId"), x, y };
+    }
     return { type, playerId: text("playerId"), x, y };
   }
 
   if (type === "upgrade-tower") {
-    return { type, playerId: text("playerId"), towerId: text("towerId") };
+    const track = commandSource.track;
+    if (!isValidUpgradeTrack(track)) {
+      throw new GameApiError("invalid-command", `upgrade-tower: track must be one of ${UPGRADE_TRACKS.join(", ")}`);
+    }
+    return { type, playerId: text("playerId"), towerId: text("towerId"), track };
   }
 
   if (type === "set-target-mode") {
@@ -159,6 +170,14 @@ function parseCommand(body: unknown): SimulationCommand {
       throw new GameApiError("invalid-command", `set-target-mode: mode must be one of ${TARGET_MODES.join(", ")}`);
     }
     return { type, playerId: text("playerId"), towerId: text("towerId"), mode: mode as TowerTargetMode };
+  }
+
+  if (type === "set-damage-type") {
+    const damageType = commandSource.damageType;
+    if (!isValidDamageType(damageType)) {
+      throw new GameApiError("invalid-command", `set-damage-type: damageType must be one of ${DAMAGE_TYPES.join(", ")}`);
+    }
+    return { type, playerId: text("playerId"), towerId: text("towerId"), damageType };
   }
 
   if (type === "ready-for-wave") {

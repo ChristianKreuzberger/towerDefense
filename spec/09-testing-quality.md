@@ -10,12 +10,16 @@
 
 - Tower placement rejection when path would be fully blocked
 - Tower cannot target or damage other towers
+- Damage types: every type against every archetype gives max(1, round(damage * multiplier)); the minimum of 1 holds; `tower-hit.damage` equals the damage applied and the telemetry total; the same seed replays identically; set-damage-type is accepted only in prep before ready, and the transport rejects unknown types
 - Each player must place exactly one tower before wave start
-- Tower cannot be moved or sold after placement
+- Tower cannot be sold; it cannot be moved except for the single free move unlocked after 5 rounds (rejected before that, rejected a second time, rejected after ready or during a wave)
 - Wall placement blocks movement but never invalidates all tower paths
+- Anti-snowball: trailing player gets the catch-up bonus and the leader does not; the swarm income cap applies exactly at the boundary; same seed gives the same result; a wave-clear score win still ends the match after normal end-of-wave events
 - Creature kill increments points and ends match at 1000 points
 - End-of-round automatic tower repair is applied and announced
 - Upgrade and wall cost calculations remain deterministic
+- Creature routing ignores tower list order, survives the loss of the first tower, and assigns live towers round robin
+- `validateGameMap` rejects each kind of malformed map; generated maps are valid and leave at least 8 reachable tower sites on every seed (checked across several hundred seeds by counting sites, not by placing every combination)
 
 ## Client audio and settings
 

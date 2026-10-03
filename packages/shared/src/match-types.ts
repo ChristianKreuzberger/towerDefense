@@ -1,6 +1,6 @@
 import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
-import type { Tower, TowerTargetMode } from "./tower-types.js";
+import type { DamageType, Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 
 export interface PlayerSetup {
@@ -11,6 +11,9 @@ export interface PlayerSetup {
 export interface MatchSetup {
   players: PlayerSetup[];
   seed: number;
+  // Optional prebuilt map (for example a debugging snapshot); it is validated before the match starts.
+  // Without it the map is generated from the seed.
+  map?: GameMap;
 }
 
 export type MatchPhase = "placement" | "wave" | "ended";
@@ -69,6 +72,8 @@ export interface WaveTelemetrySnapshot {
   towerRepairApplied: number;
   wallRepairApplied: number;
   waveClearBonusAwarded: number;
+  catchUpBonusAwarded: number;
+  swarmIncomeCapped: number;
 }
 
 export interface MatchTelemetrySnapshot {
@@ -90,6 +95,8 @@ export interface CumulativeTelemetrySnapshot {
   towerRepairApplied: number;
   wallRepairApplied: number;
   waveClearBonusAwarded: number;
+  catchUpBonusAwarded: number;
+  swarmIncomeCapped: number;
 }
 
 export interface BalanceAnalysisPlayerSnapshot {
@@ -107,6 +114,10 @@ export interface BalanceAnalysisPlayerSnapshot {
   endingPoints: number;
   waveClearBonusThisWave: number;
   waveClearBonusTotal: number;
+  catchUpBonusThisWave: number;
+  catchUpBonusTotal: number;
+  swarmIncomeCappedThisWave: number;
+  swarmIncomeCappedTotal: number;
   towerLevel: number;
   towerHealth: number;
   wallCount: number;
@@ -134,6 +145,10 @@ export interface BalanceAnalysisSnapshot {
     endingPoints: number;
     waveClearBonusThisWave: number;
     waveClearBonusTotal: number;
+    catchUpBonusThisWave: number;
+    catchUpBonusTotal: number;
+    swarmIncomeCappedThisWave: number;
+    swarmIncomeCappedTotal: number;
     livingTowers: number;
     livingWalls: number;
     totalTowerHealth: number;
@@ -197,6 +212,24 @@ export type MatchEvent =
       cleared: boolean;
     }
   | {
+      type: "catch-up-bonus";
+      wave: number;
+      tick: number;
+      playerId: string;
+      bonus: number;
+      // Points behind the leader when the bonus was paid.
+      gap: number;
+    }
+  | {
+      type: "swarm-income-capped";
+      wave: number;
+      tick: number;
+      playerId: string;
+      creatureId: string;
+      // Reward points the kill would have paid but did not, because of the per-wave swarm income cap.
+      forfeitedPoints: number;
+    }
+  | {
       type: "tower-repaired";
       wave: number;
       tick: number;
@@ -236,8 +269,21 @@ export type MatchEvent =
       // Creature cell at impact: a creature killed within one batched response never shows up in a snapshot.
       x: number;
       y: number;
+      // After the creature's multiplier for damageType.
       damage: number;
+      damageType: DamageType;
       remainingHp: number;
+    }
+  | {
+      // The tower fired but missed; no damage. x/y is the creature cell, like tower-hit.
+      type: "tower-miss";
+      wave: number;
+      tick: number;
+      towerId: string;
+      playerId: string;
+      creatureId: string;
+      x: number;
+      y: number;
     }
   | {
       type: "creature-defeated";
@@ -289,6 +335,17 @@ export type MatchEvent =
       remainingHp: number;
     }
   | {
+      type: "tower-moved";
+      wave: number;
+      tick: number;
+      towerId: string;
+      playerId: string;
+      fromX: number;
+      fromY: number;
+      x: number;
+      y: number;
+    }
+  | {
       type: "tower-destroyed";
       wave: number;
       tick: number;
@@ -322,6 +379,8 @@ export interface PlayerState {
   hasPlacedTower: boolean;
   readyForWave: boolean;
   eliminated: boolean;
+  // True while the player still holds their one free tower move (unlocked after 5 completed rounds).
+  towerMoveAvailable: boolean;
   tower?: TowerPlacement;
 }
 
@@ -330,6 +389,8 @@ export interface MatchSnapshot {
   wave: number;
   waveTick: number;
   allPlayersReadyForWave: boolean;
+  // Creatures of the current (or, in prep, the upcoming) wave that have not spawned yet.
+  creaturesToSpawn: number;
   telemetry: MatchTelemetrySnapshot;
   balanceAnalysisExports: BalanceAnalysisSnapshot[];
   map: GameMap;
@@ -355,10 +416,18 @@ export type CommandRejectReason =
   | "wall-phase-not-active"
   | "upgrade-phase-not-active"
   | "tower-max-level"
+  | "invalid-upgrade-track"
+  | "tower-move-locked"
+  | "tower-move-used"
+  | "move-phase-not-active"
+  | "invalid-move-target"
   | "player-already-ready-for-wave"
   | "invalid-upgrade-target"
   | "invalid-target-mode-target"
   | "invalid-target-mode"
+  | "damage-type-phase-not-active"
+  | "invalid-damage-type-target"
+  | "invalid-damage-type"
   | "out-of-bounds"
   | "cell-not-buildable"
   | "tower-overlap"
@@ -387,15 +456,29 @@ export type SimulationCommand =
       y: number;
     }
   | {
+      type: "move-tower";
+      playerId: string;
+      towerId: string;
+      x: number;
+      y: number;
+    }
+  | {
       type: "upgrade-tower";
       playerId: string;
       towerId: string;
+      track: UpgradeTrack;
     }
   | {
       type: "set-target-mode";
       playerId: string;
       towerId: string;
       mode: TowerTargetMode;
+    }
+  | {
+      type: "set-damage-type";
+      playerId: string;
+      towerId: string;
+      damageType: DamageType;
     }
   | {
       type: "ready-for-wave";

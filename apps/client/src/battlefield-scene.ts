@@ -1,13 +1,18 @@
 import Phaser from "phaser";
 
 import {
+  BASE_TOWER_UPGRADES,
   CREATURE_ARCHETYPE_STATS,
+  MAX_TOWER_LEVEL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   PATH_CELL_MAX_WEAR,
   getTowerStats,
+  getTowerStyleTier,
+  TOWER_STYLE_TIER_SIZE,
+  TOWER_STYLE_TIERS,
   isInSpawnProtection
 } from "@tower-defense/shared";
-import type { Creature, CreatureArchetype, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, Wall } from "@tower-defense/shared";
+import type { Creature, CreatureArchetype, DamageType, MapCell, MatchEvent, MatchPhase, MatchSnapshot, Tower, TowerUpgrades, Wall } from "@tower-defense/shared";
 
 import { Effects } from "./art/fx";
 import { CREAM, INK, UI_COLORS, colorForPlayer, playerIndex } from "./art/palette";
@@ -65,6 +70,8 @@ export interface PlacementContext {
   playerId: string;
   hasTowerAlready: boolean;
   wallMode?: boolean;
+  // Moving the tower: the ghost tower is shown even though the player already has one.
+  moveMode?: boolean;
 }
 
 interface TowerVisual {
@@ -77,6 +84,9 @@ interface TowerVisual {
   flash: Phaser.GameObjects.Image;
   player: number;
   level: number;
+  tier: number;
+  upgrades: TowerUpgrades;
+  damageType: DamageType;
   hp: number;
   maxHp: number;
   angle: number;
@@ -395,7 +405,7 @@ class BattlefieldScene extends Phaser.Scene {
     if (!this.placementContext) {
       return false;
     }
-    if (!this.placementContext.wallMode && this.placementContext.hasTowerAlready) {
+    if (!this.placementContext.wallMode && !this.placementContext.moveMode && this.placementContext.hasTowerAlready) {
       return false;
     }
     return this.isHoverValid(x, y);
@@ -427,7 +437,7 @@ class BattlefieldScene extends Phaser.Scene {
       if (hovered) {
         hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
         hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
-        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.level).range);
+        this.drawRangeCircle(hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.upgrades).range);
       }
     }
     this.updateTowerTooltip();
@@ -454,9 +464,9 @@ class BattlefieldScene extends Phaser.Scene {
         ghostWall.setTexture(KEY.wall(index, 0)).setPosition(cx, cy).setVisible(true);
       } else {
         ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
-        ghostTurret.setTexture(KEY.turret(index, 1)).setPosition(cx, cy).setVisible(true);
+        ghostTurret.setTexture(KEY.turret(index, 0)).setPosition(cx, cy).setVisible(true);
         // Placement is one-shot, so show the coverage before the player commits.
-        this.drawRangeCircle(hover, cx, cy, getTowerStats(1).range);
+        this.drawRangeCircle(hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
       }
     }
   }
@@ -482,14 +492,16 @@ class BattlefieldScene extends Phaser.Scene {
       tooltip.hidden = true;
       return;
     }
-    const stats = getTowerStats(tower.level);
+    const stats = getTowerStats(tower.upgrades);
+    const trackLevel = (level: number): string => `${level}/${MAX_TOWER_LEVEL}`;
     const rows: Array<[string, string]> = [
       ["Level", String(stats.level)],
       ["Health", `${tower.hp}/${tower.maxHp}`],
-      ["Range", `${stats.range} cells`],
-      ["Damage", `${stats.damagePerShot} per shot`],
+      ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
+      ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
+      ["Type", tower.damageType],
       ["DPS", String(stats.damagePerSecond)],
-      ["Accuracy", `${Math.round(stats.accuracy * 100)}%`]
+      ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
     ];
     tooltip.replaceChildren(
       ...rows.map(([label, value]) => {
@@ -514,7 +526,12 @@ class BattlefieldScene extends Phaser.Scene {
     tooltip.hidden = false;
   }
 
-  removeTooltip(): void {
+  // Everything the scene attached outside Phaser's own object tree: the canvas listener, the input
+  // handlers and the tooltip element. Call before game.destroy(), which removes the canvas.
+  removeListeners(): void {
+    this.game?.canvas?.removeEventListener("pointerleave", this.handlePointerLeave);
+    this.input?.off("pointerdown", this.handlePointerDown, this);
+    this.input?.off("pointermove", this.handlePointerMove, this);
     this.tooltip?.remove();
   }
 
@@ -877,7 +894,7 @@ class BattlefieldScene extends Phaser.Scene {
     const shadow = this.add.image(0, cellSize * 0.2, KEY.shadow).setDisplaySize(cellSize * TOWER_SCALE * 1.05, cellSize * 1.15);
     const base = this.add.image(0, 0, KEY.towerBase(player)).setScale(INV);
     const flash = this.add.image(0, 0, KEY.soft).setTint(0xff5a4a).setDisplaySize(cellSize * 2, cellSize * 2).setVisible(false);
-    const turret = this.add.image(0, 0, KEY.turret(player, tower.level)).setScale(INV);
+    const turret = this.add.image(0, 0, KEY.turret(player, getTowerStyleTier(tower.level))).setScale(INV);
     const badge = this.add.image(cellSize * 0.74, cellSize * 0.7, KEY.badge(player)).setScale(INV);
     const pips = this.add.image(0, cellSize * 1.12, KEY.pips(1)).setScale(INV).setVisible(false);
     const barWidth = cellSize * 1.5;
@@ -889,21 +906,36 @@ class BattlefieldScene extends Phaser.Scene {
     container.add([shadow, base, flash, turret, badge, pips, hpBg, hpFill]);
     return {
       container, base, turret, pips, hpBg, hpFill, flash,
-      player, level: tower.level, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
+      player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, damageType: tower.damageType, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
       baseX: cx, baseY: cy, flashUntil: 0, shakeUntil: 0, recoilUntil: 0
     };
   }
 
   private updateTowerVisual(visual: TowerVisual, tower: Tower, cellSize: number): void {
     const { cx, cy } = cellCenter(tower.x, tower.y, cellSize);
+    const relocated = visual.baseX !== cx || visual.baseY !== cy;
     visual.baseX = cx;
     visual.baseY = cy;
-    if (visual.level !== tower.level) {
-      visual.level = tower.level;
-      visual.turret.setTexture(KEY.turret(visual.player, tower.level));
+    if (relocated) {
+      this.glideTowerTo(visual, cx, cy);
     }
-    if (tower.level >= 2) {
-      visual.pips.setTexture(KEY.pips(tower.level - 1)).setVisible(true);
+    visual.upgrades = { ...tower.upgrades };
+    visual.damageType = tower.damageType;
+    if (visual.level !== tower.level) {
+      const bought = tower.level > visual.level;
+      const tier = getTowerStyleTier(tower.level);
+      const newStyle = tier !== visual.tier;
+      visual.level = tower.level;
+      visual.tier = tier;
+      visual.turret.setTexture(KEY.turret(visual.player, tier));
+      if (bought) {
+        this.playLevelUp(visual, newStyle);
+      }
+    }
+    // Pips show progress towards the next style tier (0 to 2); the top tier has nothing left to earn.
+    const progress = visual.tier >= TOWER_STYLE_TIERS - 1 ? 0 : (tower.level - 1) % TOWER_STYLE_TIER_SIZE;
+    if (progress >= 1) {
+      visual.pips.setTexture(KEY.pips(progress)).setVisible(true);
     } else {
       visual.pips.setVisible(false);
     }
@@ -913,6 +945,27 @@ class BattlefieldScene extends Phaser.Scene {
       const ratio = tower.maxHealth > 0 ? Math.max(0, Math.min(1, tower.health / tower.maxHealth)) : 0;
       visual.hpFill.setDisplaySize(Math.max(0, cellSize * 1.5 * ratio), cellSize * 0.2).setTint(hpColor(ratio));
     }
+  }
+
+  // The one free tower move: the tower glides to its new tile and settles with a small pop.
+  private glideTowerTo(visual: TowerVisual, x: number, y: number): void {
+    if (this.reducedMotion) {
+      visual.container.setPosition(x, y);
+      return;
+    }
+    this.fx?.puff(visual.container.x, visual.container.y, 0xd9d2c0, 0);
+    this.tweens.add({ targets: visual.container, x, y, duration: 350, ease: "Quad.InOut" });
+    this.tweens.add({ targets: visual.container, scale: 1.12, duration: 175, yoyo: true, delay: 100 });
+  }
+
+  private playLevelUp(visual: TowerVisual, newStyle: boolean): void {
+    this.fx?.shine(visual.baseX, visual.baseY, newStyle, 0);
+    this.fx?.floatText(visual.baseX, visual.baseY - this.cellSize * 1.4, newStyle ? "New style!" : "Level up", 0xf2b84b, 0);
+    if (this.reducedMotion) {
+      return;
+    }
+    visual.container.setScale(1);
+    this.tweens.add({ targets: visual.container, scale: newStyle ? 1.3 : 1.15, duration: 140, yoyo: true, ease: "Quad.Out" });
   }
 
   private playTowerPopAnimation(container: Phaser.GameObjects.Container): void {
@@ -1065,7 +1118,27 @@ class BattlefieldScene extends Phaser.Scene {
             const color = colorForPlayer(event.playerId);
             const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
             const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
-            fx.projectile(tower.baseX, tower.baseY, x, y, color, delay);
+            fx.projectile(tower.baseX, tower.baseY, x, y, color, delay, tower.tier);
+            tower.recoilUntil = now + delay + RECOIL_MS;
+            budget -= 1;
+          }
+          break;
+        }
+        case "tower-miss": {
+          const tower = this.towerVisuals.get(event.towerId);
+          const creature = this.creatureVisuals.get(event.creatureId);
+          if (tower) {
+            const color = colorForPlayer(event.playerId);
+            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
+            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
+            // The shot flies past the creature, offset sideways so a miss is visibly different from a hit.
+            const dx = x - tower.baseX;
+            const dy = y - tower.baseY;
+            const length = Math.max(1, Math.hypot(dx, dy));
+            const missX = x + (-dy / length) * cellSize * 0.9;
+            const missY = y + (dx / length) * cellSize * 0.9;
+            fx.projectile(tower.baseX, tower.baseY, missX, missY, color, delay, tower.tier);
+            fx.floatText(x, y - cellSize * 0.5, "miss", 0xcfc8b8, delay + 120);
             tower.recoilUntil = now + delay + RECOIL_MS;
             budget -= 1;
           }
@@ -1152,6 +1225,7 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
     render: { antialias: true }
   });
 
+  let destroyed = false;
   const scene = new BattlefieldScene();
   scene.setOnCellClick(options.onCellClick);
   game.scene.add("battlefield", scene, true);
@@ -1176,8 +1250,15 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
       scene?.setPlacementContext(context);
     },
     destroy(): void {
-      scene.removeTooltip();
+      if (destroyed) {
+        return;
+      }
+      destroyed = true;
+      const canvas = game.canvas;
+      scene.removeListeners();
       game.destroy(true);
+      // Phaser removes the canvas on its next frame; a replacement game must not share the container with it.
+      canvas?.remove();
     }
   };
 }

@@ -21,11 +21,17 @@ import {
   type CreatureArchetype,
   isWithinCreatureAttackRange,
   getCreatureMovementSpeedUnits,
+  PATH_CELL_MAX_WEAR,
   getTowerRange,
+  isInSpawnProtection,
+  getWaveCreatureCount,
   getTowerUpgradeCost,
   MAX_TOWER_LEVEL,
   getWallCost,
   getWaveClearBonus,
+  getDamageAgainst,
+  DAMAGE_TYPES,
+  type DamageType,
   isValidTowerPlacement,
   isValidWallPlacement,
   type GameMap,
@@ -105,7 +111,8 @@ function getBuildableCoordinates(seed: number, count: number): Array<{ x: number
   return getPlaceableCellsNearSpawn(seed, count);
 }
 
-function createSinglePlayerWaveSimulation(seed: number): ReturnType<typeof createMatch> {
+// `damageType` is set before readying; tests that assert exact per-hit damage use a type that is neutral (x1) against the first runner.
+function createSinglePlayerWaveSimulation(seed: number, damageType?: DamageType): ReturnType<typeof createMatch> {
   const towerCoordinate = getBuildableCoordinate(seed);
   const simulation = createMatch({
     players: [{ id: "p1", name: "Alpha" }],
@@ -119,6 +126,10 @@ function createSinglePlayerWaveSimulation(seed: number): ReturnType<typeof creat
     y: towerCoordinate.y
   });
   assert.equal(placeTower.accepted, true);
+
+  if (damageType) {
+    assert.equal(simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType }).accepted, true);
+  }
 
   const ready = simulation.applyCommand({
     type: "ready-for-wave",
@@ -373,6 +384,7 @@ test("rejects overlapping tower placements", () => {
 
 test("rejects placements that newly block left-to-right path connectivity", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 3,
     seed: 0,
@@ -398,7 +410,8 @@ test("rejects placements that newly block left-to-right path connectivity", () =
       health: 100,
       maxHealth: 100,
       level: 1,
-      targetMode: "first"
+      upgrades: { range: 1, damage: 1, accuracy: 1 },
+      targetMode: "first", damageType: "physical"
     },
     {
       id: "t-2",
@@ -408,7 +421,8 @@ test("rejects placements that newly block left-to-right path connectivity", () =
       health: 100,
       maxHealth: 100,
       level: 1,
-      targetMode: "first"
+      upgrades: { range: 1, damage: 1, accuracy: 1 },
+      targetMode: "first", damageType: "physical"
     }
   ];
 
@@ -419,6 +433,7 @@ test("rejects placements that newly block left-to-right path connectivity", () =
 
 test("rejects walls that remove the last left-to-right route even when towers stay reachable", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 2,
     seed: 0,
@@ -432,7 +447,7 @@ test("rejects walls that remove the last left-to-right route even when towers st
     ]
   };
   const towers: Tower[] = [
-    { id: "t-1", playerId: "p1", x: 0, y: 1, health: 100, maxHealth: 100, level: 1, targetMode: "first" }
+    { id: "t-1", playerId: "p1", x: 0, y: 1, health: 100, maxHealth: 100, level: 1, upgrades: { range: 1, damage: 1, accuracy: 1 }, targetMode: "first", damageType: "physical" }
   ];
 
   const result = isValidWallPlacement({ playerId: "p1", x: 1, y: 0 }, [], towers, map);
@@ -442,6 +457,7 @@ test("rejects walls that remove the last left-to-right route even when towers st
 
 test("allows placements when an alternate path remains", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 3,
     seed: 0,
@@ -467,7 +483,8 @@ test("allows placements when an alternate path remains", () => {
       health: 100,
       maxHealth: 100,
       level: 1,
-      targetMode: "first"
+      upgrades: { range: 1, damage: 1, accuracy: 1 },
+      targetMode: "first", damageType: "physical"
     }
   ];
 
@@ -477,6 +494,7 @@ test("allows placements when an alternate path remains", () => {
 
 test("rejects wall placements that block all paths to a live tower", () => {
   const map: GameMap = {
+    schemaVersion: 1,
     width: 3,
     height: 3,
     seed: 0,
@@ -502,7 +520,8 @@ test("rejects wall placements that block all paths to a live tower", () => {
       health: 100,
       maxHealth: 100,
       level: 1,
-      targetMode: "first"
+      upgrades: { range: 1, damage: 1, accuracy: 1 },
+      targetMode: "first", damageType: "physical"
     }
   ];
 
@@ -622,13 +641,13 @@ test("upgrades tower in prep phase before ready and deducts deterministic cost",
   });
   assert.equal(placeTower.accepted, true);
 
-  const startingUpgradeCost = getTowerUpgradeCost(1);
+  const startingUpgradeCost = getTowerUpgradeCost("damage", 1);
   simulation.awardPoints("p1", startingUpgradeCost);
 
   const upgrade = simulation.applyCommand({
     type: "upgrade-tower",
     playerId: "p1",
-    towerId: "tower-p1"
+    towerId: "tower-p1", track: "damage"
   });
   assert.equal(upgrade.accepted, true);
   assert.equal(simulation.getSnapshot().phase, "placement");
@@ -651,17 +670,17 @@ test("rejects tower upgrade after the player readied while the phase is still pl
   });
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstTower.x, y: firstTower.y });
   simulation.applyCommand({ type: "place-tower", playerId: "p2", x: secondTower.x, y: secondTower.y });
-  simulation.awardPoints("p1", getTowerUpgradeCost(1));
-  simulation.awardPoints("p2", getTowerUpgradeCost(1));
+  simulation.awardPoints("p1", getTowerUpgradeCost("damage", 1));
+  simulation.awardPoints("p2", getTowerUpgradeCost("damage", 1));
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   assert.equal(simulation.getSnapshot().phase, "placement");
 
-  const late = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  const late = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
   assert.equal(late.accepted, false);
   assert.equal(late.reason, "player-already-ready-for-wave");
 
   // A player who has not readied yet is unaffected by the other player's ready.
-  const other = simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2" });
+  const other = simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2", track: "damage" });
   assert.equal(other.accepted, true);
 });
 
@@ -674,9 +693,9 @@ test("rejects tower upgrade during the wave phase", () => {
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: towerCoordinate.x, y: towerCoordinate.y });
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   assert.equal(simulation.getSnapshot().phase, "wave");
-  simulation.awardPoints("p1", getTowerUpgradeCost(1));
+  simulation.awardPoints("p1", getTowerUpgradeCost("damage", 1));
 
-  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
   assert.equal(upgrade.accepted, false);
   assert.equal(upgrade.reason, "upgrade-phase-not-active");
 });
@@ -714,7 +733,7 @@ test("rejects tower upgrade when player has insufficient points", () => {
   const upgrade = simulation.applyCommand({
     type: "upgrade-tower",
     playerId: "p1",
-    towerId: "tower-p1"
+    towerId: "tower-p1", track: "damage"
   });
   assert.equal(upgrade.accepted, false);
   assert.equal(upgrade.reason, "insufficient-points");
@@ -743,11 +762,11 @@ test("rejects tower upgrade for invalid target ownership", () => {
     x: secondTower.x,
     y: secondTower.y
   });
-  simulation.awardPoints("p2", getTowerUpgradeCost(1));
+  simulation.awardPoints("p2", getTowerUpgradeCost("damage", 1));
   const invalidOwnership = simulation.applyCommand({
     type: "upgrade-tower",
     playerId: "p2",
-    towerId: "tower-p1"
+    towerId: "tower-p1", track: "damage"
   });
   assert.equal(invalidOwnership.accepted, false);
   assert.equal(invalidOwnership.reason, "invalid-upgrade-target");
@@ -755,7 +774,7 @@ test("rejects tower upgrade for invalid target ownership", () => {
   const unknownTower = simulation.applyCommand({
     type: "upgrade-tower",
     playerId: "p2",
-    towerId: "tower-missing"
+    towerId: "tower-missing", track: "damage"
   });
   assert.equal(unknownTower.accepted, false);
   assert.equal(unknownTower.reason, "invalid-upgrade-target");
@@ -1129,6 +1148,29 @@ test("applies deterministic movement speed modifiers from path wear", () => {
   assert.equal(getCreatureMovementSpeedUnits(99), 40);
 });
 
+test("raises path wear on a lane cell when a creature walks onto it during the wave", () => {
+  const simulation = createSinglePlayerWaveSimulation(48);
+  let steppedCell: { x: number; y: number } | undefined;
+
+  for (let step = 0; step < 200 && !steppedCell; step += 1) {
+    assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+    const movement = simulation.getSnapshot().events.find(
+      (event): event is Extract<MatchEvent, { type: "movement-resolved" }> =>
+        event.type === "movement-resolved" && event.steps.length > 0
+    );
+    const lastStep = movement?.steps[movement.steps.length - 1];
+    if (lastStep) {
+      steppedCell = { x: lastStep.toX, y: lastStep.toY };
+    }
+  }
+
+  assert.ok(steppedCell);
+  const cell = simulation.getSnapshot().map.cells.find((entry) => entry.x === steppedCell?.x && entry.y === steppedCell?.y);
+  assert.ok(cell);
+  assert.ok(cell.pathWear > 0);
+  assert.ok(cell.pathWear <= PATH_CELL_MAX_WEAR);
+});
+
 test("emits deterministic movement-resolved event payload and ordering", () => {
   const simulation = createSinglePlayerWaveSimulation(48);
 
@@ -1250,6 +1292,8 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
 
   const firstTower = getBuildableCoordinate(26);
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstTower.x, y: firstTower.y });
+  // Explosive is neutral against the runner, so it keeps its 3 hp long enough to still be the "first" target.
+  simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "explosive" });
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "first" });
@@ -1303,12 +1347,13 @@ test("last mode prefers lowest pathIndex", () => {
 });
 
 test("strongest mode resolves hp ties deterministically", () => {
+  // Seed picked so no tower shot misses before the tie: accuracy is now below 100%, so the rolled misses depend on the seed.
   const simulation = createMatch({
     players: [{ id: "p1", name: "Alpha" }],
-    seed: 28
+    seed: 30
   });
 
-  const firstTower = getBuildableCoordinate(28);
+  const firstTower = getBuildableCoordinate(30);
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstTower.x, y: firstTower.y });
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
 
@@ -1371,7 +1416,7 @@ test("target assignment snapshots and events are reproducible across equal runs"
 });
 
 test("emits hit events and reduces creature hp deterministically", () => {
-  const simulation = createSinglePlayerWaveSimulation(31);
+  const simulation = createSinglePlayerWaveSimulation(31, "explosive");
 
   advanceToFirstTargetableTick(simulation);
 
@@ -1405,7 +1450,8 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
   advanceToFirstTargetableTick(simulation);
-  advanceWaveTick(simulation);
+  // Accuracy is below 100%, so the kill lands a few ticks later depending on the rolled misses.
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 12);
 
   const snapshot = simulation.getSnapshot();
   const defeatedEvents = snapshot.events.filter((event) => event.type === "creature-defeated");
@@ -1424,6 +1470,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
 });
 
 test("resolves same-target multi-tower combat in deterministic towerId order", () => {
+  // Seed picked so the shots land in the order the assertions describe: hits and misses depend on the seed.
   const runScenario = (): {
     events: {
       hitEvents: Array<{ towerId: string; creatureId: string; remainingHp: number }>;
@@ -1431,14 +1478,14 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     };
     players: Array<{ id: string; points: number }>;
   } => {
-    const firstTower = getBuildableCoordinate(49);
-    const secondTower = getSecondBuildableCoordinate(49, firstTower);
+    const firstTower = getBuildableCoordinate(29);
+    const secondTower = getSecondBuildableCoordinate(29, firstTower);
     const simulation = createMatch({
       players: [
         { id: "p2", name: "Beta" },
         { id: "p1", name: "Alpha" }
       ],
-      seed: 49
+      seed: 29
     });
 
     simulation.applyCommand({
@@ -1453,6 +1500,9 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
       x: secondTower.x,
       y: secondTower.y
     });
+    // Explosive is neutral against the runner, so the 3 hp runner still needs three hits as the assertions below describe.
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "explosive" });
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p2", towerId: "tower-p2", damageType: "explosive" });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
 
@@ -1460,7 +1510,8 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     simulation.applyCommand({ type: "set-target-mode", playerId: "p2", towerId: "tower-p2", mode: "first" });
 
     advanceToFirstTargetableTick(simulation);
-  advanceWaveTick(simulation);
+  // Accuracy is below 100%, so the kill lands a few ticks later depending on the rolled misses.
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "creature-defeated"), 12);
 
     const snapshot = simulation.getSnapshot();
     const hitEvents = snapshot.events.filter((event) => event.type === "tower-hit");
@@ -1598,7 +1649,8 @@ test("creature tower selection among in-range towers breaks ties by distance, th
     health,
     maxHealth: 100,
     level: 1,
-    targetMode: "first"
+    upgrades: { range: 1, damage: 1, accuracy: 1 },
+    targetMode: "first", damageType: "physical"
   });
   const towers = (...entries: Tower[]): Map<string, Tower> => new Map(entries.map((entry) => [entry.id, entry]));
   // "tower-missing" means no sticky target, like after the assigned tower died.
@@ -1891,6 +1943,10 @@ test("selects deterministic wall targets and emits wall-hit events", () => {
       x: towerCoordinate.x,
       y: towerCoordinate.y
     }).accepted,
+    true
+  );
+  assert.equal(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "explosive" }).accepted,
     true
   );
   assert.equal(simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" }).accepted, true);
@@ -2350,14 +2406,14 @@ test("exports deterministic balance-analysis snapshot with expected wave and eco
     true
   );
 
-  simulation.awardPoints("p1", getWallCost(0) + getTowerUpgradeCost(1));
+  simulation.awardPoints("p1", getWallCost(0) + getTowerUpgradeCost("damage", 1));
   simulation.awardPoints("p2", getWallCost(1));
 
   assert.equal(
     simulation.applyCommand({
       type: "upgrade-tower",
       playerId: "p1",
-      towerId: "tower-p1"
+      towerId: "tower-p1", track: "damage"
     }).accepted,
     true
   );
@@ -2414,8 +2470,8 @@ test("exports deterministic balance-analysis snapshot with expected wave and eco
 
   const expectedP1SpendWalls = getWallCost(0);
   const expectedP2SpendWalls = getWallCost(1);
-  const expectedP1SpendUpgrades = getTowerUpgradeCost(1);
-  const baselineP1Awarded = getWallCost(0) + getTowerUpgradeCost(1);
+  const expectedP1SpendUpgrades = getTowerUpgradeCost("damage", 1);
+  const baselineP1Awarded = getWallCost(0) + getTowerUpgradeCost("damage", 1);
   const baselineP2Awarded = getWallCost(1);
 
   const p1 = exportSnapshot.players.find((player) => player.playerId === "p1");
@@ -2484,9 +2540,9 @@ test("balance-analysis export snapshots are deterministic across equivalent runs
     simulation.applyCommand({ type: "place-tower", playerId: "p2", x: secondTower.x, y: secondTower.y });
 
     simulation.awardPoints("p1", getWallCost(0));
-    simulation.awardPoints("p2", getWallCost(1) + getTowerUpgradeCost(1));
+    simulation.awardPoints("p2", getWallCost(1) + getTowerUpgradeCost("damage", 1));
 
-    simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2" });
+    simulation.applyCommand({ type: "upgrade-tower", playerId: "p2", towerId: "tower-p2", track: "damage" });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
     simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
 
@@ -2721,11 +2777,6 @@ type TargetMode = "first" | "last" | "strongest" | "nearest";
 
 // Creatures cannot be targeted for their first SPAWN_PROTECTION_TICKS ticks, so the first creature is
 // shootable on the tick after the protected ones. Wave ticks start at 1 and creature 1 spawns on tick 1.
-// A runner outlives the first volley, so kill assertions need one more tick of tower fire.
-function advanceWaveTick(simulation: ReturnType<typeof createMatch>): void {
-  simulation.applyCommand({ type: "advance-wave" });
-}
-
 function advanceToFirstTargetableTick(simulation: ReturnType<typeof createMatch>): void {
   for (let tick = 0; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
@@ -2777,9 +2828,9 @@ function firstTickTarget(
   const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y });
   for (let level = 1; level <= upgrades; level += 1) {
-    simulation.awardPoints("p1", getTowerUpgradeCost(level));
+    simulation.awardPoints("p1", getTowerUpgradeCost("range", level));
     assert.equal(
-      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" }).accepted,
+      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" }).accepted,
       true
     );
   }
@@ -3404,7 +3455,7 @@ test("keeps walls combat-only and upgrades prep-only after the target-mode chang
 
   simulation.awardPoints("p1", 200);
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
-  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  const upgrade = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
   assert.equal(upgrade.reason, "upgrade-phase-not-active");
 });
 
@@ -3413,13 +3464,13 @@ test("upgrades up to MAX_TOWER_LEVEL, then rejects with tower-max-level and char
   // 80 + 128 + 204 + 327: the full cost of going from level 1 to the cap.
   let total = 0;
   for (let level = 1; level < MAX_TOWER_LEVEL; level += 1) {
-    total += getTowerUpgradeCost(level);
+    total += getTowerUpgradeCost("damage", level);
   }
   simulation.awardPoints("p1", total);
 
   for (let level = 1; level < MAX_TOWER_LEVEL; level += 1) {
     assert.equal(
-      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" }).accepted,
+      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" }).accepted,
       true,
       `upgrade from level ${level} should be accepted`
     );
@@ -3429,10 +3480,471 @@ test("upgrades up to MAX_TOWER_LEVEL, then rejects with tower-max-level and char
 
   simulation.awardPoints("p1", 500);
   const pointsBefore = simulation.getSnapshot().players[0]?.points;
-  const rejected = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1" });
+  const rejected = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
 
   assert.equal(rejected.accepted, false);
   assert.equal(rejected.reason, "tower-max-level");
   assert.equal(simulation.getSnapshot().towers[0]?.level, MAX_TOWER_LEVEL);
   assert.equal(simulation.getSnapshot().players[0]?.points, pointsBefore);
+});
+
+test("each upgrade track is bought and priced on its own and leaves the others alone", () => {
+  const simulation = createPrepMatchWithTower(15);
+  simulation.awardPoints("p1", 400);
+
+  for (const track of ["range", "damage", "accuracy"] as const) {
+    const before = simulation.getSnapshot().players[0]?.points ?? 0;
+    const result = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track });
+    assert.equal(result.accepted, true, track);
+    assert.equal(simulation.getSnapshot().players[0]?.points, before - getTowerUpgradeCost(track, 1), track);
+  }
+
+  const tower = simulation.getSnapshot().towers[0];
+  assert.deepEqual(tower?.upgrades, { range: 2, damage: 2, accuracy: 2 });
+  assert.equal(tower?.level, 4);
+
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "accuracy" });
+  assert.deepEqual(simulation.getSnapshot().towers[0]?.upgrades, { range: 2, damage: 2, accuracy: 3 });
+});
+
+test("a track at max level is rejected while the other tracks can still be upgraded", () => {
+  const simulation = createPrepMatchWithTower(15);
+  let total = 0;
+  for (let level = 1; level < MAX_TOWER_LEVEL; level += 1) {
+    total += getTowerUpgradeCost("accuracy", level);
+  }
+  simulation.awardPoints("p1", total + 500);
+  for (let level = 1; level < MAX_TOWER_LEVEL; level += 1) {
+    assert.equal(
+      simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "accuracy" }).accepted,
+      true
+    );
+  }
+
+  const pointsBefore = simulation.getSnapshot().players[0]?.points;
+  const rejected = simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "accuracy" });
+  assert.deepEqual(rejected, { accepted: false, reason: "tower-max-level" });
+  assert.equal(simulation.getSnapshot().players[0]?.points, pointsBefore);
+
+  assert.equal(
+    simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" }).accepted,
+    true
+  );
+});
+
+test("an unknown upgrade track is rejected and costs nothing", () => {
+  const simulation = createPrepMatchWithTower(15);
+  simulation.awardPoints("p1", 200);
+  const result = simulation.applyCommand({
+    type: "upgrade-tower",
+    playerId: "p1",
+    towerId: "tower-p1",
+    track: "speed" as unknown as "range"
+  });
+  assert.deepEqual(result, { accepted: false, reason: "invalid-upgrade-track" });
+  assert.equal(simulation.getSnapshot().players[0]?.points, 200);
+});
+
+test("range upgrades extend reach and damage upgrades raise damage per shot, independently", () => {
+  const seed = 40;
+  const outOfRange = findTowerCellAtDistance(seed, getTowerRange(1), getTowerRange(2));
+  assert.equal(firstTickTarget(seed, outOfRange, "first", 0), null);
+  assert.ok(firstTickTarget(seed, outOfRange, "first", 1));
+
+  const simulation = createPrepMatchWithTower(31);
+  // The first target is a runner; explosive is neutral against it, so damage level 3 shows as exactly 3.
+  simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "explosive" });
+  simulation.awardPoints("p1", getTowerUpgradeCost("damage", 1) + getTowerUpgradeCost("damage", 2));
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "tower-hit"), 60);
+  const hit = simulation.getSnapshot().events.find((event) => event.type === "tower-hit");
+  assert.equal(hit?.type === "tower-hit" ? hit.damage : 0, 3);
+});
+
+test("shots can miss at base accuracy, deterministically, and never at max accuracy", () => {
+  const run = (accuracyLevel: number): { hits: number; misses: number; firstMiss: string } => {
+    const simulation = createPrepMatchWithTower(31);
+    const tower = (simulation as unknown as { state: { towers: Tower[] } }).state.towers[0];
+    assert.ok(tower);
+    tower.upgrades.accuracy = accuracyLevel;
+    simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+    tickUntil(simulation, () => simulation.getSnapshot().phase !== "wave", 400);
+    const events = simulation.getSnapshot().events;
+    const misses = events.filter((event) => event.type === "tower-miss");
+    return {
+      hits: events.filter((event) => event.type === "tower-hit").length,
+      misses: misses.length,
+      firstMiss: JSON.stringify(misses[0] ?? null)
+    };
+  };
+
+  const base = run(1);
+  assert.ok(base.hits > 0);
+  assert.ok(base.misses > 0, "a 70% tower should miss at least once in a whole wave");
+  assert.deepEqual(run(1), base);
+
+  const max = run(MAX_TOWER_LEVEL);
+  assert.equal(max.misses, 0);
+  assert.ok(max.hits > 0);
+});
+
+test("a miss deals no damage and carries the creature cell", () => {
+  const simulation = createPrepMatchWithTower(31);
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "tower-miss"), 400);
+  const events = simulation.getSnapshot().events;
+  const miss = events.find((event) => event.type === "tower-miss");
+  assert.ok(miss && miss.type === "tower-miss");
+  assert.equal(typeof miss.x, "number");
+  assert.equal(events.some((event) => event.type === "tower-hit" && event.tick === miss.tick && event.towerId === miss.towerId), false);
+});
+
+test("creaturesToSpawn counts down during a wave and previews the next wave in prep", () => {
+  const simulation = createPrepMatchWithTower(31);
+  assert.equal(simulation.getSnapshot().creaturesToSpawn, getWaveCreatureCount(1));
+
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().creaturesToSpawn, getWaveCreatureCount(1));
+  const seen: number[] = [];
+  tickUntil(
+    simulation,
+    () => {
+      const snapshot = simulation.getSnapshot();
+      if (snapshot.phase === "wave") {
+        seen.push(snapshot.creaturesToSpawn);
+      }
+      return snapshot.phase !== "wave";
+    },
+    400
+  );
+  assert.equal(Math.min(...seen), 0);
+  assert.ok(seen.every((value, index) => index === 0 || value <= (seen[index - 1] ?? Infinity)), "never goes back up mid-wave");
+  assert.ok(seen.includes(getWaveCreatureCount(1) - 1), "passes through partial counts");
+
+  const afterWave = simulation.getSnapshot();
+  assert.equal(afterWave.phase, "placement");
+  assert.equal(afterWave.wave, 2);
+  assert.equal(afterWave.creaturesToSpawn, getWaveCreatureCount(2));
+});
+
+// The move unlocks after 5 completed rounds; tests jump straight to the prep of wave 6 instead of playing 5 waves.
+function jumpToWave(simulation: ReturnType<typeof createMatch>, wave: number): void {
+  (simulation as unknown as { state: { wave: number } }).state.wave = wave;
+}
+
+function freeCellAwayFrom(seed: number, taken: { x: number; y: number }): { x: number; y: number } {
+  const cell = getPlaceableCellsNearSpawn(seed, 3).find((entry) => entry.x !== taken.x || entry.y !== taken.y);
+  assert.ok(cell);
+  return cell;
+}
+
+test("moving a tower is locked until 5 rounds are done, and a rejected move keeps the token", () => {
+  const simulation = createPrepMatchWithTower(31);
+  const tower = simulation.getSnapshot().towers[0];
+  assert.ok(tower);
+  const target = freeCellAwayFrom(31, tower);
+
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, false);
+  for (const wave of [1, 5]) {
+    jumpToWave(simulation, wave);
+    const result = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: target.x, y: target.y });
+    assert.deepEqual(result, { accepted: false, reason: "tower-move-locked" }, `wave ${wave}`);
+  }
+
+  jumpToWave(simulation, 6);
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, true);
+  const bad = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: tower.x, y: tower.y });
+  assert.deepEqual(bad, { accepted: false, reason: "tower-overlap" });
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, true);
+});
+
+test("the free move relocates the tower, keeps its progress, emits an event and is used up", () => {
+  const simulation = createPrepMatchWithTower(31);
+  simulation.awardPoints("p1", 200);
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" });
+  simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "strongest" });
+  const before = simulation.getSnapshot().towers[0];
+  assert.ok(before);
+  const target = freeCellAwayFrom(31, before);
+
+  jumpToWave(simulation, 6);
+  const result = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: target.x, y: target.y });
+  assert.deepEqual(result, { accepted: true });
+
+  const after = simulation.getSnapshot();
+  const moved = after.towers[0];
+  assert.deepEqual({ x: moved?.x, y: moved?.y }, target);
+  assert.deepEqual(moved?.upgrades, before.upgrades);
+  assert.equal(moved?.level, before.level);
+  assert.equal(moved?.targetMode, "strongest");
+  assert.equal(moved?.health, before.health);
+  assert.deepEqual(after.players[0]?.tower, { playerId: "p1", x: target.x, y: target.y });
+  assert.equal(after.players[0]?.towerMoveAvailable, false);
+  assert.ok(after.events.some((event) => event.type === "tower-moved" && event.fromX === before.x && event.x === target.x && event.towerId === "tower-p1"));
+
+  const second = simulation.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: before.x, y: before.y });
+  assert.deepEqual(second, { accepted: false, reason: "tower-move-used" });
+});
+
+test("a move follows the placement rules and needs prep, before ready, and the player's own tower", () => {
+  const [firstCell, secondCell] = getBuildableCoordinates(10, 2);
+  assert.ok(firstCell && secondCell);
+  const simulation = createMatch({
+    players: [{ id: "p1", name: "Alpha" }, { id: "p2", name: "Beta" }],
+    seed: 10
+  });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstCell.x, y: firstCell.y });
+  simulation.applyCommand({ type: "place-tower", playerId: "p2", x: secondCell.x, y: secondCell.y });
+  jumpToWave(simulation, 6);
+  const move = (x: number, y: number, playerId = "p1", towerId = "tower-p1") =>
+    simulation.applyCommand({ type: "move-tower", playerId, towerId, x, y });
+
+  assert.equal(move(-1, 0).reason, "out-of-bounds");
+  assert.equal(move(getNonBuildableCoordinate(10).x, getNonBuildableCoordinate(10).y).reason, "cell-not-buildable");
+  const map = simulation.getSnapshot().map;
+  const protectedCell = map.cells.find((cell) => cell.buildable && isInSpawnProtection(map, cell.x, cell.y));
+  assert.ok(protectedCell, "expected a buildable cell inside the cave's protected area");
+  assert.equal(move(protectedCell.x, protectedCell.y).reason, "spawn-protected");
+  assert.equal(move(secondCell.x, secondCell.y).reason, "tower-overlap");
+  assert.equal(move(5, 5, "p1", "tower-p2").reason, "invalid-move-target");
+  assert.equal(move(5, 5, "p1", "tower-missing").reason, "invalid-move-target");
+
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(move(firstCell.x, firstCell.y + 1).reason, "player-already-ready-for-wave");
+  // The flag means "usable right now", so it drops once the player is ready.
+  assert.equal(simulation.getSnapshot().players[0]?.towerMoveAvailable, false);
+  assert.equal(simulation.getSnapshot().players[1]?.towerMoveAvailable, true);
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p2" });
+  assert.equal(simulation.getSnapshot().phase, "wave");
+  assert.equal(move(firstCell.x, firstCell.y + 1).reason, "move-phase-not-active");
+});
+
+// Damage types (#16)
+
+function archetypeOfCreature(events: MatchEvent[], creatureId: string): CreatureArchetype {
+  const spawned = events.find((event) => event.type === "creature-spawned" && event.creatureId === creatureId);
+  assert.ok(spawned && spawned.type === "creature-spawned");
+  return spawned.archetype;
+}
+
+function runWaveWithDamageType(damageType: DamageType, damageLevel = 1): ReturnType<typeof createMatch> {
+  const simulation = createPrepMatchWithTower(31);
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType }),
+    { accepted: true }
+  );
+  const tower = (simulation as unknown as { state: { towers: Tower[] } }).state.towers[0];
+  assert.ok(tower);
+  tower.upgrades.damage = damageLevel;
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  tickUntil(simulation, () => simulation.getSnapshot().phase !== "wave", 400);
+  return simulation;
+}
+
+test("a new tower is physical and the snapshot carries its damage type", () => {
+  const simulation = createPrepMatchWithTower(15);
+  assert.equal(simulation.getSnapshot().towers[0]?.damageType, "physical");
+});
+
+test("each damage type against each archetype: tower-hit damage matches the multiplier table, minimum 1", () => {
+  const seen = new Set<string>();
+  for (const damageType of DAMAGE_TYPES) {
+    for (const damageLevel of [1, 3]) {
+      const events = runWaveWithDamageType(damageType, damageLevel).getSnapshot().events;
+      const hits = events.filter((event): event is Extract<MatchEvent, { type: "tower-hit" }> => event.type === "tower-hit");
+      assert.ok(hits.length > 0);
+      for (const hit of hits) {
+        const archetype = archetypeOfCreature(events, hit.creatureId);
+        seen.add(`${damageType}:${archetype}`);
+        assert.equal(hit.damage, getDamageAgainst(damageLevel, damageType, archetype), `${damageType} L${damageLevel} vs ${archetype}`);
+        assert.equal(hit.damageType, damageType);
+        assert.ok(hit.damage >= 1);
+      }
+    }
+  }
+  assert.ok(seen.size >= 9, `expected hits for several type/archetype pairs, saw ${[...seen].join(",")}`);
+});
+
+test("telemetry towerDamageDealt equals the damage of the tower-hit events for every type", () => {
+  for (const damageType of DAMAGE_TYPES) {
+    const snapshot = runWaveWithDamageType(damageType, 2).getSnapshot();
+    const fromEvents = snapshot.events.reduce((total, event) => total + (event.type === "tower-hit" ? event.damage : 0), 0);
+    assert.ok(fromEvents > 0);
+    assert.equal(snapshot.telemetry.completedWaves[0]?.towerDamageDealt, fromEvents);
+  }
+});
+
+test("the same seed and damage type replay identically", () => {
+  const first = JSON.stringify(runWaveWithDamageType("magic", 2).getSnapshot().events);
+  const second = JSON.stringify(runWaveWithDamageType("magic", 2).getSnapshot().events);
+  assert.equal(first, second);
+});
+
+test("set-damage-type is accepted in prep before ready, and the type persists into the wave", () => {
+  const simulation = createPrepMatchWithTower(15);
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "explosive" }),
+    { accepted: true }
+  );
+  assert.equal(simulation.getSnapshot().towers[0]?.damageType, "explosive");
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().towers[0]?.damageType, "explosive");
+});
+
+test("set-damage-type is rejected during the wave and for bad input, each with its own reason", () => {
+  const simulation = createPrepMatchWithTower(15);
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p9", towerId: "tower-p1", damageType: "magic" }),
+    { accepted: false, reason: "unknown-player" }
+  );
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "nope", damageType: "magic" }),
+    { accepted: false, reason: "invalid-damage-type-target" }
+  );
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "fire" as unknown as DamageType }),
+    { accepted: false, reason: "invalid-damage-type" }
+  );
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().phase, "wave");
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" }),
+    { accepted: false, reason: "damage-type-phase-not-active" }
+  );
+  assert.equal(simulation.getSnapshot().towers[0]?.damageType, "physical");
+});
+
+test("set-damage-type is rejected once the player is ready while others still prepare, and for another player's tower", () => {
+  const seed = 31;
+  const [a, b] = getBuildableCoordinates(seed, 2);
+  assert.ok(a && b);
+  const simulation = createMatch({ players: [{ id: "p1", name: "A" }, { id: "p2", name: "B" }], seed });
+  simulation.applyCommand({ type: "place-tower", playerId: "p1", x: a.x, y: a.y });
+  simulation.applyCommand({ type: "place-tower", playerId: "p2", x: b.x, y: b.y });
+  simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  assert.equal(simulation.getSnapshot().phase, "placement");
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" }),
+    { accepted: false, reason: "player-already-ready-for-wave" }
+  );
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p2", towerId: "tower-p1", damageType: "magic" }),
+    { accepted: false, reason: "invalid-damage-type-target" }
+  );
+  assert.deepEqual(
+    simulation.applyCommand({ type: "set-damage-type", playerId: "p2", towerId: "tower-p2", damageType: "magic" }),
+    { accepted: true }
+  );
+});
+
+test("a snapshot is a copy: later upgrades do not change an earlier snapshot's tower", () => {
+  const simulation = createPrepMatchWithTower(15);
+  simulation.awardPoints("p1", 200);
+  const before = simulation.getSnapshot();
+  simulation.applyCommand({ type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "damage" });
+  assert.deepEqual(before.towers[0]?.upgrades, { range: 1, damage: 1, accuracy: 1 });
+  assert.equal(before.towers[0]?.level, 1);
+  assert.deepEqual(simulation.getSnapshot().towers[0]?.upgrades, { range: 1, damage: 2, accuracy: 1 });
+});
+
+test("when the route is recomputed mid-wave, live creatures stay on their own cell", () => {
+  const simulation = createSinglePlayerWaveSimulation(31);
+  tickUntil(simulation, () => simulation.getSnapshot().creatures.length > 0 && simulation.getSnapshot().waveTick > 12, 60);
+  const internals = simulation as unknown as {
+    state: { creatures: Array<{ x: number; y: number; pathIndex: number }> };
+    currentWavePath: Array<{ x: number; y: number }>;
+    refreshCreatureRoute(): void;
+  };
+  const creature = internals.state.creatures[0];
+  assert.ok(creature && creature.pathIndex > 0);
+  const cell = { x: creature.x, y: creature.y };
+  // A stale index (as after a route change) must be re-anchored to the creature's own position on the new route.
+  creature.pathIndex = 0;
+  internals.refreshCreatureRoute();
+  const anchored = internals.currentWavePath[creature.pathIndex];
+  assert.deepEqual({ x: anchored?.x, y: anchored?.y }, cell);
+});
+
+test("a creature cut off from its route cell is re-anchored by walking distance and moved onto the new route", () => {
+  const simulation = createSinglePlayerWaveSimulation(31);
+  tickUntil(simulation, () => simulation.getSnapshot().creatures.length > 0 && simulation.getSnapshot().waveTick > 12, 60);
+  const internals = simulation as unknown as {
+    state: {
+      creatures: Array<{ x: number; y: number; pathIndex: number; pathProgressUnits: number }>;
+      walls: Array<{ id: string; playerId: string; x: number; y: number; hp: number; maxHp: number }>;
+    };
+    currentWavePath: Array<{ x: number; y: number }>;
+    refreshCreatureRoute(): void;
+  };
+  const snapshot = simulation.getSnapshot();
+  const walkable = new Set(snapshot.map.cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
+  const towers = new Set(snapshot.towers.map((tower) => `${tower.x},${tower.y}`));
+  const walkingDistance = (from: { x: number; y: number }, to: { x: number; y: number }, wall: { x: number; y: number }): number => {
+    const seen = new Map<string, number>([[`${from.x},${from.y}`, 0]]);
+    const queue = [from];
+    for (let i = 0; i < queue.length; i += 1) {
+      const cell = queue[i]!;
+      const dist = seen.get(`${cell.x},${cell.y}`)!;
+      if (cell.x === to.x && cell.y === to.y) {
+        return dist;
+      }
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const next = { x: cell.x + dx, y: cell.y + dy };
+        const key = `${next.x},${next.y}`;
+        if (walkable.has(key) && !towers.has(key) && key !== `${wall.x},${wall.y}` && !seen.has(key)) {
+          seen.set(key, dist + 1);
+          queue.push(next);
+        }
+      }
+    }
+    return Number.POSITIVE_INFINITY;
+  };
+
+  const creature = internals.state.creatures[0]!;
+  const original = [...internals.currentWavePath];
+  let reanchored = 0;
+  // Block each route cell in turn; where the maze offers a detour, the cells it bypasses leave the route.
+  for (let blockIndex = 2; blockIndex < original.length - 2; blockIndex += 1) {
+    const blocked = original[blockIndex]!;
+    internals.state.walls = [{ id: "wall-test", playerId: "p1", x: blocked.x, y: blocked.y, hp: 1, maxHp: 1 }];
+    internals.refreshCreatureRoute();
+    const detour = new Set(internals.currentWavePath.map((cell) => `${cell.x},${cell.y}`));
+    const bypassed = original.slice(blockIndex + 1).find((cell) => !detour.has(`${cell.x},${cell.y}`));
+    if (!bypassed) {
+      continue;
+    }
+    // Put the creature on a cell the detour no longer uses, then recompute the route as a destroyed wall would.
+    internals.state.walls = [];
+    internals.refreshCreatureRoute();
+    internals.state.walls = [{ id: "wall-test", playerId: "p1", x: blocked.x, y: blocked.y, hp: 1, maxHp: 1 }];
+    Object.assign(creature, { x: bypassed.x, y: bypassed.y, pathProgressUnits: 500 });
+    internals.refreshCreatureRoute();
+    const anchor = internals.currentWavePath[creature.pathIndex]!;
+    assert.deepEqual({ x: creature.x, y: creature.y }, { x: anchor.x, y: anchor.y }, "x/y follow the new anchor");
+    assert.equal(creature.pathProgressUnits, 0, "progress resets when the creature moves to another cell");
+    const nearestByWalking = Math.min(
+      ...internals.currentWavePath.map((cell) => walkingDistance(bypassed, cell, blocked))
+    );
+    assert.equal(walkingDistance(bypassed, anchor, blocked), nearestByWalking, "anchor is the closest route cell by walking distance");
+    reanchored += 1;
+    internals.state.walls = [];
+    internals.refreshCreatureRoute();
+  }
+  assert.ok(reanchored > 0, "expected the maze to offer at least one detour");
+});
+
+test("move-tower and set-damage-type reject eliminated players", () => {
+  const eliminated = createPrepMatchWithTower(31);
+  jumpToWave(eliminated, 6);
+  (eliminated as unknown as { state: { players: Array<{ eliminated: boolean }> } }).state.players[0]!.eliminated = true;
+  assert.equal(
+    eliminated.applyCommand({ type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 5, y: 5 }).reason,
+    "player-eliminated"
+  );
+  assert.equal(
+    eliminated.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" }).reason,
+    "player-eliminated"
+  );
 });

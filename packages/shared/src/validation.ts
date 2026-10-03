@@ -1,11 +1,9 @@
 import { getMapCell, isInSpawnProtection, type GameMap } from "./map-types.js";
-import { TOWER_TARGET_MODES, type Tower, type TowerTargetMode } from "./tower-types.js";
+import { DAMAGE_TYPES, TOWER_TARGET_MODES, UPGRADE_TRACKS, type DamageType, type Tower, type TowerTargetMode, type UpgradeTrack } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
 import type { TowerPlacement, CommandRejectReason } from "./match-types.js";
 import {
-  BASE_TOWER_UPGRADE_COST,
   BASE_WALL_COST,
-  TOWER_UPGRADE_COST_GROWTH,
   WALL_COST_GROWTH
 } from "./game-rules.js";
 
@@ -236,9 +234,13 @@ function checkPlacementPathSafety(
 export function validatePathSafety(
   placement: TowerPlacement,
   existingTowers: Tower[],
-  map: GameMap
+  map: GameMap,
+  existingWalls: Wall[] = []
 ): PathSafetyCheckResult {
   const blockedBefore = new Set<string>();
+  for (const wall of existingWalls) {
+    blockedBefore.add(toKey(wall.x, wall.y));
+  }
   for (const tower of existingTowers) {
     blockedBefore.add(toKey(tower.x, tower.y));
   }
@@ -271,10 +273,6 @@ export function getWallCost(existingWallCount: number): number {
   return Math.floor(BASE_WALL_COST * WALL_COST_GROWTH ** existingWallCount);
 }
 
-export function getTowerUpgradeCost(currentTowerLevel: number): number {
-  return Math.floor(BASE_TOWER_UPGRADE_COST * TOWER_UPGRADE_COST_GROWTH ** currentTowerLevel);
-}
-
 export function isValidTowerUpgradeTarget(
   towerId: string,
   playerId: string,
@@ -282,6 +280,14 @@ export function isValidTowerUpgradeTarget(
 ): boolean {
   const tower = existingTowers.find((entry) => entry.id === towerId);
   return tower ? tower.playerId === playerId : false;
+}
+
+export function isValidUpgradeTrack(track: unknown): track is UpgradeTrack {
+  return typeof track === "string" && (UPGRADE_TRACKS as readonly string[]).includes(track);
+}
+
+export function isValidDamageType(value: unknown): value is DamageType {
+  return typeof value === "string" && (DAMAGE_TYPES as readonly string[]).includes(value);
 }
 
 export function isValidTowerTargetMode(mode: string): mode is TowerTargetMode {
@@ -330,7 +336,8 @@ export function isValidWallPlacement(
 export function isValidTowerPlacement(
   placement: TowerPlacement,
   existingTowers: Tower[],
-  map: GameMap
+  map: GameMap,
+  existingWalls: Wall[] = []
 ): TowerPlacementValidationResult {
   const cell = getMapCell(map, placement.x, placement.y);
   if (!cell) {
@@ -350,7 +357,11 @@ export function isValidTowerPlacement(
     return { valid: false, reason: "tower-overlap" };
   }
 
-  const pathSafety = validatePathSafety(placement, existingTowers, map);
+  if (existingWalls.some((wall) => wall.x === placement.x && wall.y === placement.y)) {
+    return { valid: false, reason: "wall-overlap" };
+  }
+
+  const pathSafety = validatePathSafety(placement, existingTowers, map, existingWalls);
   if (!pathSafety.safe) {
     return pathSafety.reason
       ? { valid: false, reason: pathSafety.reason }

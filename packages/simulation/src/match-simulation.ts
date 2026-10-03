@@ -3,17 +3,22 @@ import {
   isWithinCreatureAttackRange,
   getCreatureBaseHp,
   getCreatureRewardPoints,
+  DEFAULT_DAMAGE_TYPE,
   DEFAULT_TOWER_TARGET_MODE,
   DEFAULT_TOWER_HEALTH,
   DEFAULT_WALL_HEALTH,
   GAME_RULES,
   PATH_CELL_MAX_WEAR,
   BETWEEN_WAVE_PATH_WEAR_REPAIR,
+  PATH_WEAR_PER_TRAVERSAL,
   MOVEMENT_PROGRESS_UNITS_PER_CELL,
   getBetweenWaveTowerRepairAmount,
   getBetweenWaveWallRepairAmount,
   getCreatureMovementSpeedUnits,
+  BASE_TOWER_UPGRADES,
+  getTowerAccuracy,
   getTowerDamage,
+  getTowerOverallLevel,
   getTowerRange,
   SPAWN_PROTECTION_TICKS,
   type CommandResult,
@@ -36,15 +41,27 @@ import {
   getWallCost,
   getTowerUpgradeCost,
   getWaveClearBonus,
+  getCatchUpBonus,
+  type CreatureArchetype,
+  SWARM_KILL_INCOME_CAP_PER_WAVE,
+  getWaveCreatureArchetype,
+  getWaveCreatureCount,
+  WAVE_SPAWN_INTERVAL_TICKS,
+  getDamageAgainst,
+  isValidDamageType,
   isValidTowerPlacement,
   isValidTowerTargetMode,
   isValidTowerUpgradeTarget,
+  isValidUpgradeTrack,
   MAX_TOWER_LEVEL,
+  TOWER_MOVE_AFTER_WAVES,
   isValidWallPlacement,
   WIN_SCORE,
+  validateGameMap,
 } from "@tower-defense/shared";
 
 import { generateMap } from "./procedural-map.js";
+import { rollShot } from "./shot-roll.js";
 
 interface InternalMatchState {
   phase: "placement" | "wave" | "ended";
@@ -66,6 +83,11 @@ interface InternalMatchState {
   playerSpentOnUpgradesCurrentWave: Record<string, number>;
   playerWaveClearBonusTotal: Record<string, number>;
   playerWaveClearBonusCurrentWave: Record<string, number>;
+  playerCatchUpBonusTotal: Record<string, number>;
+  playerCatchUpBonusCurrentWave: Record<string, number>;
+  playerSwarmIncomeCurrentWave: Record<string, number>;
+  playerSwarmIncomeCappedTotal: Record<string, number>;
+  playerSwarmIncomeCappedCurrentWave: Record<string, number>;
   events: MatchEvent[];
   winnerId?: string;
   endReason?: "score-win" | "all-towers-destroyed";
@@ -75,8 +97,6 @@ interface WaveSpawnPlan {
   totalCreatures: number;
   spawnIntervalTicks: number;
 }
-
-const WAVE_SPAWN_ARCHETYPES: readonly Creature["archetype"][] = ["runner", "swarm", "armored", "tank"];
 
 function createEmptyKillsByArchetype(): TelemetryKillsByArchetype {
   return {
@@ -102,7 +122,9 @@ function createWaveTelemetrySnapshot(wave: number, tick: number): WaveTelemetryS
     wallDamageIntake: 0,
     towerRepairApplied: 0,
     wallRepairApplied: 0,
-    waveClearBonusAwarded: 0
+    waveClearBonusAwarded: 0,
+    catchUpBonusAwarded: 0,
+    swarmIncomeCapped: 0
   };
 }
 
@@ -127,7 +149,9 @@ function createEmptyCumulativeTelemetrySnapshot(): CumulativeTelemetrySnapshot {
     wallDamageIntake: 0,
     towerRepairApplied: 0,
     wallRepairApplied: 0,
-    waveClearBonusAwarded: 0
+    waveClearBonusAwarded: 0,
+    catchUpBonusAwarded: 0,
+    swarmIncomeCapped: 0
   };
 }
 
@@ -151,6 +175,8 @@ function accumulateWaveTelemetry(
   target.towerRepairApplied += waveTelemetry.towerRepairApplied;
   target.wallRepairApplied += waveTelemetry.wallRepairApplied;
   target.waveClearBonusAwarded += waveTelemetry.waveClearBonusAwarded;
+  target.catchUpBonusAwarded += waveTelemetry.catchUpBonusAwarded;
+  target.swarmIncomeCapped += waveTelemetry.swarmIncomeCapped;
 }
 
 function cloneCumulativeTelemetrySnapshot(snapshot: CumulativeTelemetrySnapshot): CumulativeTelemetrySnapshot {
@@ -168,9 +194,12 @@ function toCellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function getOpenPathForCreatures(map: GameMap, tower: Tower, walls: Wall[]): Array<{ x: number; y: number }> {
+// One shared lane: every live tower and wall is an obstacle, so the route cannot depend on the order of the towers.
+function getOpenPathForCreatures(map: GameMap, towers: Tower[], walls: Wall[]): Array<{ x: number; y: number }> {
   const blocked = new Set<string>();
-  blocked.add(toCellKey(tower.x, tower.y));
+  for (const tower of towers) {
+    blocked.add(toCellKey(tower.x, tower.y));
+  }
   for (const wall of walls) {
     blocked.add(toCellKey(wall.x, wall.y));
   }
@@ -261,6 +290,7 @@ export class MatchSimulation {
   private readonly state: InternalMatchState;
   private readonly currentWavePath: Array<{ x: number; y: number }> = [];
   private currentWaveSpawned = 0;
+  private readonly towerMovesUsed = new Set<string>();
 
   public constructor(setup: MatchSetup) {
     if (setup.players.length < GAME_RULES.minPlayers || setup.players.length > GAME_RULES.maxPlayers) {
@@ -269,11 +299,17 @@ export class MatchSimulation {
       );
     }
 
+    const map = setup.map ?? generateMap(setup.seed);
+    const mapErrors = validateGameMap(map);
+    if (mapErrors.length > 0) {
+      throw new Error(`invalid map: ${mapErrors.map((error) => `${error.code} (${error.message})`).join("; ")}`);
+    }
+
     this.state = {
       phase: "placement",
       wave: 1,
       waveTick: 0,
-      map: generateMap(setup.seed),
+      map,
       towers: [],
       walls: [],
       creatures: [],
@@ -291,6 +327,11 @@ export class MatchSimulation {
       playerSpentOnUpgradesCurrentWave: createPlayerCounterMap(setup.players),
       playerWaveClearBonusTotal: createPlayerCounterMap(setup.players),
       playerWaveClearBonusCurrentWave: createPlayerCounterMap(setup.players),
+      playerCatchUpBonusTotal: createPlayerCounterMap(setup.players),
+      playerCatchUpBonusCurrentWave: createPlayerCounterMap(setup.players),
+      playerSwarmIncomeCurrentWave: createPlayerCounterMap(setup.players),
+      playerSwarmIncomeCappedTotal: createPlayerCounterMap(setup.players),
+      playerSwarmIncomeCappedCurrentWave: createPlayerCounterMap(setup.players),
       events: [],
       players: setup.players.map((player) => ({
         id: player.id,
@@ -298,7 +339,8 @@ export class MatchSimulation {
         points: 0,
         hasPlacedTower: false,
         readyForWave: false,
-        eliminated: false
+        eliminated: false,
+        towerMoveAvailable: false
       }))
     };
   }
@@ -326,7 +368,7 @@ export class MatchSimulation {
         return { accepted: false, reason: "tower-already-placed" };
       }
 
-      const validation = isValidTowerPlacement(command, this.state.towers, this.state.map);
+      const validation = isValidTowerPlacement(command, this.state.towers, this.state.map, this.state.walls);
       if (!validation.valid) {
         return validation.reason
           ? { accepted: false, reason: validation.reason }
@@ -347,7 +389,9 @@ export class MatchSimulation {
         health: DEFAULT_TOWER_HEALTH,
         maxHealth: DEFAULT_TOWER_HEALTH,
         level: 1,
-        targetMode: DEFAULT_TOWER_TARGET_MODE
+        upgrades: { ...BASE_TOWER_UPGRADES },
+        targetMode: DEFAULT_TOWER_TARGET_MODE,
+        damageType: DEFAULT_DAMAGE_TYPE
       });
 
       return { accepted: true };
@@ -452,6 +496,69 @@ export class MatchSimulation {
       return { accepted: true };
     }
 
+    if (command.type === "move-tower") {
+      // Like upgrades, a move is a prep decision made before committing to the wave.
+      if (this.state.phase !== "placement") {
+        return { accepted: false, reason: "move-phase-not-active" };
+      }
+
+      const player = this.state.players.find((entry) => entry.id === command.playerId);
+      if (!player) {
+        return { accepted: false, reason: "unknown-player" };
+      }
+
+      if (player.eliminated) {
+        return { accepted: false, reason: "player-eliminated" };
+      }
+
+      if (player.readyForWave) {
+        return { accepted: false, reason: "player-already-ready-for-wave" };
+      }
+
+      const tower = this.state.towers.find((entry) => entry.id === command.towerId);
+      if (!tower || tower.playerId !== command.playerId) {
+        return { accepted: false, reason: "invalid-move-target" };
+      }
+
+      if (this.towerMovesUsed.has(player.id)) {
+        return { accepted: false, reason: "tower-move-used" };
+      }
+
+      if (this.state.wave <= TOWER_MOVE_AFTER_WAVES) {
+        return { accepted: false, reason: "tower-move-locked" };
+      }
+
+      // The tower's own cell is free to reuse in principle, but moving onto it would waste the token.
+      if (command.x === tower.x && command.y === tower.y) {
+        return { accepted: false, reason: "tower-overlap" };
+      }
+
+      const others = this.state.towers.filter((entry) => entry.id !== tower.id);
+      const validation = isValidTowerPlacement({ playerId: command.playerId, x: command.x, y: command.y }, others, this.state.map, this.state.walls);
+      if (!validation.valid) {
+        return validation.reason ? { accepted: false, reason: validation.reason } : { accepted: false };
+      }
+
+      const fromX = tower.x;
+      const fromY = tower.y;
+      tower.x = command.x;
+      tower.y = command.y;
+      player.tower = { playerId: command.playerId, x: command.x, y: command.y };
+      this.towerMovesUsed.add(player.id);
+      this.state.events.push({
+        type: "tower-moved",
+        wave: this.state.wave,
+        tick: this.state.waveTick,
+        towerId: tower.id,
+        playerId: tower.playerId,
+        fromX,
+        fromY,
+        x: command.x,
+        y: command.y
+      });
+      return { accepted: true };
+    }
+
     if (command.type === "upgrade-tower") {
       // Upgrades are a prep decision made before committing to the wave.
       if (this.state.phase !== "placement") {
@@ -480,11 +587,16 @@ export class MatchSimulation {
         return { accepted: false, reason: "invalid-upgrade-target" };
       }
 
-      if (tower.level >= MAX_TOWER_LEVEL) {
+      const track = command.track;
+      if (!isValidUpgradeTrack(track)) {
+        return { accepted: false, reason: "invalid-upgrade-track" };
+      }
+
+      if (tower.upgrades[track] >= MAX_TOWER_LEVEL) {
         return { accepted: false, reason: "tower-max-level" };
       }
 
-      const upgradeCost = getTowerUpgradeCost(tower.level);
+      const upgradeCost = getTowerUpgradeCost(track, tower.upgrades[track]);
       if (player.points < upgradeCost) {
         return { accepted: false, reason: "insufficient-points" };
       }
@@ -494,8 +606,41 @@ export class MatchSimulation {
         (this.state.playerSpentOnUpgradesTotal[command.playerId] ?? 0) + upgradeCost;
       this.state.playerSpentOnUpgradesCurrentWave[command.playerId] =
         (this.state.playerSpentOnUpgradesCurrentWave[command.playerId] ?? 0) + upgradeCost;
-      tower.level += 1;
+      tower.upgrades[track] += 1;
+      tower.level = getTowerOverallLevel(tower.upgrades);
 
+      return { accepted: true };
+    }
+
+    if (command.type === "set-damage-type") {
+      // Same window as upgrades: a prep decision, made before the player commits with ready.
+      const player = this.state.players.find((entry) => entry.id === command.playerId);
+      if (!player) {
+        return { accepted: false, reason: "unknown-player" };
+      }
+
+      if (player.eliminated) {
+        return { accepted: false, reason: "player-eliminated" };
+      }
+
+      if (this.state.phase !== "placement") {
+        return { accepted: false, reason: "damage-type-phase-not-active" };
+      }
+
+      if (player.readyForWave) {
+        return { accepted: false, reason: "player-already-ready-for-wave" };
+      }
+
+      const tower = this.state.towers.find((entry) => entry.id === command.towerId);
+      if (!tower || tower.playerId !== command.playerId) {
+        return { accepted: false, reason: "invalid-damage-type-target" };
+      }
+
+      if (!isValidDamageType(command.damageType)) {
+        return { accepted: false, reason: "invalid-damage-type" };
+      }
+
+      tower.damageType = command.damageType;
       return { accepted: true };
     }
 
@@ -526,6 +671,17 @@ export class MatchSimulation {
     return { accepted: false, reason: "unsupported-command" };
   }
 
+  private isTowerMoveAvailable(player: PlayerState): boolean {
+    return (
+      this.state.phase === "placement"
+      && player.hasPlacedTower
+      && !player.eliminated
+      && !player.readyForWave
+      && !this.towerMovesUsed.has(player.id)
+      && this.state.wave > TOWER_MOVE_AFTER_WAVES
+    );
+  }
+
   public awardPoints(playerId: string, points: number): void {
     const player = this.state.players.find((entry) => entry.id === playerId);
     if (!player || this.state.phase === "ended") {
@@ -549,6 +705,9 @@ export class MatchSimulation {
       phase: this.state.phase,
       wave: this.state.wave,
       waveTick: this.state.waveTick,
+      creaturesToSpawn: this.state.phase === "wave"
+        ? Math.max(0, getWaveCreatureCount(this.state.wave) - this.currentWaveSpawned)
+        : this.state.phase === "placement" ? getWaveCreatureCount(this.state.wave) : 0,
       allPlayersReadyForWave: this.areSurvivorsReadyForWave(),
       telemetry: {
         currentWave: cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave),
@@ -564,17 +723,22 @@ export class MatchSimulation {
         totals: { ...entry.totals }
       })),
       map: {
+        schemaVersion: this.state.map.schemaVersion,
         width: this.state.map.width,
         height: this.state.map.height,
         seed: this.state.map.seed,
         cells: this.state.map.cells.map((cell) => ({ ...cell })),
-        ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {})
+        ...(this.state.map.spawn ? { spawn: { ...this.state.map.spawn } } : {}),
+        ...(this.state.map.goal ? { goal: { ...this.state.map.goal } } : {})
       },
-      towers: this.state.towers.map((tower) => ({ ...tower })),
+      towers: this.state.towers.map((tower) => ({ ...tower, upgrades: { ...tower.upgrades } })),
       walls: this.state.walls.map((wall) => ({ ...wall })),
       creatures: this.state.creatures.map((creature) => ({ ...creature })),
       targetAssignments: this.state.targetAssignments.map((assignment) => ({ ...assignment })),
-      players: this.state.players.map((player) => ({ ...player })),
+      players: this.state.players.map((player) => ({
+        ...player,
+        towerMoveAvailable: this.isTowerMoveAvailable(player)
+      })),
       events: this.state.events.map((event) => ({ ...event })),
       ...(this.state.winnerId ? { winnerId: this.state.winnerId } : {}),
       ...(this.state.endReason ? { endReason: this.state.endReason } : {})
@@ -589,14 +753,12 @@ export class MatchSimulation {
       this.state.playerAwardedPointsCurrentWave[player.id] = 0;
       this.state.playerSpentOnWallsCurrentWave[player.id] = 0;
       this.state.playerWaveClearBonusCurrentWave[player.id] = 0;
+      this.state.playerCatchUpBonusCurrentWave[player.id] = 0;
+      this.state.playerSwarmIncomeCurrentWave[player.id] = 0;
+      this.state.playerSwarmIncomeCappedCurrentWave[player.id] = 0;
     }
     this.currentWaveSpawned = 0;
-    this.currentWavePath.length = 0;
-    if (this.state.towers[0]) {
-      this.currentWavePath.push(
-        ...getOpenPathForCreatures(this.state.map, this.state.towers[0], this.state.walls)
-      );
-    }
+    this.refreshCreatureRoute();
     this.state.events.push({
       type: "wave-start",
       wave: this.state.wave,
@@ -605,10 +767,80 @@ export class MatchSimulation {
     this.state.targetAssignments = this.computeTargetAssignments();
   }
 
+  private refreshCreatureRoute(): void {
+    this.currentWavePath.length = 0;
+    this.currentWavePath.push(...getOpenPathForCreatures(this.state.map, this.state.towers, this.state.walls));
+    // Creatures keep their cell when the route changes. One that is no longer on the route moves to the closest route
+    // cell by walking distance (not straight-line: in the maze that picks a neighbouring corridor), ties to the earlier cell.
+    const routeIndexByCell = new Map<string, number>();
+    this.currentWavePath.forEach((cell, index) => routeIndexByCell.set(toCellKey(cell.x, cell.y), index));
+    for (const creature of this.state.creatures) {
+      const onRoute = routeIndexByCell.get(toCellKey(creature.x, creature.y));
+      if (onRoute !== undefined) {
+        creature.pathIndex = onRoute;
+        continue;
+      }
+      const anchor = this.findClosestRouteIndexByWalking(creature, routeIndexByCell);
+      const cell = this.currentWavePath[anchor];
+      creature.pathIndex = anchor;
+      if (cell) {
+        creature.x = cell.x;
+        creature.y = cell.y;
+      }
+      creature.pathProgressUnits = 0;
+    }
+  }
+
+  // BFS over the cells the route may use, level by level so the earliest route index wins among equally near cells.
+  private findClosestRouteIndexByWalking(
+    from: { x: number; y: number; pathIndex: number },
+    routeIndexByCell: Map<string, number>
+  ): number {
+    const walkable = new Set<string>();
+    for (const cell of this.state.map.cells) {
+      if (cell.buildable) {
+        walkable.add(toCellKey(cell.x, cell.y));
+      }
+    }
+    for (const tower of this.state.towers) {
+      walkable.delete(toCellKey(tower.x, tower.y));
+    }
+    for (const wall of this.state.walls) {
+      walkable.delete(toCellKey(wall.x, wall.y));
+    }
+    const seen = new Set<string>([toCellKey(from.x, from.y)]);
+    let level = [{ x: from.x, y: from.y }];
+    while (level.length > 0) {
+      let best: number | undefined;
+      const next: Array<{ x: number; y: number }> = [];
+      for (const cell of level) {
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const neighbor = { x: cell.x + dx, y: cell.y + dy };
+          const key = toCellKey(neighbor.x, neighbor.y);
+          if (seen.has(key) || !walkable.has(key)) {
+            continue;
+          }
+          seen.add(key);
+          const index = routeIndexByCell.get(key);
+          if (index !== undefined && (best === undefined || index < best)) {
+            best = index;
+          }
+          next.push(neighbor);
+        }
+      }
+      if (best !== undefined) {
+        return best;
+      }
+      level = next;
+    }
+    // Sealed in by obstacles: keep the old index, clamped to the new route.
+    return Math.min(from.pathIndex, Math.max(0, this.currentWavePath.length - 1));
+  }
+
   private getWaveSpawnPlan(): WaveSpawnPlan {
     return {
-      totalCreatures: this.state.wave + 2,
-      spawnIntervalTicks: 2
+      totalCreatures: getWaveCreatureCount(this.state.wave),
+      spawnIntervalTicks: WAVE_SPAWN_INTERVAL_TICKS
     };
   }
 
@@ -628,7 +860,9 @@ export class MatchSimulation {
     }
 
     const spawnOrdinal = this.currentWaveSpawned + 1;
-    const archetype = WAVE_SPAWN_ARCHETYPES[(spawnOrdinal - 1) % WAVE_SPAWN_ARCHETYPES.length] ?? "runner";
+    // Round robin over the live towers (sorted by id) spreads the preferred targets across players.
+    const liveTowers = [...this.state.towers].sort((a, b) => a.id.localeCompare(b.id));
+    const archetype = getWaveCreatureArchetype(spawnOrdinal);
     const creature: Creature = {
       id: `wave-${this.state.wave}-creature-${spawnOrdinal}`,
       archetype,
@@ -638,7 +872,7 @@ export class MatchSimulation {
       pathIndex: 0,
       pathProgressUnits: 0,
       spawnTick: this.state.waveTick,
-      targetTowerId: this.state.towers[0]?.id ?? "tower-missing"
+      targetTowerId: liveTowers[(spawnOrdinal - 1) % liveTowers.length]?.id ?? "tower-missing"
     };
 
     this.currentWaveSpawned += 1;
@@ -718,6 +952,9 @@ export class MatchSimulation {
       }
 
       const finalPathNode = this.currentWavePath[nextPathIndex] ?? currentPathNode;
+      for (const step of steps) {
+        this.addPathWear(step.toX, step.toY);
+      }
 
       this.state.events.push({
         type: "movement-resolved",
@@ -821,7 +1058,23 @@ export class MatchSimulation {
         continue;
       }
 
-      const damage = this.getTowerDamage(tower);
+      // Misses are decided by the match seed, so replays and tower order never change the outcome.
+      const roll = rollShot(this.state.map.seed, this.state.wave, this.state.waveTick, tower.id);
+      if (roll >= getTowerAccuracy(tower.upgrades.accuracy)) {
+        this.state.events.push({
+          type: "tower-miss",
+          wave: this.state.wave,
+          tick: this.state.waveTick,
+          towerId: tower.id,
+          playerId: tower.playerId,
+          creatureId: creature.id,
+          x: creature.x,
+          y: creature.y
+        });
+        continue;
+      }
+
+      const damage = getDamageAgainst(this.getTowerDamage(tower), tower.damageType, creature.archetype);
       creature.hp -= damage;
       this.state.telemetry.currentWave.towerDamageDealt += damage;
       this.updateCurrentWaveTelemetryTick();
@@ -836,13 +1089,13 @@ export class MatchSimulation {
         x: creature.x,
         y: creature.y,
         damage,
+        damageType: tower.damageType,
         remainingHp: Math.max(0, creature.hp)
       });
 
       if (creature.hp <= 0) {
         creaturesById.delete(creature.id);
-        const rewardPoints = getCreatureRewardPoints(creature.archetype);
-        this.awardPoints(tower.playerId, rewardPoints);
+        const rewardPoints = this.awardCreatureKillIncome(tower.playerId, creature.archetype, creature.id);
         this.state.telemetry.currentWave.creaturesDefeated += 1;
         this.state.telemetry.currentWave.killsByArchetype[creature.archetype] += 1;
         this.updateCurrentWaveTelemetryTick();
@@ -934,7 +1187,11 @@ export class MatchSimulation {
       }
     }
 
+    const towerCountBefore = this.state.towers.length;
     this.state.towers = [...towersById.values()].sort((a, b) => a.id.localeCompare(b.id));
+    if (this.state.towers.length !== towerCountBefore) {
+      this.refreshCreatureRoute();
+    }
     this.checkFailStateAfterTowerDestruction();
   }
 
@@ -1002,11 +1259,8 @@ export class MatchSimulation {
 
     this.state.walls = [...wallsById.values()].sort((a, b) => a.id.localeCompare(b.id));
 
-    if (destroyedWall && this.state.towers[0]) {
-      this.currentWavePath.length = 0;
-      this.currentWavePath.push(
-        ...getOpenPathForCreatures(this.state.map, this.state.towers[0], this.state.walls)
-      );
+    if (destroyedWall) {
+      this.refreshCreatureRoute();
     }
   }
 
@@ -1026,7 +1280,7 @@ export class MatchSimulation {
 
   private selectCreatureTargetForTower(tower: Tower): Creature | undefined {
     // Squared comparison keeps the range check free of sqrt and float drift.
-    const range = getTowerRange(tower.level);
+    const range = getTowerRange(tower.upgrades.range);
     const creatures = this.state.creatures
       .filter((creature) => !this.isSpawnProtected(creature) && this.getSquaredDistance(tower, creature) <= range * range)
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -1128,7 +1382,7 @@ export class MatchSimulation {
   }
 
   private getTowerDamage(tower: Tower): number {
-    return getTowerDamage(tower.level);
+    return getTowerDamage(tower.upgrades.damage);
   }
 
   private getCreatureAttackDamage(creature: Creature): number {
@@ -1253,6 +1507,13 @@ export class MatchSimulation {
     return (dx * dx) + (dy * dy);
   }
 
+  private addPathWear(x: number, y: number): void {
+    const cell = this.state.map.cells.find((entry) => entry.x === x && entry.y === y);
+    if (cell) {
+      cell.pathWear = Math.min(PATH_CELL_MAX_WEAR, Math.max(0, cell.pathWear) + PATH_WEAR_PER_TRAVERSAL);
+    }
+  }
+
   private getCellPathWear(x: number, y: number): number {
     const cell = this.state.map.cells.find((entry) => entry.x === x && entry.y === y);
     if (!cell) {
@@ -1299,6 +1560,7 @@ export class MatchSimulation {
     this.repairWallsBetweenWaves();
     this.repairPathWearBetweenWaves();
     this.awardWaveClearBonus(waveCleared);
+    this.awardCatchUpBonus();
     this.emitTelemetrySnapshotEvent();
     const completedWaveTelemetry = cloneWaveTelemetrySnapshot(this.state.telemetry.currentWave);
     this.state.telemetry.completedWaves.push(completedWaveTelemetry);
@@ -1328,6 +1590,77 @@ export class MatchSimulation {
   private isWaveCleared(): boolean {
     const telemetry = this.state.telemetry.currentWave;
     return telemetry.creaturesSpawned > 0 && telemetry.creaturesExited === 0;
+  }
+
+  // Pays a kill reward, except swarm points beyond the per-player per-wave cap (spec/06). Returns the points paid.
+  private awardCreatureKillIncome(playerId: string, archetype: CreatureArchetype, creatureId: string): number {
+    const reward = getCreatureRewardPoints(archetype);
+    let paid = reward;
+    if (archetype === "swarm") {
+      const earned = this.state.playerSwarmIncomeCurrentWave[playerId] ?? 0;
+      paid = Math.max(0, Math.min(reward, SWARM_KILL_INCOME_CAP_PER_WAVE - earned));
+      this.state.playerSwarmIncomeCurrentWave[playerId] = earned + paid;
+      const forfeited = reward - paid;
+      if (forfeited > 0) {
+        this.state.playerSwarmIncomeCappedTotal[playerId] =
+          (this.state.playerSwarmIncomeCappedTotal[playerId] ?? 0) + forfeited;
+        this.state.playerSwarmIncomeCappedCurrentWave[playerId] =
+          (this.state.playerSwarmIncomeCappedCurrentWave[playerId] ?? 0) + forfeited;
+        this.state.telemetry.currentWave.swarmIncomeCapped += forfeited;
+        this.state.events.push({
+          type: "swarm-income-capped",
+          wave: this.state.wave,
+          tick: this.state.waveTick,
+          playerId,
+          creatureId,
+          forfeitedPoints: forfeited
+        });
+      }
+    }
+    this.awardPoints(playerId, paid);
+    return paid;
+  }
+
+  // Trailing survivors get a capped fraction of their gap to the leader. Runs after the wave-clear bonus and never
+  // after a score win, and it stops short of WIN_SCORE so it cannot end the match by itself.
+  private awardCatchUpBonus(): void {
+    if (this.state.phase === "ended") {
+      return;
+    }
+    const recipients = this.state.players
+      .filter((player) => !player.eliminated)
+      .filter((player) => this.state.towers.some((tower) => tower.playerId === player.id && tower.health > 0))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (recipients.length === 0) {
+      return;
+    }
+    // Everyone is measured against the same leader score, taken before any catch-up points are paid.
+    const leaderPoints = Math.max(...recipients.map((player) => player.points));
+
+    for (const player of recipients) {
+      const gap = leaderPoints - player.points;
+      const bonus = Math.min(getCatchUpBonus(gap), WIN_SCORE - 1 - player.points);
+      if (bonus <= 0) {
+        continue;
+      }
+      player.points += bonus;
+      this.state.playerAwardedPointsTotal[player.id] = (this.state.playerAwardedPointsTotal[player.id] ?? 0) + bonus;
+      this.state.playerAwardedPointsCurrentWave[player.id] =
+        (this.state.playerAwardedPointsCurrentWave[player.id] ?? 0) + bonus;
+      this.state.playerCatchUpBonusTotal[player.id] = (this.state.playerCatchUpBonusTotal[player.id] ?? 0) + bonus;
+      this.state.playerCatchUpBonusCurrentWave[player.id] =
+        (this.state.playerCatchUpBonusCurrentWave[player.id] ?? 0) + bonus;
+      this.state.telemetry.currentWave.catchUpBonusAwarded += bonus;
+      this.updateCurrentWaveTelemetryTick();
+      this.state.events.push({
+        type: "catch-up-bonus",
+        wave: this.state.wave,
+        tick: this.state.waveTick,
+        playerId: player.id,
+        bonus,
+        gap
+      });
+    }
   }
 
   private awardWaveClearBonus(cleared: boolean): void {
@@ -1463,31 +1796,12 @@ export class MatchSimulation {
     const repairs: Array<{ x: number; y: number; wearBefore: number; wearAfter: number }> = [];
 
     for (const cell of this.state.map.cells) {
-      const isWallCell = this.state.walls.some((wall) => wall.x === cell.x && wall.y === cell.y);
-      const hadCreatureTraffic = this.state.events.some(
-        (event) =>
-          (event.type === "creature-spawned" || event.type === "creature-exited") &&
-          event.wave === this.state.wave &&
-          event.x === cell.x &&
-          event.y === cell.y
-      );
-
-      const wearBeforeWave = Math.max(0, cell.pathWear);
-      const wearAfterWaveLoad = Math.min(
-        PATH_CELL_MAX_WEAR,
-        wearBeforeWave + (isWallCell ? 2 : 0) + (hadCreatureTraffic ? 1 : 0)
-      );
-      const repairAmount = Math.min(BETWEEN_WAVE_PATH_WEAR_REPAIR, wearAfterWaveLoad);
-      const wearAfter = wearAfterWaveLoad - repairAmount;
+      const wearBefore = Math.max(0, cell.pathWear);
+      const wearAfter = Math.max(0, wearBefore - BETWEEN_WAVE_PATH_WEAR_REPAIR);
       cell.pathWear = wearAfter;
 
-      if (repairAmount > 0) {
-        repairs.push({
-          x: cell.x,
-          y: cell.y,
-          wearBefore: wearAfterWaveLoad,
-          wearAfter
-        });
+      if (wearAfter < wearBefore) {
+        repairs.push({ x: cell.x, y: cell.y, wearBefore, wearAfter });
       }
     }
 
@@ -1537,6 +1851,10 @@ export class MatchSimulation {
         const spentUpgradesThisWave = this.state.playerSpentOnUpgradesCurrentWave[player.id] ?? 0;
         const waveClearBonusThisWave = this.state.playerWaveClearBonusCurrentWave[player.id] ?? 0;
         const waveClearBonusTotal = this.state.playerWaveClearBonusTotal[player.id] ?? 0;
+        const catchUpBonusThisWave = this.state.playerCatchUpBonusCurrentWave[player.id] ?? 0;
+        const catchUpBonusTotal = this.state.playerCatchUpBonusTotal[player.id] ?? 0;
+        const swarmIncomeCappedThisWave = this.state.playerSwarmIncomeCappedCurrentWave[player.id] ?? 0;
+        const swarmIncomeCappedTotal = this.state.playerSwarmIncomeCappedTotal[player.id] ?? 0;
         const netThisWave = awardedThisWave - spentWallsThisWave - spentUpgradesThisWave;
         const netTotal = awardedTotal - spentWallsTotal - spentUpgradesTotal;
 
@@ -1555,6 +1873,10 @@ export class MatchSimulation {
           endingPoints: player.points,
           waveClearBonusThisWave,
           waveClearBonusTotal,
+          catchUpBonusThisWave,
+          catchUpBonusTotal,
+          swarmIncomeCappedThisWave,
+          swarmIncomeCappedTotal,
           towerLevel: tower?.level ?? 0,
           towerHealth: tower?.health ?? 0,
           wallCount: playerWalls.length,
@@ -1574,6 +1896,10 @@ export class MatchSimulation {
       endingPoints: players.reduce((total, player) => total + player.endingPoints, 0),
       waveClearBonusThisWave: players.reduce((total, player) => total + player.waveClearBonusThisWave, 0),
       waveClearBonusTotal: players.reduce((total, player) => total + player.waveClearBonusTotal, 0),
+      catchUpBonusThisWave: players.reduce((total, player) => total + player.catchUpBonusThisWave, 0),
+      catchUpBonusTotal: players.reduce((total, player) => total + player.catchUpBonusTotal, 0),
+      swarmIncomeCappedThisWave: players.reduce((total, player) => total + player.swarmIncomeCappedThisWave, 0),
+      swarmIncomeCappedTotal: players.reduce((total, player) => total + player.swarmIncomeCappedTotal, 0),
       livingTowers: this.state.towers.filter((tower) => tower.health > 0).length,
       livingWalls: this.state.walls.filter((wall) => wall.health > 0).length,
       totalTowerHealth: this.state.towers.reduce((total, tower) => total + Math.max(0, tower.health), 0),

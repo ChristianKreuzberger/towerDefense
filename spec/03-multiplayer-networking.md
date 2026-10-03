@@ -22,6 +22,7 @@ MVP runs offline in a single local process with an authoritative simulation core
 - placeWall
 - upgradeTower
 - setTargetMode
+- setDamageType
 - readyForWave
 - pingMap
 

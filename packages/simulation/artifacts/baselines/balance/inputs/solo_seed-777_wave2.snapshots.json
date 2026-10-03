@@ -17,11 +17,11 @@
       "matchSeed": 777,
       "exportOrdinal": 1,
       "wave": 1,
-      "tick": 15,
+      "tick": 18,
       "waveTelemetry": {
         "wave": 1,
-        "tick": 15,
-        "movementProgressUnits": 2400,
+        "tick": 18,
+        "movementProgressUnits": 2520,
         "movementSteps": 24,
         "creaturesSpawned": 3,
         "creaturesDefeated": 3,
@@ -32,16 +32,18 @@
           "armored": 1,
           "tank": 0
         },
-        "towerDamageDealt": 10,
-        "towerDamageIntake": 2,
+        "towerDamageDealt": 11,
+        "towerDamageIntake": 4,
         "wallDamageIntake": 0,
-        "towerRepairApplied": 2,
+        "towerRepairApplied": 4,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 15
+        "waveClearBonusAwarded": 15,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
-        "movementProgressUnits": 2400,
+        "movementProgressUnits": 2520,
         "movementSteps": 24,
         "creaturesSpawned": 3,
         "creaturesDefeated": 3,
@@ -52,12 +54,14 @@
           "armored": 1,
           "tank": 0
         },
-        "towerDamageDealt": 10,
-        "towerDamageIntake": 2,
+        "towerDamageDealt": 11,
+        "towerDamageIntake": 4,
         "wallDamageIntake": 0,
-        "towerRepairApplied": 2,
+        "towerRepairApplied": 4,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 15
+        "waveClearBonusAwarded": 15,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "players": [
         {
@@ -75,6 +79,10 @@
           "endingPoints": 47,
           "waveClearBonusThisWave": 15,
           "waveClearBonusTotal": 15,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
           "towerHealth": 100,
           "wallCount": 0,
@@ -93,6 +101,10 @@
         "endingPoints": 47,
         "waveClearBonusThisWave": 15,
         "waveClearBonusTotal": 15,
+        "catchUpBonusThisWave": 0,
+        "catchUpBonusTotal": 0,
+        "swarmIncomeCappedThisWave": 0,
+        "swarmIncomeCappedTotal": 0,
         "livingTowers": 1,
         "livingWalls": 0,
         "totalTowerHealth": 100,
@@ -105,12 +117,12 @@
       "matchSeed": 777,
       "exportOrdinal": 2,
       "wave": 2,
-      "tick": 293,
+      "tick": 329,
       "waveTelemetry": {
         "wave": 2,
-        "tick": 293,
-        "movementProgressUnits": 30900,
-        "movementSteps": 309,
+        "tick": 329,
+        "movementProgressUnits": 30640,
+        "movementSteps": 305,
         "creaturesSpawned": 4,
         "creaturesDefeated": 3,
         "creaturesExited": 1,
@@ -120,17 +132,19 @@
           "armored": 1,
           "tank": 0
         },
-        "towerDamageDealt": 14,
-        "towerDamageIntake": 5,
+        "towerDamageDealt": 17,
+        "towerDamageIntake": 8,
         "wallDamageIntake": 0,
-        "towerRepairApplied": 5,
+        "towerRepairApplied": 8,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 0
+        "waveClearBonusAwarded": 0,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
-        "movementProgressUnits": 33300,
-        "movementSteps": 333,
+        "movementProgressUnits": 33160,
+        "movementSteps": 329,
         "creaturesSpawned": 7,
         "creaturesDefeated": 6,
         "creaturesExited": 1,
@@ -140,12 +154,14 @@
           "armored": 2,
           "tank": 0
         },
-        "towerDamageDealt": 24,
-        "towerDamageIntake": 7,
+        "towerDamageDealt": 28,
+        "towerDamageIntake": 12,
         "wallDamageIntake": 0,
-        "towerRepairApplied": 7,
+        "towerRepairApplied": 12,
         "wallRepairApplied": 0,
-        "waveClearBonusAwarded": 15
+        "waveClearBonusAwarded": 15,
+        "catchUpBonusAwarded": 0,
+        "swarmIncomeCapped": 0
       },
       "players": [
         {
@@ -163,6 +179,10 @@
           "endingPoints": 79,
           "waveClearBonusThisWave": 0,
           "waveClearBonusTotal": 15,
+          "catchUpBonusThisWave": 0,
+          "catchUpBonusTotal": 0,
+          "swarmIncomeCappedThisWave": 0,
+          "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
           "towerHealth": 100,
           "wallCount": 0,
@@ -181,11 +201,15 @@
         "endingPoints": 79,
         "waveClearBonusThisWave": 0,
         "waveClearBonusTotal": 15,
+        "catchUpBonusThisWave": 0,
+        "catchUpBonusTotal": 0,
+        "swarmIncomeCappedThisWave": 0,
+        "swarmIncomeCappedTotal": 0,
         "livingTowers": 1,
         "livingWalls": 0,
         "totalTowerHealth": 100,
         "totalWallHealth": 0,
-        "mapPathWearTotal": 0
+        "mapPathWearTotal": 5
       }
     }
   ]

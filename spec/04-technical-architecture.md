@@ -27,6 +27,10 @@
 - Shared package prevents drift in formulas and types
 - Client audio (procedural Web Audio) and settings are presentation-only modules under `apps/client/src/audio` and `settings`; they consume snapshots/events and never touch the simulation or transport
 
+## Client module layout
+
+`apps/client/src/main.ts` is a thin entry: it publishes palette variables, installs controls, hotkeys and test hooks, then reconnects. Static markup lives in `template.ts` and element lookups in `dom.ts`; all mutable state is one `store` in `state.ts` (constants in `constants.ts`). Rendering is split into `board.ts` (Phaser mount), `scoreboard.ts`, `toolbar.ts`, `phase.ts`, `guide.ts`, `end-overlay.ts` and `menu.ts`; `playback.ts` owns the tick loop. `hydrate.ts` and `apply.ts` turn host responses into snapshots and render them, `session.ts` sends every request, and `actions.ts`, `controls.ts` and `hotkeys.ts` turn input into commands. Modules lower in the stack never import the ones above them: upward calls (tile click, chip click, tick request) are plugged in by `installControls`. The client reaches the host only through `@tower-defense/transport/http-client` (`api.ts` chooses the fetch requester or the in-page host for the GitHub Pages build), no module calls `fetch` itself, and names are only ever set through `textContent`. A new match or rematch destroys the Phaser game and mounts a fresh one, and `destroy()` removes every listener the scene attached. `window.__testBoard` (`test-hooks.ts`) is the only hook the e2e tests rely on.
+
 ## Build tools
 
 - Client dev/build: Vite

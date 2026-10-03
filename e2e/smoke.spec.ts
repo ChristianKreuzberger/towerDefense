@@ -55,7 +55,10 @@ async function clickCellNearSpawn(
   await page.locator("#board canvas").click({ position });
 }
 
-async function startMatch(page: Page, path: string): Promise<void> {
+// Opens the menu, leaving any match the host kept alive from the previous test.
+async function openMenu(page: Page, path: string): Promise<void> {
+  // Starting over a running match asks for confirmation; the helper always agrees.
+  page.on("dialog", (dialog) => void dialog.accept());
   // Register before goto so the load-time snapshot response can't be missed.
   const reconnect = page.waitForResponse((response) => response.url().includes("/api/snapshot"));
   await page.goto(path);
@@ -68,12 +71,19 @@ async function startMatch(page: Page, path: string): Promise<void> {
     await page.getByRole("button", { name: "Back To Menu" }).click();
   }
   await expect(page.locator("#menuScreen")).toBeVisible();
+}
+
+async function startMatch(page: Page, path: string): Promise<void> {
+  await openMenu(page, path);
   await page.locator("#menuSeed").fill("777");
   await page.locator("#menuPlayerName1").fill("Alpha");
   await page.locator("#menuPlayerName2").fill("Bravo");
   await page.getByRole("button", { name: "Start Match" }).click();
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(page.locator("#board canvas")).toBeVisible();
+  // Every new match opens with the map preview; the helper moves on to placement.
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator("#mapPreviewRoot")).toBeHidden();
 }
 
 test("completes the local setup flow, auto-plays combat, and rematches", async ({ page }) => {
@@ -91,6 +101,19 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
 
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(page.locator("#board canvas")).toBeVisible();
+
+  // A new match opens with the map preview: map overview, seed and the player list; nothing can be placed yet.
+  const preview = page.locator("#mapPreviewRoot .map-preview-modal");
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute("role", "dialog");
+  await expect(preview).toContainText("Seed 43");
+  await expect(preview).toContainText("Player 1: Alpha");
+  await expect(preview).toContainText("Player 2: Bravo");
+  await expect(page.locator("#mapPreviewContinueBtn")).toBeFocused();
+  await expect(page.locator("#gameScreen")).toHaveAttribute("inert", "");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(preview).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
 
   // Developer controls are hidden by default.
   await expect(page.locator("#snapshot")).toBeHidden();
@@ -502,8 +525,11 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
   await expect(page.locator("#turnBanner")).toContainText("Bravo");
   const bannerFontSize = await page.locator("#turnBanner strong").evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
   expect(bannerFontSize).toBeGreaterThanOrEqual(40);
-  // The handoff must refresh the toolbar: p2 is not ready, so Upgrade must not stay dimmed from p1.
-  await expect(page.locator("#upgradeBtn")).not.toHaveClass(/dim/);
+  // The handoff must refresh the toolbar: p2 is not ready, so the upgrade buttons must not stay dimmed from p1.
+  await expect(page.locator(".upgrade-btn")).toHaveCount(3);
+  for (const id of ["#upgradeRangeBtn", "#upgradeDamageBtn", "#upgradeAccuracyBtn"]) {
+    await expect(page.locator(id)).not.toHaveClass(/dim/);
+  }
 });
 
 test("hovering a tower shows its level and combat stats", async ({ page }) => {
@@ -588,4 +614,266 @@ test("wall and target-mode controls follow the phase and a disabled wall button 
   await page.locator("#readyBtn").click();
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
   await expect(page.locator("#placeWallBtn")).toHaveAttribute("aria-disabled", "false");
+});
+
+test("the damage type selector follows the tower, is sent as a command and locks once the player is ready", async ({ page }) => {
+  await startMatch(page, "/");
+  // Nothing to change before a tower exists.
+  await expect(page.locator("#damageType")).toBeDisabled();
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#damageType")).toBeEnabled();
+  await expect(page.locator("#damageType")).toHaveValue("physical");
+
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+  await page.locator("#damageType").selectOption("magic");
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toContain("set-damage-type");
+  expect(commands[0]).toContain("magic");
+  await expect(page.locator("#feedbackQueue")).not.toContainText("rejected");
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ playerId: string; damageType: string }> } };
+  expect(live.snapshot.towers.find((tower) => tower.playerId === "p1")?.damageType).toBe("magic");
+
+  // Readying commits the type: the control locks, like the upgrade buttons.
+  await page.locator("#readyBtn").click();
+  await expect(page.locator("#damageType")).toBeDisabled();
+  await expect(page.locator("#damageType")).toHaveValue("magic");
+});
+
+async function showEndedOverlay(page: Page): Promise<void> {
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const ended = {
+    ...live.snapshot,
+    phase: "ended",
+    winnerId: "p1",
+    endReason: "score-win",
+    players: (live.snapshot.players as Array<Record<string, unknown>>).map((player) => ({ ...player, points: player.id === "p1" ? 1000 : 0 }))
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: ended }) });
+  });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#matchEndOverlay")).toBeVisible();
+}
+
+test("match-end modal is a real dialog: focus moves in, Tab stays inside, Escape closes it for good", async ({ page }) => {
+  await startMatch(page, "/");
+  const modal = page.locator(".match-end-modal");
+  await showEndedOverlay(page);
+
+  await expect(modal).toHaveAttribute("role", "dialog");
+  await expect(modal).toHaveAttribute("aria-modal", "true");
+  await expect(modal).toHaveAttribute("aria-labelledby", "matchEndTitle");
+  await expect(page.locator("#matchEndTitle")).toHaveText("Match Ended");
+  await expect(page.locator("#rematchBtn")).toBeFocused();
+  await expect(page.locator("#gameScreen")).toHaveAttribute("inert", "");
+
+  for (let press = 0; press < 8; press += 1) {
+    await page.keyboard.press("Tab");
+    const inside = await page.evaluate(() => Boolean(document.activeElement?.closest(".match-end-modal")));
+    expect(inside, `focus escaped the modal on Tab press ${press + 1}`).toBe(true);
+  }
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
+  // Focus goes back to the button that was focused when the modal opened.
+  await expect(page.getByRole("button", { name: "Refresh Snapshot" })).toBeFocused();
+
+  // Refreshing the same ended match must not pop the dismissed modal open again.
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await page.waitForTimeout(500);
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+});
+
+test("the guide close button has an accessible name and the shortcut bar matches real hotkeys", async ({ page }) => {
+  await startMatch(page, "/");
+  await expect(page.locator("#guideCloseBtn")).toHaveAttribute("aria-label", "Dismiss guidance");
+  await expect(page.locator("#guideCloseBtn")).toHaveAttribute("title", "Dismiss guidance");
+  const bar = page.locator("#shortcutBar");
+  for (const text of ["ready", "tower", "wall mode", "upgrade", "switch player", "pause", "mute", "move cursor"]) {
+    await expect(bar).toContainText(text);
+  }
+});
+
+test("the prep banner previews the next wave and combat shows creatures still to spawn", async ({ page }) => {
+  await startMatch(page, "/");
+  await expect(page.locator("#wavePreview")).toHaveText("Next wave 1: 1x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic)");
+
+  await clickCellNearSpawn(page, 0);
+  await page.locator("#playerId").selectOption("p2");
+  await clickCellNearSpawn(page, 1);
+  await page.locator("#readyBtn").click();
+  await page.locator("#playerId").selectOption("p1");
+  await page.locator("#readyBtn").click();
+
+  await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
+  await expect(page.locator("#wavePreview")).toHaveText("");
+  await expect(page.locator("#battlefieldMeta")).toContainText("still to spawn");
+  await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE", { timeout: 20_000 });
+  await expect(page.locator("#wavePreview")).toHaveText(/^Next wave 2: .*Tank/);
+});
+
+test("hotkeys do nothing when the action is not available", async ({ page }) => {
+  await startMatch(page, "/");
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+
+  // No tower yet: ready, wall and upgrades are not available.
+  for (const key of ["r", "w", "u", "i", "o"]) {
+    await page.keyboard.press(key);
+  }
+  await page.waitForTimeout(300);
+  expect(commands).toEqual([]);
+
+  // After placing, T (place tower) is no longer available either.
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  commands.length = 0;
+  await page.keyboard.press("t");
+  await page.waitForTimeout(300);
+  expect(commands).toEqual([]);
+});
+
+test("starting a match over a running one asks first, and the menu offers to resume", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  await page.getByRole("button", { name: "Back To Menu" }).click();
+  await expect(page.locator("#menuScreen")).toBeVisible();
+  await expect(page.locator("#menuResumeBtn")).toBeVisible();
+
+  // Cancelling the confirmation leaves the running match untouched.
+  let asked = "";
+  page.removeAllListeners("dialog");
+  page.once("dialog", (dialog) => {
+    asked = dialog.message();
+    void dialog.dismiss();
+  });
+  await page.getByRole("button", { name: "Start Match" }).click();
+  await expect.poll(() => asked).toBe("Replace the running match?");
+  await expect(page.locator("#menuScreen")).toBeVisible();
+
+  await page.locator("#menuResumeBtn").click();
+  await expect(page.locator("#gameScreen")).toBeVisible();
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+});
+
+test("after the match ended the ready and place-tower buttons are disabled and the status names the winner", async ({ page }) => {
+  await startMatch(page, "/");
+  await showEndedOverlay(page);
+  await expect(page.locator("#phaseSub")).toContainText("Winner Alpha");
+  await expect(page.locator("#readyBtn")).toBeDisabled();
+  await expect(page.locator("#placeTowerBtn")).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#matchEndOverlay")).toBeHidden();
+  await expect(page.locator("#readyBtn")).toBeDisabled();
+});
+
+test("the move button explains itself while locked and, once unlocked, sends a move on the next tile click", async ({ page }) => {
+  await startMatch(page, "/");
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+
+  const commands: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/api/command")) {
+      commands.push(request.postData() ?? "");
+    }
+  });
+
+  // Locked before round 5 is done: dimmed, labelled, and a press only explains.
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#moveTowerCost")).toHaveText("after R5");
+  await page.locator("#moveTowerBtn").click({ force: true });
+  await expect(page.locator("#feedbackQueue")).toContainText("unlocks after round 5");
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-pressed", "false");
+  expect(commands).toEqual([]);
+
+  // A snapshot from round 6 where the player still holds the token enables it.
+  const live = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: Record<string, unknown> };
+  const unlocked = {
+    ...live.snapshot,
+    wave: 6,
+    players: (live.snapshot.players as Array<Record<string, unknown>>).map((player) => ({ ...player, towerMoveAvailable: player.id === "p1" }))
+  };
+  await page.route("**/api/snapshot*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, snapshot: unlocked }) });
+  }, { times: 1 });
+  await page.getByRole("button", { name: "Refresh Snapshot" }).click();
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-disabled", "false");
+  await expect(page.locator("#moveTowerCost")).toHaveText("free");
+
+  await page.keyboard.press("v");
+  await expect(page.locator("#moveTowerBtn")).toHaveAttribute("aria-pressed", "true");
+  await clickBuildableCell(page, 3);
+  await expect.poll(() => commands.length).toBe(1);
+  expect(commands[0]).toContain('"type":"move-tower"');
+  expect(commands[0]).toContain('"towerId":"tower-p1"');
+});
+
+test("the map preview blocks placement, closes with Esc, and does not reappear on reconnect", async ({ page }) => {
+  await openMenu(page, "/");
+  await page.locator("#menuSeed").fill("777");
+  await page.getByRole("button", { name: "Start Match" }).click();
+  const dialog = page.locator("#mapPreviewRoot");
+  await expect(dialog).toBeVisible();
+  await expect(page.locator("#mapPreviewCanvas")).toBeVisible();
+  await expect(dialog).toContainText("Protected area");
+
+  // Hotkeys are off while it is open, and Tab stays on the Continue button.
+  await page.keyboard.press("t");
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#mapPreviewContinueBtn")).toBeFocused();
+  const snapshot = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: unknown[] } };
+  expect(snapshot.snapshot.towers).toEqual([]);
+
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  // Reloading reconnects to the running match without the preview.
+  await page.reload();
+  await expect(page.locator("#gameScreen")).toBeVisible();
+  await expect(dialog).toBeHidden();
+});
+
+test("starting further matches replaces the board instead of leaking canvases and tooltips", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await startMatch(page, "/");
+  for (let round = 0; round < 3; round += 1) {
+    await page.getByRole("button", { name: "Back To Menu" }).click();
+    await page.getByRole("button", { name: "Start Match" }).click();
+    await expect(page.locator("#gameScreen")).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(page.locator("#mapPreviewRoot")).toBeHidden();
+    await expect(page.locator("#board canvas")).toHaveCount(1);
+    await expect(page.locator("#board .tower-tooltip")).toHaveCount(1);
+  }
+
+  // The fresh board still takes clicks: placing a tower works after the replacements.
+  await clickBuildableCell(page);
+  await expect(page.locator("#status")).toHaveText("accepted");
+  expect(pageErrors).toEqual([]);
+});
+
+test("the map preview still closes with Esc after a click on its backdrop moved focus away", async ({ page }) => {
+  await openMenu(page, "/");
+  await page.getByRole("button", { name: "Start Match" }).click();
+  const dialog = page.locator("#mapPreviewRoot");
+  await expect(dialog).toBeVisible();
+  await dialog.click({ position: { x: 4, y: 4 } });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
 });

@@ -5,8 +5,8 @@ import { SPAWN_PROTECTION_RADIUS } from "./game-rules.js";
 import { isInSpawnProtection, type GameMap } from "./map-types.js";
 import type { Tower } from "./tower-types.js";
 import type { Wall } from "./wall-types.js";
+import { getTowerUpgradeCost } from "./game-rules.js";
 import {
-  getTowerUpgradeCost,
   getWallCost,
   isValidTowerTargetMode,
   isValidTowerPlacement,
@@ -19,11 +19,11 @@ function mapFrom(rows: string[]): GameMap {
   const cells = rows.flatMap((row, y) =>
     [...row].map((char, x) => ({ x, y, buildable: char === ".", pathWear: 0 }))
   );
-  return { width: rows[0]?.length ?? 0, height: rows.length, seed: 1, cells };
+  return { schemaVersion: 1, width: rows[0]?.length ?? 0, height: rows.length, seed: 1, cells };
 }
 
 function towerAt(id: string, x: number, y: number, playerId = id): Tower {
-  return { id, playerId, x, y, health: 100, maxHealth: 100, level: 0, targetMode: "first" };
+  return { id, playerId, x, y, health: 100, maxHealth: 100, level: 1, upgrades: { range: 1, damage: 1, accuracy: 1 }, targetMode: "first", damageType: "physical" };
 }
 
 function wallAt(x: number, y: number): Wall {
@@ -122,7 +122,7 @@ test("wall placement: rejects cutting the only lane and cutting off a tower", ()
 
 test("cost helpers grow with count and level", () => {
   assert.ok(getWallCost(1) >= getWallCost(0));
-  assert.ok(getTowerUpgradeCost(2) >= getTowerUpgradeCost(0));
+  assert.ok(getTowerUpgradeCost("damage", 2) >= getTowerUpgradeCost("damage", 1));
 });
 
 test("upgrade target and target mode checks", () => {
@@ -188,4 +188,15 @@ test("spawn protection: a wall may not cut a tower off from the cave even if it 
 
 test("spawn protection: a map without a cave protects nothing", () => {
   assert.equal(isInSpawnProtection(OPEN, 0, 0), false);
+});
+
+test("tower placement counts existing walls when it checks that a route stays open", () => {
+  // Two parallel branches joined at both ends; a wall already closes the top one.
+  const ring = mapFrom([".......", ".#####.", "......."]);
+  const walls = [wallAt(3, 0)];
+  const closingBottom = { playerId: "p1", x: 3, y: 2 };
+
+  // Without the wall the bottom cell is harmless, with it the placement would shut the last route.
+  assert.deepEqual(isValidTowerPlacement(closingBottom, [], ring), { valid: true });
+  assert.deepEqual(isValidTowerPlacement(closingBottom, [], ring, walls), { valid: false, reason: "path-blocked" });
 });

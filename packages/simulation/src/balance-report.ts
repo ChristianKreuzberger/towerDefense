@@ -26,6 +26,8 @@ export interface BalanceReportCumulativeSummary {
   towerRepairApplied: number;
   wallRepairApplied: number;
   waveClearBonusAwarded: number;
+  catchUpBonusAwarded: number;
+  swarmIncomeCapped: number;
   awardedPointsTotal: number;
   spentOnWallsTotal: number;
   spentOnUpgradesTotal: number;
@@ -161,6 +163,8 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
   let towerRepairApplied = 0;
   let wallRepairApplied = 0;
   let waveClearBonusAwarded = 0;
+  let catchUpBonusAwarded = 0;
+  let swarmIncomeCapped = 0;
 
   for (const wave of waveSummaries) {
     totalTicks += toNumber(wave.waveTelemetry.tick);
@@ -170,6 +174,8 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
     towerRepairApplied += toNumber(wave.waveTelemetry.towerRepairApplied);
     wallRepairApplied += toNumber(wave.waveTelemetry.wallRepairApplied);
     waveClearBonusAwarded += toNumber(wave.waveTelemetry.waveClearBonusAwarded);
+    catchUpBonusAwarded += toNumber(wave.waveTelemetry.catchUpBonusAwarded);
+    swarmIncomeCapped += toNumber(wave.waveTelemetry.swarmIncomeCapped);
     cumulativeKills.runner += toNumber(wave.waveTelemetry.killsByArchetype.runner);
     cumulativeKills.swarm += toNumber(wave.waveTelemetry.killsByArchetype.swarm);
     cumulativeKills.armored += toNumber(wave.waveTelemetry.killsByArchetype.armored);
@@ -192,6 +198,8 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
     towerRepairApplied,
     wallRepairApplied,
     waveClearBonusAwarded,
+    catchUpBonusAwarded,
+    swarmIncomeCapped,
     awardedPointsTotal: finalSnapshot.totals.awardedPointsTotal,
     spentOnWallsTotal: finalSnapshot.totals.spentOnWallsTotal,
     spentOnUpgradesTotal: finalSnapshot.totals.spentOnUpgradesTotal,
@@ -224,6 +232,8 @@ function formatPlayerLine(prefix: string, player: BalanceAnalysisPlayerSnapshot)
     `${prefix}${player.playerId} (${player.playerName}) status=${status}` +
     ` delta=${player.netPointsDeltaThisWave}` +
     ` bonus=${player.waveClearBonusThisWave}` +
+    ` catchUp=${player.catchUpBonusThisWave}` +
+    ` swarmCapped=${player.swarmIncomeCappedThisWave}` +
     ` total=${player.netPointsTotal}` +
     ` ending=${player.endingPoints}` +
     ` towerLv=${player.towerLevel}` +
@@ -264,6 +274,9 @@ export function formatBalanceReport(report: BalanceReport): string {
         `net=${wave.totals.netPointsDeltaThisWave}`
     );
     lines.push(`Wave-clear bonus: awarded=${wave.totals.waveClearBonusThisWave}`);
+    lines.push(
+      `Anti-snowball: catchUp=${wave.waveTelemetry.catchUpBonusAwarded} swarmIncomeCapped=${wave.waveTelemetry.swarmIncomeCapped}`
+    );
     lines.push("Players:");
     for (const player of wave.players) {
       lines.push(formatPlayerLine("- ", player));
@@ -285,6 +298,9 @@ export function formatBalanceReport(report: BalanceReport): string {
     `Repairs totals: towers=${report.cumulative.towerRepairApplied} walls=${report.cumulative.wallRepairApplied}`
   );
   lines.push(`Wave-clear bonus total: ${report.cumulative.waveClearBonusAwarded}`);
+  lines.push(
+    `Anti-snowball totals: catchUp=${report.cumulative.catchUpBonusAwarded} swarmIncomeCapped=${report.cumulative.swarmIncomeCapped}`
+  );
   lines.push(
     `Economy totals: awarded=${report.cumulative.awardedPointsTotal} ` +
       `spentWalls=${report.cumulative.spentOnWallsTotal} ` +

@@ -34,6 +34,23 @@ test("unknown set-target-mode values are rejected instead of becoming first", ()
   assertRejected(command(api, { type: "set-target-mode", playerId: "p1", towerId: "tower-p1" }), "invalid-command");
 });
 
+test("unknown or missing set-damage-type values are rejected instead of becoming physical", () => {
+  const api = startedApi();
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "fire" }), "invalid-command");
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: 3 }), "invalid-command");
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1" }), "invalid-command");
+  assertRejected(command(api, { type: "set-damage-type", playerId: "p1", damageType: "magic" }), "invalid-command");
+});
+
+test("a valid set-damage-type reaches the simulation and its rejection comes back as a normal result", () => {
+  const api = startedApi();
+  const response = command(api, { type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType: "magic" });
+  assert.equal(response.status, 200);
+  const payload = response.payload as { result: { accepted: boolean; reason?: string } };
+  assert.equal(payload.result.accepted, false);
+  assert.equal(payload.result.reason, "invalid-damage-type-target");
+});
+
 test("place-tower and place-wall reject non-integer or non-finite coordinates", () => {
   const api = startedApi();
   for (const type of ["place-tower", "place-wall"]) {
@@ -54,11 +71,32 @@ test("out-of-bounds coordinates come back as a machine-readable command rejectio
   }
 });
 
+test("move-tower validates ids and coordinates like placement", () => {
+  const api = startedApi();
+  assertRejected(command(api, { type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 1.5, y: 2 }), "invalid-coordinates");
+  assertRejected(command(api, { type: "move-tower", playerId: "p1", x: 1, y: 2 }), "invalid-command");
+  // Well-formed but without a tower to move: a normal command rejection, not a validation error.
+  const locked = command(api, { type: "move-tower", playerId: "p1", towerId: "tower-p1", x: 1, y: 2 });
+  assert.equal(locked.status, 200);
+  assert.deepEqual((locked.payload as { result: unknown }).result, { accepted: false, reason: "invalid-move-target" });
+});
+
 test("a missing or unsupported command is rejected with invalid-command", () => {
   const api = startedApi();
   assertRejected(post(api, "/api/command", {}), "invalid-command");
   assertRejected(command(api, { type: "teleport" }), "invalid-command");
   assertRejected(command(api, { type: "upgrade-tower", playerId: 7, towerId: "tower-p1" }), "invalid-command");
+});
+
+test("upgrade-tower needs a known track", () => {
+  const api = startedApi();
+  for (const track of [undefined, "speed", 3, null]) {
+    assertRejected(command(api, { type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track }), "invalid-command");
+  }
+  const response = command(api, { type: "upgrade-tower", playerId: "p1", towerId: "tower-p1", track: "range" });
+  assert.equal(response.status, 200);
+  // A valid track passes validation; with no tower placed yet the simulation rejects it normally.
+  assert.equal((response.payload as { result: { accepted: boolean } }).result.accepted, false);
 });
 
 test("duplicate player ids are rejected", () => {

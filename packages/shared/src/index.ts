@@ -8,7 +8,9 @@ export interface WorkspacePackageInfo {
 export * from "./game-rules.js";
 export * from "./match-types.js";
 export * from "./map-types.js";
+export * from "./map-validation.js";
 export * from "./tower-types.js";
 export * from "./wall-types.js";
 export * from "./creature-types.js";
 export * from "./validation.js";
+export * from "./wave-plan.js";

@@ -56,6 +56,7 @@ export function cuesForSnapshotChange({ previous, next, events, suppress }: Snap
   for (const event of events) {
     switch (event.type) {
       case "tower-hit":
+      case "tower-miss":
         if (!shotTowers.has(event.towerId) && shotTowers.size < MAX_SHOTS_PER_SNAPSHOT) {
           shotTowers.add(event.towerId);
           cues.push({ id: "tower-shot", playerNumber: playerNumberOf(event.playerId) });
@@ -120,6 +121,7 @@ export function cueForCommandResult(commandType: string, accepted: boolean): Sou
   const cues: Record<string, SoundId> = {
     "place-tower": "place-tower",
     "place-wall": "place-wall",
+    "move-tower": "place-tower",
     "upgrade-tower": "upgrade",
     "ready-for-wave": "ready"
   };
