@@ -127,6 +127,7 @@
   .tool {
     justify-items: center;
     padding: 6px 4px;
+    min-height: 44px;
   }
 
   .tool-label {

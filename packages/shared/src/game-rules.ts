@@ -17,6 +17,9 @@ export const BUILDABLE_CELL_THRESHOLD = 0.3;
 export const PATH_WIDTH = 2;
 // Towers go on these dedicated spots next to the road, never on the road itself (spec/05, Tower spots).
 export const TOWER_SPOT_COUNT = 16;
+// Extra spots appended after the base ones, so existing spot order (and seeded picks) stay unchanged.
+export const TOWER_SPOT_EXTRA_COUNT = 16;
+export const TOWER_SPOT_TOTAL = TOWER_SPOT_COUNT + TOWER_SPOT_EXTRA_COUNT;
 export const TOWER_SPOT_MIN_SPACING = 3;
 export const TOWER_SPOT_MAX_LANE_DISTANCE = 4;
 export const BETWEEN_WAVE_TOWER_REPAIR_PERCENT = 0.2;
@@ -72,6 +75,7 @@ export const GAME_RULES = {
   buildableCellThreshold: BUILDABLE_CELL_THRESHOLD,
   pathWidth: PATH_WIDTH,
   towerSpotCount: TOWER_SPOT_COUNT,
+  towerSpotTotal: TOWER_SPOT_TOTAL,
   towerSpotMinSpacing: TOWER_SPOT_MIN_SPACING,
   towerSpotMaxLaneDistance: TOWER_SPOT_MAX_LANE_DISTANCE,
   upgradeTrackCosts: UPGRADE_TRACK_COSTS,

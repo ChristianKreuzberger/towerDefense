@@ -6,6 +6,7 @@ import { showTurnBanner } from "./phase";
 import { selectedPlayerId } from "./player-util";
 import { renderPlayerCards } from "./scoreboard";
 import { store } from "./state";
+import { resetTouchSelection } from "./touch-selection";
 import { renderToolbar } from "./toolbar";
 import { firstPendingPlayerId, nextPendingPlayerId } from "./turn";
 
@@ -29,6 +30,8 @@ export function resetTurnAfterWave(previous: MatchSnapshot | null, snapshot: Mat
 }
 
 export function applyActivePlayerChange(): void {
+  // Every path that switches player lands here (the select too), so a selection never carries over.
+  resetTouchSelection();
   // Move mode belongs to the player who pressed it; the next hot-seat player starts clean.
   if (store.moveMode) {
     setMoveMode(false);

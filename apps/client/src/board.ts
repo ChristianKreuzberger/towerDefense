@@ -38,6 +38,7 @@ export const battlefieldMount: BattlefieldMount = {
   cellToCss: (x, y) => mount.cellToCss(x, y),
   cellSize: () => mount.cellSize(),
   setCursor: (x, y) => mount.setCursor(x, y),
+  previewCell: (x, y) => mount.previewCell(x, y),
   setPlacementContext: (context) => mount.setPlacementContext(context),
   zoomStep: (direction) => mount.zoomStep(direction),
   resetView: () => mount.resetView(),

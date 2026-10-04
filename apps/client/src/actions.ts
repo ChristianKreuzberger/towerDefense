@@ -4,18 +4,22 @@ import { coordValue } from "./coord";
 import { el, must } from "./dom";
 import { addFeedback } from "./feedback";
 import type { GuideAction } from "./guide";
-import { resolvePlacementCell } from "./placement";
+import { isTouchConfirm, resolvePlacementCell, snapToSpot } from "./placement";
 import { setPlaying } from "./playback";
 import { playerTowerId, selectedPlayerId } from "./player-util";
 import { fetchSnapshot, sendCommand } from "./session";
 import { closeTowerMenu, openTowerMenu } from "./tower-menu";
 import { renderToolbar } from "./toolbar";
 import { setActivePlayer } from "./turns";
+import { getSelectedSpot, isTouchMode, setSelectedSpot } from "./touch-selection";
 import { store } from "./state";
 
 // User intents that become host commands: tile clicks, the tower placement shortcut and guide buttons.
 
-export function handleCellSelected(x: number, y: number): void {
+// Touch placement is select, then confirm (spec/11). Compact layout or a coarse pointer means a finger.
+export function handleCellSelected(tappedX: number, tappedY: number): void {
+  let x = tappedX;
+  let y = tappedY;
   if (!store.current) {
     return;
   }
@@ -31,6 +35,22 @@ export function handleCellSelected(x: number, y: number): void {
     return;
   }
   closeTowerMenu();
+
+  const placing = store.moveMode || (store.current.phase === "placement" && !store.current.towers.some((tower) => tower.playerId === selectedPlayerId()));
+  const touch = placing && isTouchMode();
+  if (touch && store.mapCache) {
+    const current = store.current;
+    const occupied = occupiedCellKeys(current);
+    const snapped = snapToSpot(
+      { x, y },
+      store.mapCache.towerSpots,
+      (cell) => store.mapCache?.towerSpotKeys.has(`${cell.x},${cell.y}`) === true && !occupied.has(`${cell.x},${cell.y}`)
+    );
+    if (snapped) {
+      x = snapped.x;
+      y = snapped.y;
+    }
+  }
 
   store.cursorChosen = true;
 
@@ -53,6 +73,12 @@ export function handleCellSelected(x: number, y: number): void {
   if (occupiedCellKeys(store.current).has(`${x},${y}`)) {
     return;
   }
+
+  if (touch && !isTouchConfirm(getSelectedSpot(), { x, y })) {
+    setSelectedSpot({ x, y });
+    return;
+  }
+  setSelectedSpot(null);
 
   const playerId = selectedPlayerId();
   if (store.moveMode) {
@@ -86,6 +112,7 @@ export function placeTowerForSelectedPlayer(): void {
   }
   el.x.value = String(coords.x);
   el.y.value = String(coords.y);
+  setSelectedSpot(null);
   void sendCommand({
     type: "place-tower",
     playerId,

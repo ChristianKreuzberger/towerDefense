@@ -19,6 +19,9 @@ export interface OverlayState {
   towerSpotKeys: Set<string>;
   hoverX: number | null;
   hoverY: number | null;
+  // The spot a touch selected: drawn like a hover, but it survives the pointer leaving (a finger has no hover).
+  previewX: number | null;
+  previewY: number | null;
   hoverTowerId: string | null;
   hoverRuinId: string | null;
   hoverGraphics?: Phaser.GameObjects.Graphics;
@@ -90,12 +93,9 @@ export function drawHoverAndGhost(s: OverlayState, env: OverlayEnv): void {
   }
   updateTowerTooltip(s, env);
 
-  if (s.hoverX === null || s.hoverY === null) {
-    return;
-  }
-  const x = s.hoverX;
-  const y = s.hoverY;
-  if (!isHoverValid(s, x, y)) {
+  const x = s.previewX ?? s.hoverX;
+  const y = s.previewY ?? s.hoverY;
+  if (x === null || y === null || !isHoverValid(s, x, y)) {
     return;
   }
 
