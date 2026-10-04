@@ -21,12 +21,12 @@
       "matchSeed": 19,
       "exportOrdinal": 1,
       "wave": 1,
-      "tick": 18,
+      "tick": 22,
       "waveTelemetry": {
         "wave": 1,
-        "tick": 18,
-        "movementProgressUnits": 2810,
-        "movementSteps": 26,
+        "tick": 22,
+        "movementProgressUnits": 4110,
+        "movementSteps": 40,
         "creaturesSpawned": 5,
         "creaturesDefeated": 5,
         "creaturesExited": 0,
@@ -37,16 +37,16 @@
           "tank": 1
         },
         "towerDamageDealt": 23,
-        "towerDamageIntake": 15,
-        "towerRepairApplied": 15,
+        "towerDamageIntake": 80,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 1,
-        "movementProgressUnits": 2810,
-        "movementSteps": 26,
+        "movementProgressUnits": 4110,
+        "movementSteps": 40,
         "creaturesSpawned": 5,
         "creaturesDefeated": 5,
         "creaturesExited": 0,
@@ -57,8 +57,8 @@
           "tank": 1
         },
         "towerDamageDealt": 23,
-        "towerDamageIntake": 15,
-        "towerRepairApplied": 15,
+        "towerDamageIntake": 80,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -68,13 +68,13 @@
           "playerId": "p1",
           "playerName": "Alpha",
           "eliminated": false,
-          "awardedPointsThisWave": 35,
+          "awardedPointsThisWave": 63,
           "spentOnUpgradesThisWave": 0,
-          "netPointsDeltaThisWave": 35,
-          "awardedPointsTotal": 35,
+          "netPointsDeltaThisWave": 63,
+          "awardedPointsTotal": 63,
           "spentOnUpgradesTotal": 0,
-          "netPointsTotal": 35,
-          "endingPoints": 135,
+          "netPointsTotal": 63,
+          "endingPoints": 163,
           "waveClearBonusThisWave": 15,
           "waveClearBonusTotal": 15,
           "catchUpBonusThisWave": 0,
@@ -88,13 +88,13 @@
           "playerId": "p2",
           "playerName": "Beta",
           "eliminated": false,
-          "awardedPointsThisWave": 57,
+          "awardedPointsThisWave": 29,
           "spentOnUpgradesThisWave": 0,
-          "netPointsDeltaThisWave": 57,
-          "awardedPointsTotal": 57,
+          "netPointsDeltaThisWave": 29,
+          "awardedPointsTotal": 29,
           "spentOnUpgradesTotal": 0,
-          "netPointsTotal": 57,
-          "endingPoints": 157,
+          "netPointsTotal": 29,
+          "endingPoints": 129,
           "waveClearBonusThisWave": 15,
           "waveClearBonusTotal": 15,
           "catchUpBonusThisWave": 0,
@@ -102,7 +102,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 175
+          "towerHealth": 130
         }
       ],
       "totals": {
@@ -120,8 +120,8 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 2,
-        "totalTowerHealth": 350,
-        "mapPathWearTotal": 9
+        "totalTowerHealth": 305,
+        "mapPathWearTotal": 15
       }
     },
     {
@@ -129,12 +129,12 @@
       "matchSeed": 19,
       "exportOrdinal": 2,
       "wave": 2,
-      "tick": 18,
+      "tick": 27,
       "waveTelemetry": {
         "wave": 2,
-        "tick": 18,
-        "movementProgressUnits": 2380,
-        "movementSteps": 21,
+        "tick": 27,
+        "movementProgressUnits": 4400,
+        "movementSteps": 44,
         "creaturesSpawned": 6,
         "creaturesDefeated": 6,
         "creaturesExited": 0,
@@ -145,16 +145,16 @@
           "tank": 1
         },
         "towerDamageDealt": 25,
-        "towerDamageIntake": 0,
-        "towerRepairApplied": 0,
+        "towerDamageIntake": 70,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
       },
       "cumulativeTelemetry": {
         "completedWaveCount": 2,
-        "movementProgressUnits": 5190,
-        "movementSteps": 47,
+        "movementProgressUnits": 8510,
+        "movementSteps": 84,
         "creaturesSpawned": 11,
         "creaturesDefeated": 11,
         "creaturesExited": 0,
@@ -165,8 +165,8 @@
           "tank": 2
         },
         "towerDamageDealt": 48,
-        "towerDamageIntake": 15,
-        "towerRepairApplied": 15,
+        "towerDamageIntake": 150,
+        "towerRepairApplied": 70,
         "waveClearBonusAwarded": 60,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -176,13 +176,13 @@
           "playerId": "p1",
           "playerName": "Alpha",
           "eliminated": false,
-          "awardedPointsThisWave": 57,
+          "awardedPointsThisWave": 49,
           "spentOnUpgradesThisWave": 45,
-          "netPointsDeltaThisWave": 12,
-          "awardedPointsTotal": 92,
+          "netPointsDeltaThisWave": 4,
+          "awardedPointsTotal": 112,
           "spentOnUpgradesTotal": 45,
-          "netPointsTotal": 47,
-          "endingPoints": 147,
+          "netPointsTotal": 67,
+          "endingPoints": 167,
           "waveClearBonusThisWave": 15,
           "waveClearBonusTotal": 30,
           "catchUpBonusThisWave": 0,
@@ -196,13 +196,13 @@
           "playerId": "p2",
           "playerName": "Beta",
           "eliminated": false,
-          "awardedPointsThisWave": 43,
+          "awardedPointsThisWave": 51,
           "spentOnUpgradesThisWave": 64,
-          "netPointsDeltaThisWave": -21,
-          "awardedPointsTotal": 100,
+          "netPointsDeltaThisWave": -13,
+          "awardedPointsTotal": 80,
           "spentOnUpgradesTotal": 64,
-          "netPointsTotal": 36,
-          "endingPoints": 136,
+          "netPointsTotal": 16,
+          "endingPoints": 116,
           "waveClearBonusThisWave": 15,
           "waveClearBonusTotal": 30,
           "catchUpBonusThisWave": 0,
@@ -210,7 +210,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 2,
-          "towerHealth": 175
+          "towerHealth": 95
         }
       ],
       "totals": {
@@ -228,8 +228,8 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 2,
-        "totalTowerHealth": 350,
-        "mapPathWearTotal": 17
+        "totalTowerHealth": 270,
+        "mapPathWearTotal": 35
       }
     }
   ]
