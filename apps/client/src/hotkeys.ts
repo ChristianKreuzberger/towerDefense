@@ -6,7 +6,7 @@ import { closeOverlay, isEndOverlayOpen } from "./end-overlay";
 import { hideGuideOverlay } from "./guide";
 import { isMoreOpen, setMoreOpen } from "./mobile-menu";
 import { playerNumber } from "./player-util";
-import { mapPreview, settingsDialog, settingsStore, tour } from "./services";
+import { settingsDialog, settingsStore, tour } from "./services";
 import { store } from "./state";
 import { isActionAvailable } from "./toolbar";
 import { closeTowerMenu, isTowerMenuOpen } from "./tower-menu";
@@ -29,15 +29,6 @@ export function installHotkeys(): () => void {
       if (event.key === "Escape") {
         event.preventDefault();
         tour.close();
-      }
-      return;
-    }
-
-    if (mapPreview.isOpen()) {
-      // Game hotkeys stay off while it is open. Esc also works after a backdrop click moved focus out of the dialog.
-      if (event.key === "Escape") {
-        event.preventDefault();
-        mapPreview.close();
       }
       return;
     }

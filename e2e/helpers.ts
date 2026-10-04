@@ -103,9 +103,6 @@ export async function startMatch(page: Page, path: string): Promise<void> {
   await page.getByRole("button", { name: "Start Match" }).click();
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(page.locator("#board canvas")).toBeVisible();
-  // Every new match opens with the map preview; the helper moves on to placement.
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.locator("#mapPreviewRoot")).toBeHidden();
 }
 
 export async function showEndedOverlay(page: Page): Promise<void> {

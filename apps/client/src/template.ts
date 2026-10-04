@@ -191,7 +191,6 @@ export const APP_TEMPLATE = `
   </footer>
 
   <div id="settingsRoot"></div>
-  <div id="mapPreviewRoot"></div>
   <div id="tourRoot"></div>
 
   <div id="feedbackQueue" class="toasts" role="status" aria-live="polite"></div>

@@ -121,8 +121,6 @@ test.describe("compact layout", () => {
     await page.locator("#mobileMoreBtn").click();
     await page.getByRole("button", { name: "Back To Menu" }).click();
     await page.getByRole("button", { name: "Start Match" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.locator("#mapPreviewRoot")).toBeHidden();
     await expect(page.locator("#placeTowerBtn .tool-label")).toHaveText("Place Tower");
     // The first tap only selects again, so nothing is placed.
     await page.locator("#board canvas").tap({ position: await cellPixel(page) });
