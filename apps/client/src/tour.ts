@@ -8,7 +8,7 @@ export interface TourDialog {
   isOpen(): boolean;
 }
 
-// Same dialog pattern as the map preview and the settings dialog (spec/11, "How-to-play tour").
+// Same dialog pattern as the settings dialog (spec/11, "How-to-play tour").
 export function mountTour(options: { root: HTMLElement; onDismiss(): void }): TourDialog {
   const { root } = options;
   root.className = "settings-overlay";

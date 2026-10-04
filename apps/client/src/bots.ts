@@ -6,7 +6,7 @@ import { botName, botsCanAct, describeBotAction } from "./bot-text";
 import { BOT_STEP_DELAY_MS } from "./constants";
 import { el } from "./dom";
 import { addFeedback } from "./feedback";
-import { mapPreview, tour } from "./services";
+import { tour } from "./services";
 import { store } from "./state";
 
 // Paces the bots in prep: the host plays one bot command per /api/ai-step call, and this timer spaces the calls so
@@ -16,7 +16,7 @@ let timer: ReturnType<typeof setTimeout> | null = null;
 let stepInFlight = false;
 
 function dialogOpen(): boolean {
-  return mapPreview.isOpen() || tour.isOpen();
+  return tour.isOpen();
 }
 
 function eligible(): boolean {
@@ -42,7 +42,7 @@ async function runBotStep(): Promise<void> {
   if (!eligible()) {
     return;
   }
-  // The map preview and tour are modal: bots hold still behind them, then carry on.
+  // The tour is modal: bots hold still behind them, then carry on.
   if (dialogOpen()) {
     syncBotPacing();
     return;

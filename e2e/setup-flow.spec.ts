@@ -19,18 +19,9 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   await expect(page.locator("#gameScreen")).toBeVisible();
   await expect(page.locator("#board canvas")).toBeVisible();
 
-  // A new match opens with the map preview: map overview, seed and the player list; nothing can be placed yet.
-  const preview = page.locator("#mapPreviewRoot .map-preview-modal");
-  await expect(preview).toBeVisible();
-  await expect(preview).toHaveAttribute("role", "dialog");
-  await expect(preview).toContainText("Seed 43");
-  await expect(preview).toContainText("Player 1: Alpha");
-  await expect(preview).toContainText("Player 2: Bravo");
-  await expect(page.locator("#mapPreviewContinueBtn")).toBeFocused();
-  await expect(page.locator("#gameScreen")).toHaveAttribute("inert", "");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(preview).toBeHidden();
+  // A new match goes straight to placement: nothing blocks the page and the place button has focus.
   await expect(page.locator("#gameScreen")).not.toHaveAttribute("inert", "");
+  await expect(page.locator("#placeTowerBtn")).toBeFocused();
 
   // Developer controls are hidden by default.
   await expect(page.locator("#snapshot")).toBeHidden();
@@ -182,8 +173,6 @@ test("starting further matches replaces the board instead of leaking canvases an
     await page.getByRole("button", { name: "Back To Menu" }).click();
     await page.getByRole("button", { name: "Start Match" }).click();
     await expect(page.locator("#gameScreen")).toBeVisible();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.locator("#mapPreviewRoot")).toBeHidden();
     await expect(page.locator("#board canvas")).toHaveCount(1);
     await expect(page.locator("#board .tower-tooltip")).toHaveCount(1);
   }

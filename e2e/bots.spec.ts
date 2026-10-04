@@ -15,9 +15,7 @@ test("a bot places after the human, readies by itself and keeps readying every p
   await page.locator("#menuBotDifficulty2").selectOption("hard");
   await page.getByRole("button", { name: "Start Match" }).click();
 
-  const preview = page.locator("#mapPreviewRoot .map-preview-modal");
-  await expect(preview).toContainText("Player 2: Bot 1 (hard bot)");
-  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".player-chip.p2")).toContainText("BOT");
 
   // The bot waits for the human's tower.
   await expect(page.locator('[data-tower-id="tower-p2"]')).toHaveCount(0);
@@ -47,7 +45,6 @@ test("a bots-only match plays on its own and a rematch keeps the bots", async ({
   await page.locator("#menuBotDifficulty1").selectOption("easy");
   await page.locator("#menuBotDifficulty2").selectOption("medium");
   await page.getByRole("button", { name: "Start Match" }).click();
-  await page.getByRole("button", { name: "Continue" }).click();
 
   await expect(page.locator("#guideCard")).toContainText("is a bot");
   await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT", { timeout: 15_000 });

@@ -12,22 +12,15 @@
 ## Match initialization flow
 
 1. Generate procedural map from seed
-2. Show map preview and player list
+2. Go straight to placement (no intermediate dialog; on the very first match in a browser the how-to-play tour comes first)
 3. Ask each player to place exactly one tower
 4. Prevent wave start until all required towers are placed
 
 How-to-play tour
-- A short step-by-step dialog (goal, prep, combat, between waves, controls) that explains the game. It is shown automatically before the map preview the first time a match starts in this browser (menu Start Match or Rematch, never on reconnect). Dismissing it, by finishing, "Skip tour" or Esc, marks it as seen (spec/08), so later matches go straight to the map preview
-- A "How to play" button in the main menu actions (`#menuTourBtn`) and in the match session row (`#tourBtn`) reopens it at any time; opened that way it only closes and returns focus to the opener, it does not open the map preview
+- A short step-by-step dialog (goal, prep, combat, between waves, controls) that explains the game. It is shown automatically before placement the first time a match starts in this browser (menu Start Match or Rematch, never on reconnect). Dismissing it, by finishing, "Skip tour" or Esc, marks it as seen (spec/08), so later matches go straight to placement
+- A "How to play" button in the main menu actions (`#menuTourBtn`) and in the match session row (`#tourBtn`) reopens it at any time; opened that way it only closes and returns focus to the opener, it does nothing else
 - Controls: Back, Next (on the last step "Start playing"), Skip tour, and a "Step n of N" indicator. Numbers in the text (win score, starting points, wave-clear bonus, round of the free move) come from the shared rules, never a client copy
-- Same dialog pattern as the map preview: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside, game hotkeys are ignored while it is open
-
-Map preview step
-- Shown as a dialog over the board right after a new match (menu Start Match or Rematch) has been generated. It is not shown when the client reconnects to a running match
-- Content: a small overview of the generated map (tower spots, the road creatures walk, the monster cave and its protected no-build area, with a legend). The road is the set of buildable cells; the tower spots come from the map's `towerSpots`, the seed and size, and the player list with each player's colour/number and name
-- A "Continue" button (focused when the dialog opens) closes it and starts placement for the first player; Esc does the same. It follows the match-end modal pattern: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside
-- While it is open no tower can be placed and game hotkeys are ignored
-- The overview is drawn from the snapshot's map cells only, so it shows whatever the map contains
+- Same dialog pattern as the settings dialog: `role="dialog"`, `aria-modal="true"`, labelled by its title, page behind `inert`, focus wraps inside, game hotkeys are ignored while it is open
 
 ## In-round HUD requirements
 
@@ -239,7 +232,7 @@ Event to sound table
 - The AI Players field is enabled; there is no "Coming later" note
 
 AI players in the match
-- Bots are marked with a "BOT" badge on their scoreboard chip and in the player list; their controls are never available to the table
+- Bots are marked with a "BOT" badge on their scoreboard chip; their controls are never available to the table
 - After the last human placed a tower, the client asks the host for one bot action at a time (`POST /api/ai-step`), about 600 ms apart, and shows a toast per action such as "Bot 1 upgraded damage". The pause is client pacing only (zero in tests)
-- Hot-seat handover skips bots. With no human players there is no placement prompt, the match opens on the map preview and then plays on by itself; rematch keeps the bots and their difficulties
+- Hot-seat handover skips bots. With no human players there is no placement prompt, the match opens straight on the board and plays on by itself; rematch keeps the bots and their difficulties
 - Online mode option is hidden or disabled for MVP

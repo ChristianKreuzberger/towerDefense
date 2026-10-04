@@ -17,7 +17,7 @@ import { resetMatchCaches } from "./hydrate";
 import { snapshotToSetupPlayers } from "./bot-text";
 import { menuPlayersToSetupPlayers } from "./menu";
 import { setPlaying, syncPlaybackControls } from "./playback";
-import { mapPreview, soundEngine, tour, tourStore } from "./services";
+import { soundEngine, tour, tourStore } from "./services";
 import { store } from "./state";
 import { resetTouchSelection } from "./touch-selection";
 import { passTurnAfterReady } from "./turns";
@@ -88,15 +88,15 @@ export function startFreshMatch(wire: WireSnapshot): void {
   syncPlaybackControls();
   setMoveMode(false);
   applyWireSnapshot(wire, ++store.requestSeq);
-  // A new match (menu Start or Rematch) opens with the preview; a reconnect never reaches this function.
+  // A new match (menu Start or Rematch) goes straight to placement; a reconnect never reaches this function.
   // Re-read through a copy of the store reference: TypeScript still narrows store.current to null after the reset above.
   const fresh = (store as { current: MatchSnapshot | null }).current;
   if (fresh && fresh.phase === "placement") {
-    // First match in this browser: the how-to-play tour comes first, then the map preview.
+    // First match in this browser: the how-to-play tour comes first, then placement.
     if (tourStore.hasSeen()) {
-      mapPreview.open(fresh);
+      el.placeTowerBtn.focus();
     } else {
-      tour.open({ onClose: () => mapPreview.open(fresh) });
+      tour.open({ onClose: () => el.placeTowerBtn.focus() });
     }
   }
 }
