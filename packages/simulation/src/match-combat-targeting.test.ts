@@ -5,7 +5,7 @@ import { createMatch } from "./match-simulation.js";
 import {
   STARTING_POINTS,
   BASE_TOWER_RANGE,
-  SPAWN_PROTECTION_TICKS,
+  isInSpawnProtection,
   TOWER_RANGE_PER_LEVEL,
   type MatchEvent,
   type CreatureArchetype,
@@ -17,17 +17,17 @@ import {
   type Tower,
 } from "@tower-defense/shared";
 import { getTowerSpotsNearSpawn } from "./spawn-order.js";
-import { getBuildableCoordinate, getSecondBuildableCoordinate, createSinglePlayerWaveSimulation, tickUntil, advanceToFirstTargetableTick, findTowerCellAtDistance, tryFindTowerCellAtDistance, firstTickTarget, createPrepMatchWithTower } from "./test-helpers.js";
+import { getBuildableCoordinate, getSecondBuildableCoordinate, createSinglePlayerWaveSimulation, tickUntil, advanceToFirstTargetableTick, advanceUntilOutsideSpawnArea, findTowerCellAtDistance, tryFindTowerCellAtDistance, firstTickTarget, createPrepMatchWithTower } from "./test-helpers.js";
 
 test("records deterministic target assignments on each wave tick", () => {
   const simulation = createSinglePlayerWaveSimulation(25);
 
-  advanceToFirstTargetableTick(simulation);
+  const targetableTick = advanceToFirstTargetableTick(simulation);
 
   const snapshot = simulation.getSnapshot();
   const targetEvents = snapshot.events.filter((event) => event.type === "targets-selected");
-  assert.equal(targetEvents.length, SPAWN_PROTECTION_TICKS + 1);
-  assert.equal(targetEvents[targetEvents.length - 1]?.tick, SPAWN_PROTECTION_TICKS + 1);
+  assert.equal(targetEvents.length, targetableTick);
+  assert.equal(targetEvents[targetEvents.length - 1]?.tick, targetableTick);
   assert.equal(snapshot.targetAssignments.length, 1);
   assert.equal(snapshot.targetAssignments[0]?.towerId, "tower-p1");
   assert.equal(snapshot.targetAssignments[0]?.mode, "first");
@@ -48,11 +48,8 @@ test("first mode prefers highest pathIndex with deterministic tie-break", () => 
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "first" });
 
-  // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
-  const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
-  for (let tick = 0; tick < assignmentTick; tick += 1) {
-    simulation.applyCommand({ type: "advance-wave" });
-  }
+  // The first tick on which both creatures 1 and 2 have left the protected area and can be targeted.
+  const assignmentTick = advanceUntilOutsideSpawnArea(simulation, ["wave-1-creature-1", "wave-1-creature-2"]);
 
   const snapshot = simulation.getSnapshot();
   const assignmentEvent = [...snapshot.events]
@@ -78,11 +75,8 @@ test("last mode prefers lowest pathIndex", () => {
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "last" });
 
-  // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
-  const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
-  for (let tick = 0; tick < assignmentTick; tick += 1) {
-    simulation.applyCommand({ type: "advance-wave" });
-  }
+  // The first tick on which both creatures 1 and 2 have left the protected area and can be targeted.
+  const assignmentTick = advanceUntilOutsideSpawnArea(simulation, ["wave-1-creature-1", "wave-1-creature-2"]);
 
   const snapshot = simulation.getSnapshot();
   const assignmentEvent = [...snapshot.events]
@@ -109,11 +103,8 @@ test("strongest mode resolves hp ties deterministically", () => {
 
   simulation.applyCommand({ type: "set-target-mode", playerId: "p1", towerId: "tower-p1", mode: "strongest" });
 
-  // Creature 2 spawns on tick 3, so it is first targetable SPAWN_PROTECTION_TICKS + 3 ticks into the wave.
-  const assignmentTick = SPAWN_PROTECTION_TICKS + 3;
-  for (let tick = 0; tick < assignmentTick; tick += 1) {
-    simulation.applyCommand({ type: "advance-wave" });
-  }
+  // The first tick on which both creatures 1 and 2 have left the protected area and can be targeted.
+  const assignmentTick = advanceUntilOutsideSpawnArea(simulation, ["wave-1-creature-1", "wave-1-creature-2"]);
 
   const snapshot = simulation.getSnapshot();
   const assignmentEvent = [...snapshot.events]
@@ -351,23 +342,29 @@ test("upgrading a tower extends its range to a previously out-of-range creature"
   assert.equal(firstTickTarget(seed, cell, "first", 1), "wave-1-creature-1");
 });
 
-test("a freshly spawned creature is untargetable and undamaged until spawn protection ends", () => {
-  const seed = 49;
-  // The lane is independent of the tower, so record where creature 1 is on every tick 1..SPAWN_PROTECTION_TICKS + 1
-  // and pick a cell that covers all of those positions: the creature is in range the whole time.
-  const laneProbe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
-  const probeCells = [...getTowerSpotsNearSpawn(seed)].reverse();
-  const probeCell = probeCells.find(
-    (entry) => laneProbe.applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
+// The lane does not depend on the tower, so a probe run tells where creature 1 is on every tick until it leaves the
+// protected area. Returns a tower cell that reaches all of those positions, so the creature is in range the whole time.
+function findCellCoveringSpawnAreaExit(seed: number): { cell: { x: number; y: number }; lane: Array<{ x: number; y: number }> } | null {
+  const probe = createMatch({ players: [{ id: "p1", name: "Probe" }], seed });
+  const probeCell = [...getTowerSpotsNearSpawn(seed)].reverse().find(
+    (entry) => probe.applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
   );
-  assert.ok(probeCell);
-  laneProbe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
+  if (!probeCell) {
+    return null;
+  }
+  probe.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   const lane: Array<{ x: number; y: number }> = [];
-  for (let tick = 1; tick <= SPAWN_PROTECTION_TICKS + 1; tick += 1) {
-    laneProbe.applyCommand({ type: "advance-wave" });
-    const probeCreature = laneProbe.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
-    assert.ok(probeCreature);
-    lane.push({ x: probeCreature.x, y: probeCreature.y });
+  for (let tick = 1; tick <= 200; tick += 1) {
+    probe.applyCommand({ type: "advance-wave" });
+    const snapshot = probe.getSnapshot();
+    const creature = snapshot.creatures.find((entry) => entry.id === "wave-1-creature-1");
+    if (!creature) {
+      return null;
+    }
+    lane.push({ x: creature.x, y: creature.y });
+    if (!isInSpawnProtection(snapshot.map, creature.x, creature.y)) {
+      break;
+    }
   }
   const cell = getTowerSpotsNearSpawn(seed).find(
     (entry) =>
@@ -375,17 +372,29 @@ test("a freshly spawned creature is untargetable and undamaged until spawn prote
       && createMatch({ players: [{ id: "p1", name: "Alpha" }], seed })
         .applyCommand({ type: "place-tower", playerId: "p1", x: entry.x, y: entry.y }).accepted
   );
-  assert.ok(cell, "expected a cell that covers the first creature during and right after spawn protection");
+  return cell ? { cell, lane } : null;
+}
+
+test("a creature inside the protected cave area is untargetable and undamaged until it walks out", () => {
+  let scenario: ReturnType<typeof findCellCoveringSpawnAreaExit> = null;
+  let seed = 0;
+  for (seed = 1; seed <= 100 && !scenario; seed += 1) {
+    scenario = findCellCoveringSpawnAreaExit(seed);
+  }
+  seed -= 1;
+  assert.ok(scenario, "expected a seed with a tower cell that covers the creature from spawn to the area's edge");
+  const { cell, lane } = scenario;
   const simulation = createMatch({ players: [{ id: "p1", name: "Alpha" }], seed });
   assert.equal(simulation.applyCommand({ type: "place-tower", playerId: "p1", x: cell.x, y: cell.y }).accepted, true);
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
 
   let baseHp: number | undefined;
-  for (let tick = 1; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
+  for (let tick = 1; tick < lane.length; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
     const snapshot = simulation.getSnapshot();
     const creature = snapshot.creatures.find((entry) => entry.id === "wave-1-creature-1");
     assert.ok(creature, `creature exists on tick ${tick}`);
+    assert.ok(isInSpawnProtection(snapshot.map, creature.x, creature.y), `inside the protected area on tick ${tick}`);
     // Without this the test could pass just because the creature is out of range.
     assert.ok(Math.hypot(cell.x - creature.x, cell.y - creature.y) <= getTowerRange(1), `in range on tick ${tick}`);
     baseHp ??= creature.hp;
@@ -395,10 +404,13 @@ test("a freshly spawned creature is untargetable and undamaged until spawn prote
   }
 
   simulation.applyCommand({ type: "advance-wave" });
+  const outside = simulation.getSnapshot();
+  const walkedOut = outside.creatures.find((entry) => entry.id === "wave-1-creature-1");
+  assert.ok(walkedOut && !isInSpawnProtection(outside.map, walkedOut.x, walkedOut.y), "creature has left the area");
   assert.equal(
-    simulation.getSnapshot().targetAssignments[0]?.targetCreatureId,
+    outside.targetAssignments[0]?.targetCreatureId,
     "wave-1-creature-1",
-    "targeted on the first tick after protection"
+    "targeted on the first tick outside the protected area"
   );
 });
 
