@@ -17,7 +17,7 @@
 - Bots act in prep only. They place their tower after all human players have placed theirs (immediately when there are no humans), then spend points, pick a damage type and target mode, and ready up. Bots can win at 1000 points like anyone else
 - Decisions are a pure function of the snapshot and the match seed (no `Math.random`, no `Date`), so the same setup gives the same match. The pause between bot actions is pacing done by the client and never changes outcomes
 - Easy: seeded random valid tower spot, buys a seeded random affordable track and sometimes saves instead, keeps physical damage and target `first`
-- Medium: places by lane coverage, buys accuracy, then damage, then range whenever affordable, picks the damage type that is strongest against the next wave
+- Medium: places by lane coverage (counting the early part of the route extra, a bit less than hard does, and avoiding spots right next to the road), buys accuracy, then damage, then range whenever affordable, picks the damage type that is strongest against the next wave
 - Hard: like medium, but weighs tower danger and the upgrade with the best expected damage per point, matches damage type to the whole next wave, switches target mode (strongest against tanks), and uses the free tower move when a clearly better spot exists
 - A match with zero humans runs on its own: no placement prompt, the player only watches
 

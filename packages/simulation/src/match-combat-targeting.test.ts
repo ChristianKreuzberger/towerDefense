@@ -166,7 +166,7 @@ test("target assignment snapshots and events are reproducible across equal runs"
 });
 
 test("emits hit events and reduces creature hp deterministically", () => {
-  const simulation = createSinglePlayerWaveSimulation(31, "explosive");
+  const simulation = createSinglePlayerWaveSimulation(21, "explosive");
 
   advanceToFirstTargetableTick(simulation);
 
@@ -220,7 +220,7 @@ test("emits creature-defeated event, removes creature, and awards points", () =>
 });
 
 test("resolves same-target multi-tower combat in deterministic towerId order", () => {
-  // Seed picked (the first one that works on the tower-spot maps) so the shots land in the order the assertions describe: hits and misses depend on the seed.
+  // Seed picked (the first one that works on the route-only maps) so the shots land in the order the assertions describe: hits and misses depend on the seed.
   const runScenario = (): {
     events: {
       hitEvents: Array<{ towerId: string; creatureId: string; remainingHp: number }>;
@@ -228,14 +228,14 @@ test("resolves same-target multi-tower combat in deterministic towerId order", (
     };
     players: Array<{ id: string; points: number }>;
   } => {
-    const firstTower = getBuildableCoordinate(31);
-    const secondTower = getSecondBuildableCoordinate(31, firstTower);
+    const firstTower = getBuildableCoordinate(21);
+    const secondTower = getSecondBuildableCoordinate(21, firstTower);
     const simulation = createMatch({
       players: [
         { id: "p2", name: "Beta" },
         { id: "p1", name: "Alpha" }
       ],
-      seed: 31
+      seed: 21
     });
 
     simulation.applyCommand({
@@ -321,7 +321,7 @@ test("range boundary is inclusive: creature at exactly range distance is targeta
   // Distances are checked via hypot, so only an axis-aligned cell gives an exact integer distance. With the short
   // range and moving creatures such a cell does not exist on every seed, so take the first seed that has one.
   let found: { seed: number; cell: { x: number; y: number } } | null = null;
-  for (let seed = 40; seed < 300 && !found; seed += 1) {
+  for (let seed = 1; seed < 300 && !found; seed += 1) {
     const cell = tryFindTowerCellAtDistance(seed, range - 1e-9, range);
     found = cell ? { seed, cell } : null;
   }
@@ -330,7 +330,7 @@ test("range boundary is inclusive: creature at exactly range distance is targeta
 });
 
 test("creature just beyond range is not targetable", () => {
-  const seed = 40;
+  const seed = 54;
   const range = getTowerRange(1);
   const beyond = findTowerCellAtDistance(seed, range + 1e-9, range + 1);
   assert.equal(firstTickTarget(seed, beyond, "first", 0), null);
@@ -419,7 +419,7 @@ test("tower-hit and creature-defeated events carry the cell of the creature", ()
 
 test("shots can miss at base accuracy, deterministically, and never at max accuracy", () => {
   const run = (accuracyLevel: number): { hits: number; misses: number; firstMiss: string } => {
-    const simulation = createPrepMatchWithTower(31);
+    const simulation = createPrepMatchWithTower(21);
     const tower = (simulation as unknown as { state: { towers: Tower[] } }).state.towers[0];
     assert.ok(tower);
     tower.upgrades.accuracy = accuracyLevel;
@@ -445,7 +445,7 @@ test("shots can miss at base accuracy, deterministically, and never at max accur
 });
 
 test("a miss deals no damage and carries the creature cell", () => {
-  const simulation = createPrepMatchWithTower(31);
+  const simulation = createPrepMatchWithTower(21);
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
   tickUntil(simulation, () => simulation.getSnapshot().events.some((event) => event.type === "tower-miss"), 400);
   const events = simulation.getSnapshot().events;
