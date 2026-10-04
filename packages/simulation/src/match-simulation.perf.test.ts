@@ -11,7 +11,9 @@ test("8-player match reports tick runtime over three waves", () => {
     players: playerIds.map((id) => ({ id, name: `Player ${id.slice(1)}` })),
     seed: 2024
   });
-  const candidates = getTowerSpotsNearSpawn(2024);
+  // The spots right next to the protected cave area get overrun now that creatures cannot be shot inside it, which
+  // would eliminate players mid-scenario, so the scenario starts a little farther along the lane.
+  const candidates = getTowerSpotsNearSpawn(2024).slice(3);
 
   for (const playerId of playerIds) {
     let placed = false;

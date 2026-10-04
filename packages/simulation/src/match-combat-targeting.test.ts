@@ -91,13 +91,14 @@ test("last mode prefers lowest pathIndex", () => {
 });
 
 test("strongest mode resolves hp ties deterministically", () => {
-  // Seed picked so no tower shot misses before the tie: accuracy is now below 100%, so the rolled misses depend on the seed.
+  // Seed picked so creatures 1 and 2 are both alive, with equal hp, on the first tick both are outside the protected area:
+  // accuracy is below 100% and creature 1 can be shot dead before creature 2 walks out, so this depends on the seed.
   const simulation = createMatch({
     players: [{ id: "p1", name: "Alpha" }],
-    seed: 30
+    seed: 1
   });
 
-  const firstTower = getBuildableCoordinate(30);
+  const firstTower = getBuildableCoordinate(1);
   simulation.applyCommand({ type: "place-tower", playerId: "p1", x: firstTower.x, y: firstTower.y });
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
 
