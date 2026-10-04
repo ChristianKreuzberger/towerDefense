@@ -15,7 +15,13 @@ import {
 } from "@tower-defense/shared";
 
 import { createMatch } from "./match-simulation.js";
-import { TOWER_SPOT_MIN_ROUTE_COVERAGE, generateMap } from "./procedural-map.js";
+import {
+  MAZE_BRANCH_MAX_LENGTH,
+  MAZE_MAX_BRANCHES,
+  MAZE_PITCH,
+  TOWER_SPOT_MIN_ROUTE_COVERAGE,
+  generateMap
+} from "./procedural-map.js";
 
 function roadOf(map: GameMap): Set<string> {
   return new Set(map.cells.filter((cell) => cell.buildable).map((cell) => `${cell.x},${cell.y}`));
@@ -163,4 +169,97 @@ test("createMatch refuses to start with a malformed map", () => {
     () => createMatch({ players: [{ id: "p1", name: "A" }], seed: 1, map: { ...generateMap(1), schemaVersion: 99 } }),
     /unsupported-schema-version/
   );
+});
+
+// Rebuilds the room graph (one node per MAZE_PITCH grid room) from the carved road.
+function roomGraph(map: GameMap): Map<string, string[]> {
+  const road = roadOf(map);
+  const columns = Math.floor((map.width - PATH_WIDTH) / MAZE_PITCH) + 1;
+  const rows = Math.floor((map.height - PATH_WIDTH) / MAZE_PITCH) + 1;
+  const graph = new Map<string, string[]>();
+  for (let c = 0; c < columns; c += 1) {
+    for (let r = 0; r < rows; r += 1) {
+      if (road.has(`${c * MAZE_PITCH},${r * MAZE_PITCH}`)) {
+        graph.set(`${c},${r}`, []);
+      }
+    }
+  }
+  for (const key of graph.keys()) {
+    const [c, r] = key.split(",").map(Number) as [number, number];
+    if (road.has(`${c * MAZE_PITCH + 3},${r * MAZE_PITCH}`) && graph.has(`${c + 1},${r}`)) {
+      graph.get(key)?.push(`${c + 1},${r}`);
+      graph.get(`${c + 1},${r}`)?.push(key);
+    }
+    if (road.has(`${c * MAZE_PITCH},${r * MAZE_PITCH + 3}`) && graph.has(`${c},${r + 1}`)) {
+      graph.get(key)?.push(`${c},${r + 1}`);
+      graph.get(`${c},${r + 1}`)?.push(key);
+    }
+  }
+  return graph;
+}
+
+function roomDistances(graph: Map<string, string[]>, from: string): Map<string, number> {
+  const distance = new Map<string, number>([[from, 0]]);
+  const queue = [from];
+  for (let index = 0; index < queue.length; index += 1) {
+    const key = queue[index] ?? "";
+    for (const next of graph.get(key) ?? []) {
+      if (!distance.has(next)) {
+        distance.set(next, (distance.get(key) ?? 0) + 1);
+        queue.push(next);
+      }
+    }
+  }
+  return distance;
+}
+
+for (const [label, width, height] of [["default", 50, 50], ["small", 20, 20]] as const) {
+  test(`${label} maps have few dead ends, no loops and one route between spawn and goal`, () => {
+    for (let seed = 1; seed <= 100; seed += 1) {
+      const map = generateMap(seed, width, height);
+      const graph = roomGraph(map);
+      const columns = Math.floor((width - PATH_WIDTH) / MAZE_PITCH) + 1;
+      const spawn = `0,${Math.floor((map.spawn?.y ?? 0) / MAZE_PITCH)}`;
+      const goal = `${columns - 1},${Math.floor((map.goal?.y ?? 0) / MAZE_PITCH)}`;
+      const edges = [...graph.values()].reduce((sum, list) => sum + list.length, 0) / 2;
+      assert.equal(edges, graph.size - 1, `seed ${seed} road has a loop or a detached room`);
+      const fromSpawn = roomDistances(graph, spawn);
+      const routeRooms = (fromSpawn.get(goal) ?? -1) + 1;
+      assert.ok(routeRooms >= 1, `seed ${seed} goal is not reachable`);
+      assert.ok(
+        graph.size <= routeRooms + MAZE_MAX_BRANCHES * MAZE_BRANCH_MAX_LENGTH,
+        `seed ${seed} carves ${graph.size} rooms for a route of ${routeRooms}`
+      );
+      const leaves = [...graph.values()].filter((list) => list.length === 1).length;
+      assert.ok(leaves <= 2 + MAZE_MAX_BRANCHES, `seed ${seed} has ${leaves} dead ends`);
+    }
+  });
+}
+
+test("spawn and goal rooms are the pair of left and right edge rooms furthest apart in the carved maze", () => {
+  for (let seed = 1; seed <= 100; seed += 1) {
+    const map = generateMap(seed);
+    const graph = roomGraph(map);
+    const columns = Math.floor((map.width - PATH_WIDTH) / MAZE_PITCH) + 1;
+    const spawn = `0,${Math.floor((map.spawn?.y ?? 0) / MAZE_PITCH)}`;
+    const goal = `${columns - 1},${Math.floor((map.goal?.y ?? 0) / MAZE_PITCH)}`;
+    const route = roomDistances(graph, spawn).get(goal) ?? -1;
+    assert.ok((route + 1) * MAZE_PITCH >= map.width, `seed ${seed} route is shorter than the map is wide`);
+    for (const start of graph.keys()) {
+      if (!start.startsWith("0,")) {
+        continue;
+      }
+      for (const [room, steps] of roomDistances(graph, start)) {
+        if (room.startsWith(`${columns - 1},`)) {
+          assert.ok(steps <= route, `seed ${seed}: ${start} to ${room} is longer than the spawn to goal route`);
+        }
+      }
+    }
+  }
+});
+
+test("every default map still gets the full set of tower spots", () => {
+  for (let seed = 1; seed <= 300; seed += 1) {
+    assert.equal(generateMap(seed).towerSpots.length, TOWER_SPOT_COUNT, `seed ${seed}`);
+  }
 });

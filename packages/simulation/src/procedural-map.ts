@@ -23,13 +23,14 @@ function hashCoordinates(seed: number, x: number, y: number): number {
 
 // Corridors sit on a coarse grid every MAZE_PITCH cells and are PATH_WIDTH cells wide, so the walls between them are
 // MAZE_PITCH - PATH_WIDTH cells thick. That leaves room for tower spots beside the road without touching it.
-const MAZE_PITCH = 6;
-// Share of the walls between neighbouring corridors that are knocked through, so the maze has a few loops.
-const MAZE_LOOP_CHANCE = 0.08;
+export const MAZE_PITCH = 6;
+// Side branches kept next to the route: how many, and how many rooms long at most.
+export const MAZE_MAX_BRANCHES = 2;
+export const MAZE_BRANCH_MAX_LENGTH = 2;
 
-// Carves a maze (seeded randomized depth-first search) and returns the corridor cells.
-// Hash inputs with negative coordinates keep the maze independent of the noise layer.
-// Creatures enter on the left edge and leave on the right edge, at the pair of rooms furthest apart, so the route is long.
+// Carves a maze (seeded randomized depth-first search) only to find the route, then carves just that route plus a few
+// short side branches, so the map has few dead ends. Hash inputs with negative coordinates keep the maze independent of
+// the noise layer. Creatures enter on the left edge and leave on the right edge, at the pair of rooms furthest apart.
 function carveLane(
   seed: number,
   width: number,
@@ -39,9 +40,31 @@ function carveLane(
   const columns = Math.floor((width - PATH_WIDTH) / MAZE_PITCH) + 1;
   const rows = Math.floor((height - PATH_WIDTH) / MAZE_PITCH) + 1;
   const lane = new Set<string>();
+  // The spanning tree of rooms. Nothing is carved until the route is known.
   const neighbours = new Map<string, string[]>();
 
-  const link = (ax: number, ay: number, bx: number, by: number): void => {
+  const connect = (ax: number, ay: number, bx: number, by: number): void => {
+    const from = `${ax},${ay}`;
+    const to = `${bx},${by}`;
+    neighbours.set(from, [...(neighbours.get(from) ?? []), to]);
+    neighbours.set(to, [...(neighbours.get(to) ?? []), from]);
+  };
+
+  const carved = new Set<string>();
+  const carveRoom = (key: string): void => {
+    carved.add(key);
+    const [rx, ry] = key.split(",").map(Number) as [number, number];
+    for (let x = rx * MAZE_PITCH; x < rx * MAZE_PITCH + PATH_WIDTH; x += 1) {
+      for (let y = ry * MAZE_PITCH; y < ry * MAZE_PITCH + PATH_WIDTH; y += 1) {
+        lane.add(`${x},${y}`);
+      }
+    }
+  };
+  const carveLink = (from: string, to: string): void => {
+    carveRoom(from);
+    carveRoom(to);
+    const [ax, ay] = from.split(",").map(Number) as [number, number];
+    const [bx, by] = to.split(",").map(Number) as [number, number];
     // The rectangle covers both rooms' PATH_WIDTH-wide bands and the corridor between them.
     for (
       let x = Math.min(ax, bx) * MAZE_PITCH;
@@ -56,10 +79,6 @@ function carveLane(
         lane.add(`${x},${y}`);
       }
     }
-    const from = `${ax},${ay}`;
-    const to = `${bx},${by}`;
-    neighbours.set(from, [...(neighbours.get(from) ?? []), to]);
-    neighbours.set(to, [...(neighbours.get(to) ?? []), from]);
   };
 
   const visited = new Set<string>(["0,0"]);
@@ -96,38 +115,26 @@ function carveLane(
     if (!next) {
       continue;
     }
-    link(current.x, current.y, next.x, next.y);
+    connect(current.x, current.y, next.x, next.y);
     visited.add(`${next.x},${next.y}`);
     stack.push(next);
   }
 
-  for (let x = 0; x < columns; x += 1) {
-    for (let y = 0; y < rows; y += 1) {
-      for (const next of [
-        { x: x + 1, y },
-        { x, y: y + 1 },
-      ]) {
-        const loop =
-          hashCoordinates(seed, -100 - x * rows - y, next.x - x) / 0xffffffff <
-          MAZE_LOOP_CHANCE;
-        if (next.x < columns && next.y < rows && loop) {
-          link(x, y, next.x, next.y);
-        }
-      }
-    }
-  }
-
+  // Furthest left-edge / right-edge pair of rooms. The tree has one path between two rooms, so that path is the route.
   let startRow = 0;
   let exitRow = 0;
   let longest = -1;
+  let routeParents = new Map<string, string>();
   for (let row = 0; row < rows; row += 1) {
     const distance = new Map<string, number>([[`0,${row}`, 0]]);
+    const parents = new Map<string, string>();
     const queue = [`0,${row}`];
     for (let index = 0; index < queue.length; index += 1) {
       const key = queue[index] ?? "";
       for (const next of neighbours.get(key) ?? []) {
         if (!distance.has(next)) {
           distance.set(next, (distance.get(key) ?? 0) + 1);
+          parents.set(next, key);
           queue.push(next);
         }
       }
@@ -138,9 +145,48 @@ function carveLane(
         longest = steps;
         startRow = row;
         exitRow = y;
+        routeParents = parents;
       }
     }
   }
+
+  const route: string[] = [];
+  for (let key: string | undefined = `${columns - 1},${exitRow}`; key; key = routeParents.get(key)) {
+    route.unshift(key);
+  }
+  carveRoom(route[0] ?? `0,${startRow}`);
+  for (let index = 1; index < route.length; index += 1) {
+    carveLink(route[index - 1] ?? "", route[index] ?? "");
+  }
+
+  // A few short dead-end branches off the route, so the cave is not a bare snake. Each has its own hash stream.
+  for (let branch = 0; branch < MAZE_MAX_BRANCHES; branch += 1) {
+    const starts: Array<[string, string]> = [];
+    for (const room of route) {
+      for (const next of neighbours.get(room) ?? []) {
+        if (!carved.has(next)) {
+          starts.push([room, next]);
+        }
+      }
+    }
+    if (starts.length === 0) {
+      break;
+    }
+    const pick = starts[hashCoordinates(seed, -1000 - branch, 0) % starts.length];
+    if (!pick) {
+      break;
+    }
+    const length = 1 + (hashCoordinates(seed, -1000 - branch, 1) % MAZE_BRANCH_MAX_LENGTH);
+    let from = pick[0];
+    let to: string | undefined = pick[1];
+    for (let room = 0; room < length && to; room += 1) {
+      carveLink(from, to);
+      const onward: string[] = (neighbours.get(to) ?? []).filter((next) => !carved.has(next));
+      from = to;
+      to = onward[hashCoordinates(seed, -2000 - branch, room) % Math.max(onward.length, 1)];
+    }
+  }
+
   // The last corridor column may stop short of the right edge when the width is not a multiple of the pitch.
   for (let x = (columns - 1) * MAZE_PITCH; x < width; x += 1) {
     for (let y = exitRow * MAZE_PITCH; y < exitRow * MAZE_PITCH + PATH_WIDTH; y += 1) {
