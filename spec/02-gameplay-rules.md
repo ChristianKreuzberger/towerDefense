@@ -48,7 +48,7 @@
 - A tower fires at most once per tick. Whether the shot hits is decided deterministically from the match seed, wave, tick and tower id (no hidden randomness), against the tower's accuracy: 70% at accuracy level 1, +7.5 percentage points per level, 100% at level 5. A miss deals no damage and emits a `tower-miss` event
 - Damage per shot is 1 at damage level 1 and +1 per damage level
 - A tower with no creature in range has no target and does not fire
-- Takes damage from creature attacks
+- Starts with 175 HP (raised from 100 when waves grew to 1.5x size, see spec/06) and takes damage from creature attacks
 - Auto-repaired between rounds (must be clearly shown in UI)
 
 ## Enemy model
@@ -60,7 +60,7 @@
 - Closer is stronger: the damage of each hit is the archetype's base attack damage times a distance band multiplier (x3 within 1.5 cells, x2 within 2.5, x1 within 3.5), scaled by 1.2 and rounded (see spec/06). Each tower in reach is hit with the band for its own distance, so clustered towers all take damage. The worst single hit is a tank next to a tower: round(3 x 3 x 1.2) = 11 HP
 - Hits are resolved in a fixed order (creatures by id, then towers by id) and one `creature-attack` event is emitted per creature and tower hit. The `creature-targets-selected` event still reports one primary target per creature: its preferred tower while that is in reach, otherwise the nearest tower in reach (ties: lower health, then id). It is informational only; damage does not depend on it
 - Archetypes: runner, tank, armored, swarm
-- Wave size and composition are fixed and public: wave N has N + 2 creatures, spawned one every 2 ticks, cycling runner, swarm, armored, tank in that order (so wave 1 is runner, swarm, armored; wave 2 adds a tank). The same rule gives the composition shown in the next-wave preview. The snapshot carries `creaturesToSpawn`, the number of creatures of the current wave that have not spawned yet
+- Wave size and composition are fixed and public: wave N has ceil(1.5 x (N + 2)) creatures (wave 1 = 5, wave 2 = 6, wave 5 = 11), spawned one every 2 ticks, cycling runner, swarm, armored, tank in that order (so wave 1 is two runners, a swarm, an armored and a tank). The same rule gives the composition shown in the next-wave preview. The snapshot carries `creaturesToSpawn`, the number of creatures of the current wave that have not spawned yet
 - Spawn protection: a creature is untargetable and takes no damage for its first 1 second (`CREATURE_SPAWN_PROTECTION_SECONDS`, 5 simulation ticks at the client's 5 ticks per second) after it appears at the monster cave. It still moves and can attack normally; towers just skip it until the protection ends
 - Later archetypes can include shield or split-on-death
 

@@ -55,7 +55,7 @@ test("a tower can be placed as a player switched to via hotkey", async ({ page }
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("2");
   await clickTowerSpot(page);
-  await expect(page.locator("#playerCards .player-chip").nth(1)).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards .player-chip").nth(1)).toContainText("Tower 175/175");
   await expect(page.locator("#playerCards .player-chip").nth(0)).toContainText("Tower not placed");
 });
 
@@ -77,7 +77,7 @@ test("hotkeys do nothing when the action is not available", async ({ page }) => 
 
   // After placing, T (place tower) is no longer available either.
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
   commands.length = 0;
   await page.keyboard.press("t");
   await page.waitForTimeout(300);

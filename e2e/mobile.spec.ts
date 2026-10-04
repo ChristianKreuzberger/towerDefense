@@ -51,7 +51,7 @@ for (const size of [
         // Compact layout: the first tap only selects the spot, the second confirms.
         await clickTowerSpot(page);
       }
-      await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+      await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
       expect(await boardBox(page)).toEqual(before);
       await page.locator("#readyBtn").click();
       await expect(page.locator("#turnBanner")).toHaveClass(/show/);
@@ -156,7 +156,7 @@ test.describe("compact layout", () => {
     await startMatch(page, "/");
     await page.locator("#board canvas").tap({ position: await cellPixel(page) });
     await page.locator("#board canvas").tap({ position: await cellPixel(page) });
-    await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+    await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
     const [tower] = await towers(page);
     await expect(page.locator("#towerMenu")).toBeHidden();
 
@@ -190,7 +190,7 @@ test.describe("tower popover on desktop", () => {
   test("a click opens it next to the tower, hot-seat switches to the owner, and a free cell closes it", async ({ page }) => {
     await startMatch(page, "/");
     await clickTowerSpot(page, 0);
-    await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+    await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
     await page.locator("#readyBtn").click();
     await expect(page.locator("#playerId")).toHaveValue("p2");
     const [first] = await towers(page);
@@ -230,7 +230,7 @@ test.describe("zoom and pan", () => {
     const zoomedAt = await page.evaluate(({ x, y }) => window.__testBoard!.cellToPixel(x, y), spot);
     expect(Math.abs(zoomedAt.x - at.x)).toBeLessThan(2);
     await canvas.click({ position: zoomedAt });
-    await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+    await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
     expect(await towers(page)).toMatchObject([{ x: spot.x, y: spot.y }]);
 
     await page.locator("#zoomFitBtn").click();

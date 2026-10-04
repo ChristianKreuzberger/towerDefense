@@ -464,7 +464,7 @@ function archetypeOfCreature(events: MatchEvent[], creatureId: string): Creature
 }
 
 function runWaveWithDamageType(damageType: DamageType, damageLevel = 1): ReturnType<typeof createMatch> {
-  const simulation = createPrepMatchWithTower(31);
+  const simulation = createPrepMatchWithTower(21);
   assert.deepEqual(
     simulation.applyCommand({ type: "set-damage-type", playerId: "p1", towerId: "tower-p1", damageType }),
     { accepted: true }
@@ -473,7 +473,7 @@ function runWaveWithDamageType(damageType: DamageType, damageLevel = 1): ReturnT
   assert.ok(tower);
   tower.upgrades.damage = damageLevel;
   simulation.applyCommand({ type: "ready-for-wave", playerId: "p1" });
-  tickUntil(simulation, () => simulation.getSnapshot().phase !== "wave", 400);
+  tickUntil(simulation, () => simulation.getSnapshot().phase !== "wave", 800);
   return simulation;
 }
 

@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  DEFAULT_TOWER_HEALTH,
   MAX_TOWER_LEVEL,
+  getBetweenWaveTowerRepairAmount,
   TICKS_PER_SECOND,
   getTowerAccuracy,
   getTowerDamage,
@@ -68,4 +70,9 @@ test("the style tier never exceeds the last tier and tolerates bad levels", () =
   assert.equal(getTowerStyleTier(0), 0);
   // The highest reachable overall level (every track maxed) is exactly the last tier.
   assert.equal(getTowerStyleTier(1 + 3 * (MAX_TOWER_LEVEL - 1)), TOWER_STYLE_TIERS - 1);
+});
+
+test("towers start with 175 HP and repair 35 HP between waves", () => {
+  assert.equal(DEFAULT_TOWER_HEALTH, 175);
+  assert.equal(getBetweenWaveTowerRepairAmount(DEFAULT_TOWER_HEALTH), 35);
 });

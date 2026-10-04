@@ -44,7 +44,7 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   expect(guideBox && canvasBox && guideBox.y + guideBox.height <= canvasBox.y).toBe(true);
 
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 
   await page.locator("#playerId").selectOption("p2");
   await clickCellNearSpawn(page, 1);
@@ -69,8 +69,8 @@ test("completes the local setup flow, auto-plays combat, and rematches", async (
   await expect(page.locator("#playbackControls")).toBeHidden();
   // The shorter range and spawn protection mean the tower now takes more damage in wave 1, so the exact
   // repair amount is no longer fixed; what matters is that the repair is announced.
-  await expect(page.locator("#feedbackQueue")).toContainText(/Alpha tower repaired \+\d+ HP \(\d+\/100\)/);
-  await expect(page.locator("#playerCards")).toContainText(/Tower \d+\/100/);
+  await expect(page.locator("#feedbackQueue")).toContainText(/Alpha tower repaired \+\d+ HP \(\d+\/175\)/);
+  await expect(page.locator("#playerCards")).toContainText(/Tower \d+\/175/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveClass(/repair-pulse/);
   await expect(page.locator('[data-tower-id="tower-p1"] .tower-hp-bar')).toHaveAttribute("role", "progressbar");
 
@@ -141,7 +141,7 @@ test("readying up hands the turn to the next player who is not ready", async ({ 
 test("starting a match over a running one asks first, and the menu offers to resume", async ({ page }) => {
   await startMatch(page, "/");
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 
   await page.getByRole("button", { name: "Back To Menu" }).click();
   await expect(page.locator("#menuScreen")).toBeVisible();
@@ -160,7 +160,7 @@ test("starting a match over a running one asks first, and the menu offers to res
 
   await page.locator("#menuResumeBtn").click();
   await expect(page.locator("#gameScreen")).toBeVisible();
-  await expect(page.locator("#playerCards")).toContainText("Tower 100/100");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 });
 
 test("after the match ended the ready and place-tower buttons are disabled and the status names the winner", async ({ page }) => {

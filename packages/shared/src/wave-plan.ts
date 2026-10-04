@@ -5,7 +5,9 @@ export const WAVE_SPAWN_ARCHETYPES: readonly CreatureArchetype[] = ["runner", "s
 export const WAVE_SPAWN_INTERVAL_TICKS = 2;
 
 export function getWaveCreatureCount(wave: number): number {
-  return Math.max(0, Math.floor(wave)) + 2;
+  // ceil(1.5 * (wave + 2)) in integer math, so the count never depends on float rounding.
+  const base = Math.max(0, Math.floor(wave)) + 2;
+  return Math.ceil((base * 3) / 2);
 }
 
 // 1-based position of a creature within its wave.

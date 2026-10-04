@@ -11,7 +11,7 @@ export const WIN_SCORE = 1000;
 export const STARTING_POINTS = 100;
 export const DEFAULT_MAP_WIDTH = 50;
 export const DEFAULT_MAP_HEIGHT = 50;
-export const DEFAULT_TOWER_HEALTH = 100;
+export const DEFAULT_TOWER_HEALTH = 175;
 export const BUILDABLE_CELL_THRESHOLD = 0.3;
 // Road width in cells: two creatures can walk side by side or overtake (spec/05).
 export const PATH_WIDTH = 2;

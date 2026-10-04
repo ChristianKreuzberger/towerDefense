@@ -64,10 +64,17 @@ test("the same seed gives the same bot decisions and a different seed changes ea
 });
 
 test("hard matches the damage type to the whole next wave, easy never changes it", () => {
-  // Wave 1 is runner, swarm, armored: explosive scores highest by points per damage.
+  // The first wave is now runner x2, swarm, armored, tank: physical (the default) already scores highest, so hard keeps it.
   const hard = botMatch(5, ["hard"]);
   const hardCommands = runPrep(hard);
-  const damageType = hardCommands.find((command) => command.type === "set-damage-type");
+  assert.equal(hardCommands.some((command) => command.type === "set-damage-type"), false);
+
+  // Wave 0's mix (runner, swarm, armored) is best hit by explosive, so a hard bot facing it switches.
+  const placed = botMatch(5, ["hard"]);
+  const place = planAiCommands(placed.getSnapshot(), "p1", "hard")[0];
+  assert.equal(place?.type, "place-tower");
+  assert.equal(placed.applyCommand(place as SimulationCommand).accepted, true);
+  const [damageType] = planAiCommands({ ...placed.getSnapshot(), wave: 0 }, "p1", "hard");
   assert.equal(damageType?.type === "set-damage-type" ? damageType.damageType : null, "explosive");
 
   const easyCommands = runPrep(botMatch(5, ["easy"]));
@@ -107,7 +114,8 @@ test("a ready bot and an unknown player plan nothing", () => {
 });
 
 test("a hard bot with a poor spot uses its free tower move once it unlocks", () => {
-  const simulation = botMatch(5, ["hard"]);
+  // Seed 1: with the bigger waves a tower on the worst spot survives the early waves here (it dies on most other seeds).
+  const simulation = botMatch(1, ["hard"]);
   const opening = simulation.getSnapshot();
   const ranked = planAiCommands(opening, "p1", "hard");
   const worst = ranked.at(-1);
