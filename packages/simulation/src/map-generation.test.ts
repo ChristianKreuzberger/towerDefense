@@ -258,8 +258,15 @@ test("spawn and goal rooms are the pair of left and right edge rooms furthest ap
   }
 });
 
-test("every default map still gets the full set of tower spots", () => {
+test("every default map still gets the base tower spots, listed before the extras", () => {
+  const byRow = (a: { x: number; y: number }, b: { x: number; y: number }): number => a.y - b.y || a.x - b.x;
   for (let seed = 1; seed <= 300; seed += 1) {
-    assert.equal(generateMap(seed).towerSpots.length, TOWER_SPOT_COUNT, `seed ${seed}`);
+    const spots = generateMap(seed).towerSpots;
+    assert.ok(spots.length >= TOWER_SPOT_COUNT, `seed ${seed} has only ${spots.length} spots`);
+    assert.ok(spots.length <= TOWER_SPOT_TOTAL, `seed ${seed}`);
+    const base = spots.slice(0, TOWER_SPOT_COUNT);
+    const extras = spots.slice(TOWER_SPOT_COUNT);
+    assert.deepEqual(base, [...base].sort(byRow), `seed ${seed} base spots are not in row order`);
+    assert.deepEqual(extras, [...extras].sort(byRow), `seed ${seed} extras are not in row order`);
   }
 });

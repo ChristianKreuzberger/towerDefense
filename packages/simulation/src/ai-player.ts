@@ -71,8 +71,8 @@ function proximityMultiplier(distance: number): number {
 // Hard values the early part of the route more: a creature that dies upstream never reaches the towers behind, and
 // the points go to whoever lands the killing shot.
 const EARLY_ROUTE_BONUS = 1;
-// Medium notices it too, at about two thirds of hard's weight.
-const MEDIUM_EARLY_ROUTE_BONUS = 0.7;
+// Medium notices it too, but only a little.
+const MEDIUM_EARLY_ROUTE_BONUS = 0.15;
 const HARD_EXPOSURE_WEIGHT = 1;
 
 function earlyWeightedCoverage(route: readonly Spot[], spot: Spot, range: number, earlyBonus: number): number {
