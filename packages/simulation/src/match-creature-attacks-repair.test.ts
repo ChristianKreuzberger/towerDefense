@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { createMatch } from "./match-simulation.js";
 import {
   DEFAULT_TOWER_HEALTH,
-  SPAWN_PROTECTION_TICKS,
   type MatchEvent,
   getBetweenWaveTowerRepairAmount,
   getCreatureAttackDamageAt,
@@ -392,7 +391,7 @@ function getRangeTestSeed(): number {
   return rangeTestSeed;
 }
 
-const RANGE_TICK = SPAWN_PROTECTION_TICKS + 1;
+const RANGE_TICK = 1;
 
 // Position of a creature on a given wave tick. The lane does not depend on where the tower stands, so a probe
 // with the farthest placeable tower tells us where the creature will be in the real match.
@@ -432,7 +431,6 @@ function tryFindRangeScenario(
   maxInclusive: number
 ): { tick: number; cell: { x: number; y: number } } | null {
   const map = generateMap(seed);
-  // Early ticks put the creature inside the protected cave area where no tower can stand.
   for (let tick = RANGE_TICK; tick <= 40; tick += 1) {
     let roughPosition: { x: number; y: number };
     try {
@@ -542,14 +540,11 @@ test("a runner cannot hit a tower 3 cells away but an armored creature can", () 
   assert.equal(armoredAttacks[0]?.damage, 2);
 
   // A tower this close to the lane shoots a runner dead long before it reaches the diagonal, so the runner is kept
-  // out of the tower's sights (spawn protection that never ends). Protected creatures still move and attack.
+  // out of the tower's sights (spawn protection that never ends, see freezeSpawnProtection). Protected creatures still move and attack.
   const runner = findCellJustOutOfRunnerReach(getRangeTestSeed());
   const runnerSim = createMatchWithTowerAt(getRangeTestSeed(), runner.cell);
   runToTick(runnerSim, 1);
-  const internals = runnerSim as unknown as { state: { creatures: Creature[] } };
-  for (const creature of internals.state.creatures) {
-    creature.spawnTick = Number.MAX_SAFE_INTEGER;
-  }
+  freezeSpawnProtection(runnerSim);
   runToTick(runnerSim, runner.tick - 1);
   const runnerNow = runnerSim.getSnapshot().creatures.find((entry) => entry.id === "wave-1-creature-1");
   assert.ok(runnerNow, "runner is alive on the tick it passes the tower");
@@ -606,10 +601,7 @@ test("ranged creature attacks are deterministic for the same seed", () => {
 // Spawn protection that never ends keeps the tower from shooting the creatures, so they live long enough to walk past
 // it. Protected creatures still move and attack normally.
 function freezeSpawnProtection(simulation: ReturnType<typeof createMatch>): void {
-  const internals = simulation as unknown as { state: { creatures: Creature[] } };
-  for (const creature of internals.state.creatures) {
-    creature.spawnTick = Number.MAX_SAFE_INTEGER;
-  }
+  (simulation as unknown as { isSpawnProtected: () => boolean }).isSpawnProtected = () => true;
 }
 
 test("a runner hits a tower 2 cells away for double damage", () => {

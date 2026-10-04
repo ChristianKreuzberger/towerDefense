@@ -98,7 +98,7 @@ Hand-built `GameMap` objects in tests are not validated unless a test calls `val
 - The cave is rendered as a visible cave mouth, and its protected area is shown as a faint warning tint.
 - Protected area: every cell within `SPAWN_PROTECTION_RADIUS` (5 cells, Euclidean) of the cave. No tower spot lies there, and placement would be rejected (reject reason `spawn-protected`).
 - Why 5: a level 1 tower has a range of 6, so towers just outside the area (radius 5) reach only about 1 cell into it and barely cover the cave exit, and nobody can stand next to it and kill monsters the moment they appear.
-- Why it is not enough alone: the protected radius only keeps towers away from the cave. Creatures are additionally invulnerable and untargetable for their first 1 second after spawning (see spec/02 and spec/06), so the cave exit cannot be camped even by a tower at the edge of its range.
+- Creatures are shielded too: a creature inside the protected area is invulnerable and untargetable until it walks out of it (see spec/02 and spec/06), so the cave exit cannot be camped even by a tower at the edge of its range.
 - The left-to-right route check starts from the cave cell, not from any cell on the left edge.
 
 ## Versioning

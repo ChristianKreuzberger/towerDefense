@@ -40,13 +40,9 @@ export const CATCH_UP_GAP_FRACTION = 0.1;
 export const CATCH_UP_MAX_BONUS = 30;
 // Most points one player can earn from swarm kills in a single wave.
 export const SWARM_KILL_INCOME_CAP_PER_WAVE = 80;
-// Cells (Euclidean) around the monster cave where towers are forbidden. Slightly smaller than the base
+// Cells (Euclidean) around the monster cave where towers are forbidden and creatures cannot be targeted or damaged. Slightly smaller than the base
 // tower range (6), so towers just outside barely reach the cave exit, and nobody can point-blank the spawn.
 export const SPAWN_PROTECTION_RADIUS = 5;
-// Creatures cannot be targeted or damaged for this long after spawning, so nobody camps the cave exit.
-export const CREATURE_SPAWN_PROTECTION_SECONDS = 1;
-// The client runs 5 simulation ticks per second at 1x speed, and the simulation counts ticks, not seconds.
-export const SPAWN_PROTECTION_TICKS = CREATURE_SPAWN_PROTECTION_SECONDS * 5;
 export const BASE_TOWER_RANGE = 6;
 export const TOWER_RANGE_PER_LEVEL = 1.5;
 // Highest level of each upgrade track (spec/06). A default chosen with the economy spec.
@@ -94,8 +90,6 @@ export const GAME_RULES = {
   catchUpMaxBonus: CATCH_UP_MAX_BONUS,
   swarmKillIncomeCapPerWave: SWARM_KILL_INCOME_CAP_PER_WAVE,
   spawnProtectionRadius: SPAWN_PROTECTION_RADIUS,
-  creatureSpawnProtectionSeconds: CREATURE_SPAWN_PROTECTION_SECONDS,
-  spawnProtectionTicks: SPAWN_PROTECTION_TICKS,
   baseTowerRange: BASE_TOWER_RANGE,
   towerRangePerLevel: TOWER_RANGE_PER_LEVEL,
   maxTowerLevel: MAX_TOWER_LEVEL,

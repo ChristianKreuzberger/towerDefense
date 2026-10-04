@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 
 import { createMatch } from "./match-simulation.js";
 import {
-  SPAWN_PROTECTION_TICKS,
   isInSpawnProtection,
   getTowerUpgradeCost,
   type DamageType,
@@ -10,7 +9,7 @@ import {
 import { generateMap } from "./procedural-map.js";
 import { getTowerSpotsNearSpawn } from "./spawn-order.js";
 
-// Where the first creature is on the first tick it can be targeted. With range 6 and spawn protection, towers
+// Where the first creature is on the first tick it can be targeted. With range 6 and the protected cave area, towers
 // sorted by distance to the cave itself would see creatures walk out of range before they become shootable.
 export function getFirstTargetablePosition(seed: number): { x: number; y: number } {
   const candidates = getTowerSpotsNearSpawn(seed);
@@ -156,12 +155,26 @@ export const LANE_SEEDS = [1, 19, 42, 777, 2024, 31337, 99999];
 
 export type TargetMode = "first" | "last" | "strongest" | "nearest";
 
-// Creatures cannot be targeted for their first SPAWN_PROTECTION_TICKS ticks, so the first creature is
-// shootable on the tick after the protected ones. Wave ticks start at 1 and creature 1 spawns on tick 1.
-export function advanceToFirstTargetableTick(simulation: ReturnType<typeof createMatch>): void {
-  for (let tick = 0; tick <= SPAWN_PROTECTION_TICKS; tick += 1) {
+// Creatures cannot be targeted while they are inside the cave's protected area. Advances the wave until all the
+// given creatures exist and are outside it, and returns the wave tick reached (wave ticks start at 1).
+export function advanceUntilOutsideSpawnArea(
+  simulation: ReturnType<typeof createMatch>,
+  creatureIds: string[]
+): number {
+  for (let tick = 1; tick <= 200; tick += 1) {
     simulation.applyCommand({ type: "advance-wave" });
+    const snapshot = simulation.getSnapshot();
+    const creatures = creatureIds.map((id) => snapshot.creatures.find((entry) => entry.id === id));
+    if (creatures.every((creature) => creature && !isInSpawnProtection(snapshot.map, creature.x, creature.y))) {
+      return tick;
+    }
   }
+  assert.fail(`${creatureIds.join(", ")} never left the protected area`);
+}
+
+// The first creature is shootable on the tick it leaves the protected area.
+export function advanceToFirstTargetableTick(simulation: ReturnType<typeof createMatch>): number {
+  return advanceUntilOutsideSpawnArea(simulation, ["wave-1-creature-1"]);
 }
 
 // Finds a tower cell whose distance to the first spawned creature lies in (minExclusive, maxInclusive].

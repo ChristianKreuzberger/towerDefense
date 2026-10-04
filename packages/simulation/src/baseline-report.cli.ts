@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import {
   getTowerUpgradeCost,
+  isInSpawnProtection,
   type SimulationCommand,
   type TowerTargetMode,
   type UpgradeTrack
@@ -158,9 +159,10 @@ function applyCommandOrThrow(
 }
 
 // Towers only go on tower spots, which sit a little off the road. Baseline towers take the spots whose nearest road
-// cell is earliest along the creatures' walk, so they cover the start of the lane. Changing the order shifts the
-// balance baseline.
-const SPAWN_ANCHOR_X = 0;
+// cell is earliest along the creatures' walk, starting a few cells after the protected cave area (where creatures
+// cannot be shot). Towers right at the edge of that area get overrun in wave 2 and eliminate players, so the baseline
+// towers start further along. Changing the order shifts the balance baseline.
+const LANE_CELLS_BEFORE_COVERAGE = 8;
 
 // The lane runs from the cave to the east edge and only detours around a tower standing on it, so a probe match
 // with a tower far from the lane reveals the lane the real match will use.
@@ -201,7 +203,8 @@ function placeTowersDeterministically(
     .sort((a, b) => a.localeCompare(b));
 
   const lane = probeLane(scenario.seed);
-  const walked = lane.filter((cell) => cell.x >= SPAWN_ANCHOR_X);
+  const spawn = simulation.getSnapshot().map;
+  const walked = lane.filter((cell) => !isInSpawnProtection(spawn, cell.x, cell.y)).slice(LANE_CELLS_BEFORE_COVERAGE);
   const nearestIndex = (spot: { x: number; y: number }): { index: number; distance: number } => {
     let best = { index: Number.POSITIVE_INFINITY, distance: Number.POSITIVE_INFINITY };
     walked.forEach((cell, index) => {

@@ -1,4 +1,5 @@
 import {
+  isInSpawnProtection,
   getCreatureAttackDamageAt,
   isWithinCreatureAttackRange,
   getCreatureBaseHp,
@@ -18,7 +19,6 @@ import {
   getTowerDamage,
   getTowerOverallLevel,
   getTowerRange,
-  SPAWN_PROTECTION_TICKS,
   type CommandResult,
   type BalanceAnalysisSnapshot,
   type MatchEvent,
@@ -945,9 +945,9 @@ export class MatchSimulation {
     }));
   }
 
-  // Protected for the spawn tick and the following ticks, so the creature gets a full second of travel before it can be shot.
+  // Protection is by location: inside the cave's protected area a creature cannot be shot, so the exit cannot be camped.
   private isSpawnProtected(creature: Creature): boolean {
-    return this.state.waveTick - creature.spawnTick < SPAWN_PROTECTION_TICKS;
+    return isInSpawnProtection(this.state.map, creature.x, creature.y);
   }
 
   private selectCreatureTargetForTower(tower: Tower): Creature | undefined {
