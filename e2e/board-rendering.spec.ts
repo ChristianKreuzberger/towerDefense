@@ -28,7 +28,7 @@ test("clicking the road is refused with a hint, and a tower spot accepts the tow
   expect(afterRoad.snapshot.towers).toHaveLength(0);
 
   await clickTowerSpot(page);
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 });
 
 test("creatures glide between snapshots instead of jumping", async ({ page }) => {
@@ -118,7 +118,7 @@ test("tile clicks stay accurate when CSS scales the canvas down", async ({ page 
     }
   });
 
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
   const after = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ x: number; y: number }> } };
   expect(after.snapshot.towers).toHaveLength(1);
   expect(after.snapshot.towers[0]).toMatchObject({ x: cell.x, y: cell.y });
@@ -153,7 +153,7 @@ test("board renders 20% larger by default and clicks stay accurate", async ({ pa
       y: ((cell.y + 0.5) / map.snapshot.map.height) * box.height
     }
   });
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
   const after = (await (await page.request.get("/api/snapshot")).json()) as { snapshot: { towers: Array<{ x: number; y: number }> } };
   expect(after.snapshot.towers[0]).toMatchObject({ x: cell.x, y: cell.y });
 });
@@ -161,7 +161,7 @@ test("board renders 20% larger by default and clicks stay accurate", async ({ pa
 test("hovering a tower shows its level and combat stats", async ({ page }) => {
   await startMatch(page, "/");
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 
   const tooltip = page.locator(".tower-tooltip");
   await expect(tooltip).toBeHidden();
@@ -211,7 +211,7 @@ test("player names are shown as text on the match-end overlay, never parsed as H
 test("changing the target mode sends a command", async ({ page }) => {
   await startMatch(page, "/");
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 
   // Target mode is available in prep.
   await expect(page.locator("#mode")).toBeEnabled();
@@ -233,7 +233,7 @@ test("the damage type selector follows the tower, is sent as a command and locks
   // Nothing to change before a tower exists.
   await expect(page.locator("#damageType")).toBeDisabled();
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
   await expect(page.locator("#damageType")).toBeEnabled();
   await expect(page.locator("#damageType")).toHaveValue("physical");
 
@@ -278,7 +278,7 @@ test("the prep banner previews the next wave and combat shows creatures still to
 test("the move button explains itself while locked and, once unlocked, sends a move on the next tile click", async ({ page }) => {
   await startMatch(page, "/");
   await clickCellNearSpawn(page, 0);
-  await expect(page.locator("#playerCards")).toContainText("Tower 150/150");
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
 
   const commands: string[] = [];
   page.on("request", (request) => {

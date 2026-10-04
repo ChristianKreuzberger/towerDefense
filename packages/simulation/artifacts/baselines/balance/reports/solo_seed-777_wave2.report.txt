@@ -6,34 +6,34 @@ snapshots=2
 === Wave 1 (export=1, tick=51) ===
 DPS proxy: 0.45 dmg/tick (dealt=23, ticks=51)
 Kills by archetype: runner=2 swarm=1 armored=1 tank=1 (defeated=5, spawned=5, exited=0)
-Damage intake: towers=88
-Repairs: towers=30
+Damage intake: towers=101
+Repairs: towers=35
 Economy delta: awarded=77 spentUpgrades=0 net=77
 Wave-clear bonus: awarded=15
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=77 bonus=15 catchUp=0 swarmCapped=0 total=77 ending=177 towerLv=1 towerHp=92
+- p1 (Alpha) status=active delta=77 bonus=15 catchUp=0 swarmCapped=0 total=77 ending=177 towerLv=1 towerHp=109
 
 === Wave 2 (export=2, tick=30) ===
 DPS proxy: 0.83 dmg/tick (dealt=25, ticks=30)
 Kills by archetype: runner=2 swarm=2 armored=1 tank=1 (defeated=6, spawned=6, exited=0)
-Damage intake: towers=90
-Repairs: towers=30
+Damage intake: towers=103
+Repairs: towers=35
 Economy delta: awarded=85 spentUpgrades=0 net=85
 Wave-clear bonus: awarded=15
 Anti-snowball: catchUp=0 swarmIncomeCapped=0
 Players:
-- p1 (Alpha) status=active delta=85 bonus=15 catchUp=0 swarmCapped=0 total=162 ending=262 towerLv=1 towerHp=32
+- p1 (Alpha) status=active delta=85 bonus=15 catchUp=0 swarmCapped=0 total=162 ending=262 towerLv=1 towerHp=41
 
 === Cumulative Summary ===
 Waves completed: 2
 DPS proxy: 0.59 dmg/tick (dealt=48, ticks=81)
 Kills by archetype: runner=4 swarm=3 armored=2 tank=2
-Damage intake totals: towers=178
-Repairs totals: towers=60
+Damage intake totals: towers=204
+Repairs totals: towers=70
 Wave-clear bonus total: 30
 Anti-snowball totals: catchUp=0 swarmIncomeCapped=0
 Economy totals: awarded=162 spentUpgrades=0 net=162 ending=262
-Structures: livingTowers=1 towerHp=32 pathWearTotal=30
+Structures: livingTowers=1 towerHp=41 pathWearTotal=30
 Players (final):
-- p1 (Alpha) status=active delta=85 bonus=15 catchUp=0 swarmCapped=0 total=162 ending=262 towerLv=1 towerHp=32
+- p1 (Alpha) status=active delta=85 bonus=15 catchUp=0 swarmCapped=0 total=162 ending=262 towerLv=1 towerHp=41

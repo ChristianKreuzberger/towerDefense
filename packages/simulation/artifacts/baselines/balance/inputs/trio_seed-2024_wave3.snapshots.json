@@ -41,8 +41,8 @@
           "tank": 1
         },
         "towerDamageDealt": 23,
-        "towerDamageIntake": 42,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 49,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 45,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -61,8 +61,8 @@
           "tank": 1
         },
         "towerDamageDealt": 23,
-        "towerDamageIntake": 42,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 49,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 45,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -86,7 +86,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 138
+          "towerHealth": 161
         },
         {
           "playerId": "p2",
@@ -106,7 +106,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 150
+          "towerHealth": 175
         },
         {
           "playerId": "p3",
@@ -126,7 +126,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 150
+          "towerHealth": 175
         }
       ],
       "totals": {
@@ -144,7 +144,7 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 3,
-        "totalTowerHealth": 438,
+        "totalTowerHealth": 511,
         "mapPathWearTotal": 8
       }
     },
@@ -169,8 +169,8 @@
           "tank": 1
         },
         "towerDamageDealt": 25,
-        "towerDamageIntake": 35,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 42,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 45,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -189,8 +189,8 @@
           "tank": 2
         },
         "towerDamageDealt": 48,
-        "towerDamageIntake": 77,
-        "towerRepairApplied": 60,
+        "towerDamageIntake": 91,
+        "towerRepairApplied": 70,
         "waveClearBonusAwarded": 90,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -214,7 +214,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 133
+          "towerHealth": 154
         },
         {
           "playerId": "p2",
@@ -234,7 +234,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 150
+          "towerHealth": 175
         },
         {
           "playerId": "p3",
@@ -254,7 +254,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 150
+          "towerHealth": 175
         }
       ],
       "totals": {
@@ -272,7 +272,7 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 3,
-        "totalTowerHealth": 433,
+        "totalTowerHealth": 504,
         "mapPathWearTotal": 20
       }
     },
@@ -297,8 +297,8 @@
           "tank": 2
         },
         "towerDamageDealt": 38,
-        "towerDamageIntake": 90,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 108,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 45,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -317,8 +317,8 @@
           "tank": 4
         },
         "towerDamageDealt": 86,
-        "towerDamageIntake": 167,
-        "towerRepairApplied": 90,
+        "towerDamageIntake": 199,
+        "towerRepairApplied": 105,
         "waveClearBonusAwarded": 135,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -342,7 +342,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 2,
-          "towerHealth": 73
+          "towerHealth": 81
         },
         {
           "playerId": "p2",
@@ -362,7 +362,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 150
+          "towerHealth": 175
         },
         {
           "playerId": "p3",
@@ -382,7 +382,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 150
+          "towerHealth": 175
         }
       ],
       "totals": {
@@ -400,7 +400,7 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 3,
-        "totalTowerHealth": 373,
+        "totalTowerHealth": 431,
         "mapPathWearTotal": 21
       }
     }

@@ -48,7 +48,7 @@
 - A tower fires at most once per tick. Whether the shot hits is decided deterministically from the match seed, wave, tick and tower id (no hidden randomness), against the tower's accuracy: 70% at accuracy level 1, +7.5 percentage points per level, 100% at level 5. A miss deals no damage and emits a `tower-miss` event
 - Damage per shot is 1 at damage level 1 and +1 per damage level
 - A tower with no creature in range has no target and does not fire
-- Starts with 150 HP (raised from 100 when waves grew to 1.5x size, see spec/06) and takes damage from creature attacks
+- Starts with 175 HP (raised from 100 when waves grew to 1.5x size, see spec/06) and takes damage from creature attacks
 - Auto-repaired between rounds (must be clearly shown in UI)
 
 ## Enemy model

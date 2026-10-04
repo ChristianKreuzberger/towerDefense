@@ -23,7 +23,7 @@ Point economy with per-player score tracking.
 - Late waves force adaptation to armor/resistance shifts
 - Path wear (spec/05) is a soft brake on busy lanes: it is bounded by the minimum creature speed, and between-wave repair keeps it from building up forever
 
-- Wave size is ceil(1.5 x (N + 2)) creatures (see spec/02). Bigger waves mean more kills and points per wave, more tower wear, and longer waves; the swarm income cap per wave (80) and rewards are unchanged, so tower HP was raised from 100 to 150 (the between-wave repair stays 20% of max health, now 30 HP). Without it a lone tower died in wave 1 on about half of all seeds. Reward values and the 1000-point goal are unchanged
+- Wave size is ceil(1.5 x (N + 2)) creatures (see spec/02). Bigger waves mean more kills and points per wave, more tower wear, and longer waves; the swarm income cap per wave (80) and rewards are unchanged, so tower HP was raised from 100 to 175 (the between-wave repair stays 20% of max health, now 35 HP). Without it a lone tower died in wave 1 on about half of all seeds, and after creature attacks became 20% stronger it still died in wave 2 of the solo baseline scenario at 150 HP. Reward values and the 1000-point goal are unchanged
 
 ## Example tuning parameters
 
@@ -47,7 +47,7 @@ Point economy with per-player score tracking.
   | tank | 11 | 7 | 4 |
 
   The worst single hit is 11 HP (tank beside a tower). All values are integers and distance checks use squared distances, so the outcome stays deterministic
-- Balance note: a tower within 3.5 cells of the lane is in real danger and can lose more HP per wave than the between-wave repair (20% of max health, 30 HP at the default 150 HP) gives back; a tower 4 to 6 cells away is safe but covers less of the lane with its range of 6, so it fires less. Every tower in reach is hit, so towers clustered on one stretch of lane all take damage. Baselines were refreshed for this change
+- Balance note: a tower within 3.5 cells of the lane is in real danger and can lose more HP per wave than the between-wave repair (20% of max health, 35 HP at the default 175 HP) gives back; a tower 4 to 6 cells away is safe but covers less of the lane with its range of 6, so it fires less. Every tower in reach is hit, so towers clustered on one stretch of lane all take damage. Baselines were refreshed for this change
 - The base range is short relative to the 50x50 map (it was 12 before), so a lone level 1 tower only covers a small stretch of the lane and range upgrades are a real choice
 
 ## Anti-snowball controls

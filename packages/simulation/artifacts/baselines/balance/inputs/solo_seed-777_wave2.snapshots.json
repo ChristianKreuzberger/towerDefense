@@ -33,8 +33,8 @@
           "tank": 1
         },
         "towerDamageDealt": 23,
-        "towerDamageIntake": 88,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 101,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 15,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -53,8 +53,8 @@
           "tank": 1
         },
         "towerDamageDealt": 23,
-        "towerDamageIntake": 88,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 101,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 15,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -78,7 +78,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 92
+          "towerHealth": 109
         }
       ],
       "totals": {
@@ -96,7 +96,7 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 1,
-        "totalTowerHealth": 92,
+        "totalTowerHealth": 109,
         "mapPathWearTotal": 15
       }
     },
@@ -121,8 +121,8 @@
           "tank": 1
         },
         "towerDamageDealt": 25,
-        "towerDamageIntake": 90,
-        "towerRepairApplied": 30,
+        "towerDamageIntake": 103,
+        "towerRepairApplied": 35,
         "waveClearBonusAwarded": 15,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -141,8 +141,8 @@
           "tank": 2
         },
         "towerDamageDealt": 48,
-        "towerDamageIntake": 178,
-        "towerRepairApplied": 60,
+        "towerDamageIntake": 204,
+        "towerRepairApplied": 70,
         "waveClearBonusAwarded": 30,
         "catchUpBonusAwarded": 0,
         "swarmIncomeCapped": 0
@@ -166,7 +166,7 @@
           "swarmIncomeCappedThisWave": 0,
           "swarmIncomeCappedTotal": 0,
           "towerLevel": 1,
-          "towerHealth": 32
+          "towerHealth": 41
         }
       ],
       "totals": {
@@ -184,7 +184,7 @@
         "swarmIncomeCappedThisWave": 0,
         "swarmIncomeCappedTotal": 0,
         "livingTowers": 1,
-        "totalTowerHealth": 32,
+        "totalTowerHealth": 41,
         "mapPathWearTotal": 30
       }
     }
