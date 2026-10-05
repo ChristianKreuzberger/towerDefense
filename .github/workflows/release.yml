@@ -64,7 +64,7 @@ jobs:
           tar -czf "${bundle_dir}.tar.gz" "${bundle_dir}"
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: tower-defense-${{ github.ref_name }}.tar.gz
           generate_release_notes: true
