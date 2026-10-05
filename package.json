@@ -29,11 +29,11 @@
     "baseline:balance:refresh:guard": "./scripts/baseline-balance-refresh-guard.sh"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "@playwright/test": "^1.62.1",
-    "@types/node": "^22.10.1",
-    "eslint": "^9.39.5",
-    "typescript": "^5.6.3",
-    "typescript-eslint": "^8.68.0"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.4",
+    "eslint": "^10.11.0",
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.71.0"
   }
 }
