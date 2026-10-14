@@ -140,7 +140,7 @@ Sound effects are procedural Web Audio only: no audio files are downloaded or bu
 
 Settings dialog
 - A "Settings" button sits in the main-menu actions (`#menuSettingsBtn`) and in the match session row (`#settingsBtn`)
-- The dialog is a modal (`role="dialog"`, `aria-modal="true"`, labelled by its title) with an effects volume slider (0-100, default 70, with a visible value label), a mute toggle (`aria-pressed`) and a Close button
+- The dialog is a modal (`role="dialog"`, `aria-modal="true"`, labelled by its title) with an effects volume slider (0-100, default 70, with a visible value label), a music volume slider (0-100, default 40) and a music on/off toggle (default off), a "Mute sound" toggle (`aria-pressed`, silences effects and music), a "Visual effects" toggle (default on) and a Close button
 - Esc, Close or a click on the backdrop dismisses it; focus returns to the button that opened it
 - While the dialog is open the rest of the page is `inert` (no Tab or pointer access behind it) and game hotkeys are ignored (Esc closes the dialog only)
 - Moving the slider plays a short preview blip (not when muted); the blip is throttled
@@ -148,8 +148,8 @@ Settings dialog
 - Settings persist in `localStorage` (see 08-data-persistence.md) and apply immediately
 
 Next-wave preview and HUD
-- During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic), 1x Tank (weak: physical)" (each archetype's weaknesses are the damage types whose multiplier is above 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
-- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed; the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (polish later). The picker is a segmented control with no new hotkey
+- During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical, resists: magic), 1x Swarm (weak: explosive, resists: physical), ..." (weaknesses are the damage types whose multiplier is above 1 and resistances those below 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
+- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed; the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (see the event to sound table). The picker is a segmented control with no new hotkey
 - The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
 - The ended status text names the winner (never the raw id)
 
@@ -183,7 +183,9 @@ Engine rules
 - If Web Audio is unavailable or throws, audio is a permanent no-op and nothing else is affected
 - Output goes through a master gain, a compressor and fixed headroom. The master gain is the volume squared (perceptual curve); muted means gain 0 and no nodes are created
 - Nothing plays while the document is hidden, while the context is not running, or on a fresh load, reconnect or event backlog (same suppression as visual effects: no previous snapshot, or more than 300 new events)
-- Sounds are throttled per id (minimum interval, maximum simultaneous voices) and by a global voice cap. Priority sounds (wave start, wave clear, win, lose, tower destroyed) are never throttled or capped
+- Sounds are throttled per id (minimum interval, maximum simultaneous voices) and by a global voice cap of 12. Priority sounds (wave start, wave clear, win, lose, tower destroyed, boss spawn, boss defeated) are never throttled or capped
+- Busy waves: when more than 2 shot sounds land in one snapshot every shot cue plays at 70% intensity, so eight towers firing together stay soft. Cannon shots are a low thump, frost shots a quiet two-note chime, arrow shots the original click (now quieter); splash hits of one blast share a single boom
+- Music (optional, procedural): a quiet looping bass-and-arpeggio pattern made from oscillators, no audio files. It is off by default (`musicEnabled`), has its own volume (`musicVolume`, default 0.4, squared like the effects volume and mixed well below the effects), and is independent of the effects volume. It starts only after the audio unlock, only while the tab is visible and the context is running, and makes no nodes when muted, when music is off or when Web Audio is missing. Priority sounds duck it to 30% for about a second. Muting stops it at once
 - Tower pitch is derived deterministically from the player number; no randomness
 - Cues from one batched response are spread across the glide time of that response, like visual effects
 
@@ -192,6 +194,12 @@ Event to sound table
 | --- | --- | --- |
 | `tower-hit`, `tower-miss` | `tower-shot` | at most one per tower id, at most 4 per snapshot; a miss draws the shot flying past the creature with a floating "miss" |
 | `creature-defeated` | `creature-kill` | at most 3 per snapshot |
+| `tower-hit` from a cannon / frost tower | `cannon-shot` / `frost-shot` | same per-tower and per-snapshot caps as `tower-shot`, which stays the arrow sound |
+| `tower-hit` with `splash` | `cannon-splash` | at most one per snapshot, does not count against the shot cap |
+| `tower-hit` on a juggernaut | `boss-hit` | at most one per snapshot, in addition to the shot sound; the creature is found from the snapshots and spawn events |
+| `creature-split` | `creature-split` | at most one per snapshot |
+| `creature-spawned` (juggernaut) | `boss-spawn` | priority, once per snapshot |
+| `creature-defeated` (juggernaut) | `boss-defeated` | priority, replaces `creature-kill` |
 | `creature-attack` | `tower-damaged` | |
 | `tower-destroyed` | `tower-destroyed` | priority |
 | `wave-start` event or phase change into `wave` | `wave-start` | once per snapshot |

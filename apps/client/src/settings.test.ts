@@ -47,12 +47,16 @@ test("parseSettings falls back field-wise and on corrupt input", () => {
   assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume: 0.3, muted: "yes" })), {
     effectsVolume: 0.3,
     muted: false,
-    effects: true
+    effects: true,
+    musicEnabled: false,
+    musicVolume: DEFAULT_AUDIO_SETTINGS.musicVolume
   });
   assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume: "loud", muted: true })), {
     effectsVolume: DEFAULT_AUDIO_SETTINGS.effectsVolume,
     muted: true,
-    effects: true
+    effects: true,
+    musicEnabled: false,
+    musicVolume: DEFAULT_AUDIO_SETTINGS.musicVolume
   });
 });
 
@@ -61,14 +65,16 @@ test("parseSettings falls back to the default for out-of-range stored volumes", 
     assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume, muted: true })), {
       effectsVolume: DEFAULT_AUDIO_SETTINGS.effectsVolume,
       muted: true,
-      effects: true
+      effects: true,
+      musicEnabled: false,
+      musicVolume: DEFAULT_AUDIO_SETTINGS.musicVolume
     });
   }
 });
 
 test("serializeSettings round-trips through parseSettings", () => {
-  const settings = { effectsVolume: 0.25, muted: true, effects: false };
-  assert.deepEqual(JSON.parse(serializeSettings(settings)), { version: 1, effectsVolume: 0.25, muted: true, effects: false });
+  const settings = { effectsVolume: 0.25, muted: true, effects: false, musicEnabled: true, musicVolume: 0.6 };
+  assert.deepEqual(JSON.parse(serializeSettings(settings)), { version: 1, effectsVolume: 0.25, muted: true, effects: false, musicEnabled: true, musicVolume: 0.6 });
   assert.deepEqual(parseSettings(serializeSettings(settings)), settings);
 });
 
@@ -77,8 +83,8 @@ test("store loads defaults and persists changes", () => {
   const store = createSettingsStore(storage);
   assert.deepEqual(store.get(), DEFAULT_AUDIO_SETTINGS);
   store.set({ effectsVolume: 0.4 });
-  assert.deepEqual(parseSettings(storage.data.get(SETTINGS_STORAGE_KEY) ?? null), { effectsVolume: 0.4, muted: false, effects: true });
-  assert.deepEqual(createSettingsStore(storage).get(), { effectsVolume: 0.4, muted: false, effects: true });
+  assert.deepEqual(parseSettings(storage.data.get(SETTINGS_STORAGE_KEY) ?? null), { effectsVolume: 0.4, muted: false, effects: true, musicEnabled: false, musicVolume: 0.4 });
+  assert.deepEqual(createSettingsStore(storage).get(), { effectsVolume: 0.4, muted: false, effects: true, musicEnabled: false, musicVolume: 0.4 });
 });
 
 test("mute keeps the volume and zeroes the effective gain", () => {
@@ -122,4 +128,30 @@ test("the visual effects setting defaults to on, persists, and survives bad stor
   // Effects never touch the audio gain.
   assert.equal(store.effectiveGain(), DEFAULT_AUDIO_SETTINGS.effectsVolume);
   assert.doesNotThrow(() => createSettingsStore(throwingStorage).set({ effects: false }));
+});
+
+test("music is off by default, has its own volume, and respects mute", () => {
+  const storage = memoryStorage();
+  const store = createSettingsStore(storage);
+  assert.equal(store.get().musicEnabled, false);
+  assert.equal(store.effectiveMusicGain(), 0);
+  store.set({ musicEnabled: true, musicVolume: 0.5 });
+  assert.equal(store.effectiveMusicGain(), 0.5);
+  // The effects volume does not move the music volume, and the other way round.
+  store.set({ effectsVolume: 0.1 });
+  assert.equal(store.effectiveMusicGain(), 0.5);
+  store.set({ musicVolume: 0.9 });
+  assert.equal(store.effectiveGain(), 0.1);
+  store.set({ muted: true });
+  assert.equal(store.effectiveMusicGain(), 0);
+  assert.equal(createSettingsStore(storage).get().musicVolume, 0.9);
+});
+
+test("bad stored music values fall back and storage failures are tolerated", () => {
+  const parsed = parseSettings(JSON.stringify({ version: 1, musicEnabled: "yes", musicVolume: 4 }));
+  assert.equal(parsed.musicEnabled, false);
+  assert.equal(parsed.musicVolume, DEFAULT_AUDIO_SETTINGS.musicVolume);
+  const store = createSettingsStore(throwingStorage);
+  assert.doesNotThrow(() => store.set({ musicEnabled: true, musicVolume: 2 }));
+  assert.equal(store.get().musicVolume, 1);
 });

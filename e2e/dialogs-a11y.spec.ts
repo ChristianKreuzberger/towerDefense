@@ -22,7 +22,7 @@ test("settings from the menu persist volume and mute across reload", async ({ pa
   await expect(opener).toBeFocused();
 
   const stored = await page.evaluate(() => localStorage.getItem("towerDefense.settings.v1"));
-  expect(JSON.parse(stored ?? "null")).toEqual({ version: 1, effectsVolume: 0.35, muted: true, effects: true });
+  expect(JSON.parse(stored ?? "null")).toEqual({ version: 1, effectsVolume: 0.35, muted: true, effects: true, musicEnabled: false, musicVolume: 0.4 });
 
   await page.reload();
   await page.locator("#settingsBtn").click();
@@ -153,4 +153,16 @@ test.describe("reduced motion", () => {
     await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE", { timeout: 30_000 });
     expect(errors).toEqual([]);
   });
+});
+
+test("music is off by default, has its own slider, and the choice persists", async ({ page }) => {
+  await startMatch(page, "/");
+  await page.locator("#settingsBtn").click();
+  await expect(page.locator("#settingsMusicBtn")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#settingsMusicVolume")).toHaveValue("40");
+  await page.locator("#settingsMusicVolume").fill("25");
+  await page.locator("#settingsMusicBtn").click();
+  await expect(page.locator("#settingsMusicBtn")).toHaveAttribute("aria-pressed", "true");
+  const stored = await page.evaluate(() => localStorage.getItem("towerDefense.settings.v1"));
+  expect(JSON.parse(stored ?? "null")).toMatchObject({ musicEnabled: true, musicVolume: 0.25, effectsVolume: 0.7 });
 });

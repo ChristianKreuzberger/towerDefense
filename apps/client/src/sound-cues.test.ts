@@ -113,3 +113,45 @@ test("an attack on an unknown tower has no pitch source", () => {
 test("a fresh load into an ended match stays silent", () => {
   assert.deepEqual(ids([], { previous: null, next: snap("ended", { endReason: "score-win" }) }), []);
 });
+
+test("cannon, frost and arrow towers each get their own shot sound", () => {
+  const next = snap("wave", {
+    towers: [
+      { id: "tc", playerId: "p1", towerType: "cannon" },
+      { id: "tf", playerId: "p2", towerType: "frost" },
+      { id: "ta", playerId: "p3", towerType: "arrow" }
+    ] as unknown as MatchSnapshot["towers"]
+  });
+  const events = ["tc", "tf", "ta"].map((towerId) => ev({ type: "tower-hit", towerId, playerId: "p1", creatureId: "c1" }));
+  assert.deepEqual(ids(events, { next }), ["cannon-shot", "frost-shot", "tower-shot"]);
+});
+
+test("splash hits share one cue and do not use up the shot cap", () => {
+  const splash = Array.from({ length: 5 }, () => ev({ type: "tower-hit", towerId: "t1", playerId: "p1", creatureId: "c2", splash: true }));
+  assert.deepEqual(ids(splash), ["cannon-splash"]);
+});
+
+test("split and boss events have cues, once per snapshot", () => {
+  assert.deepEqual(ids([ev({ type: "creature-split" }), ev({ type: "creature-split" })]), ["creature-split"]);
+  assert.deepEqual(ids([ev({ type: "creature-spawned", archetype: "juggernaut", creatureId: "boss" }), ev({ type: "creature-spawned", archetype: "juggernaut", creatureId: "b2" })]), ["boss-spawn"]);
+  assert.deepEqual(ids([ev({ type: "creature-spawned", archetype: "runner", creatureId: "r1" })]), []);
+});
+
+test("hitting and killing a juggernaut use the boss cues", () => {
+  const previous = snap("wave", { creatures: [{ id: "boss", archetype: "juggernaut" }] as unknown as MatchSnapshot["creatures"] });
+  const hit = ids([ev({ type: "tower-hit", towerId: "t1", playerId: "p1", creatureId: "boss" })], { previous });
+  assert.deepEqual(hit, ["boss-hit", "tower-shot"]);
+  const kill = ids([ev({ type: "creature-defeated", playerId: "p1", creatureId: "boss" })], { previous });
+  assert.deepEqual(kill, ["boss-defeated"]);
+  // A boss killed in the same batch that spawned it never shows in a snapshot, so the spawn event identifies it.
+  const sameBatch = ids([ev({ type: "creature-spawned", archetype: "juggernaut", creatureId: "b" }), ev({ type: "creature-defeated", playerId: "p1", creatureId: "b" })]);
+  assert.deepEqual(sameBatch, ["boss-spawn", "boss-defeated"]);
+});
+
+test("busy waves play shots quieter, a lone shot stays at full intensity", () => {
+  const shots = Array.from({ length: 4 }, (_, i) => ev({ type: "tower-hit", towerId: `t${i}`, playerId: "p1", creatureId: "c" }));
+  const busy = cuesForSnapshotChange({ previous: snap("wave"), next: snap("wave"), events: shots, suppress: false });
+  assert.ok(busy.every((cue) => cue.intensity === 0.7));
+  const calm = cuesForSnapshotChange({ previous: snap("wave"), next: snap("wave"), events: shots.slice(0, 2), suppress: false });
+  assert.ok(calm.every((cue) => cue.intensity === undefined));
+});
