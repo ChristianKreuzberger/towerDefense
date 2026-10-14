@@ -37,7 +37,11 @@ import {
   getCatchUpBonus,
   type CreatureArchetype,
   SWARM_KILL_INCOME_CAP_PER_WAVE,
+  DEFAULT_TOWER_TYPE,
+  SLOW_MIN_SPEED_UNITS,
   SPLITTER_CHILD_ARCHETYPE,
+  TOWER_TYPE_STATS,
+  isValidTowerType,
   SPLITTER_CHILD_COUNT,
   getWaveCreatureArchetype,
   getWaveCreatureCount,
@@ -191,6 +195,11 @@ export class MatchSimulation {
         return { accepted: false, reason: "tower-already-placed" };
       }
 
+      // Checked before the cell so a bad type is never confused with a placement problem.
+      if (command.towerType !== undefined && !isValidTowerType(command.towerType)) {
+        return { accepted: false, reason: "invalid-tower-type" };
+      }
+
       const validation = isValidTowerPlacement(command, this.state.towers, this.state.map);
       if (!validation.valid) {
         return validation.reason
@@ -214,7 +223,8 @@ export class MatchSimulation {
         level: 1,
         upgrades: { ...BASE_TOWER_UPGRADES },
         targetMode: DEFAULT_TOWER_TARGET_MODE,
-        damageType: DEFAULT_DAMAGE_TYPE
+        damageType: DEFAULT_DAMAGE_TYPE,
+        towerType: command.towerType ?? DEFAULT_TOWER_TYPE
       });
 
       return { accepted: true };
@@ -685,7 +695,11 @@ export class MatchSimulation {
       }
 
       const sourceWear = this.getCellPathWear(currentPathNode.x, currentPathNode.y);
-      const speedUnits = getCreatureMovementSpeedUnits(sourceWear);
+      const wearSpeedUnits = getCreatureMovementSpeedUnits(sourceWear);
+      // Frost slow: a fraction of the normal speed while the slow lasts, never below the slow floor.
+      const speedUnits = creature.slowedUntilTick !== undefined && creature.slowedUntilTick >= this.state.waveTick
+        ? Math.max(SLOW_MIN_SPEED_UNITS, Math.floor(wearSpeedUnits * TOWER_TYPE_STATS.frost.slowSpeedFactor))
+        : wearSpeedUnits;
       const fromPathIndex = creature.pathIndex;
       const fromProgressUnits = creature.pathProgressUnits;
       let progressUnits = creature.pathProgressUnits + speedUnits;
@@ -806,6 +820,59 @@ export class MatchSimulation {
     });
   }
 
+  // Shared by the main hit and splash hits: damage, events, and the kill branch (reward, telemetry, split).
+  private applyTowerDamageToCreature(
+    tower: Tower,
+    creature: Creature,
+    damage: number,
+    creaturesById: Map<string, Creature>,
+    splitChildren: Creature[],
+    splash: boolean
+  ): void {
+    creature.hp -= damage;
+    this.state.telemetry.currentWave.towerDamageDealt += damage;
+    this.updateCurrentWaveTelemetryTick();
+
+    this.state.events.push({
+      type: "tower-hit",
+      wave: this.state.wave,
+      tick: this.state.waveTick,
+      towerId: tower.id,
+      playerId: tower.playerId,
+      creatureId: creature.id,
+      x: creature.x,
+      y: creature.y,
+      damage,
+      damageType: tower.damageType,
+      remainingHp: Math.max(0, creature.hp),
+      ...(splash ? { splash: true } : {})
+    });
+
+    if (creature.hp <= 0) {
+      creaturesById.delete(creature.id);
+      const rewardPoints = this.awardCreatureKillIncome(tower.playerId, creature.archetype, creature.id);
+      this.state.telemetry.currentWave.creaturesDefeated += 1;
+      this.state.telemetry.currentWave.killsByArchetype[creature.archetype] += 1;
+      this.updateCurrentWaveTelemetryTick();
+      this.state.events.push({
+        type: "creature-defeated",
+        wave: this.state.wave,
+        tick: this.state.waveTick,
+        towerId: tower.id,
+        playerId: tower.playerId,
+        creatureId: creature.id,
+        x: creature.x,
+        y: creature.y,
+        rewardPoints
+      });
+      if (creature.archetype === "splitter") {
+        splitChildren.push(...this.splitCreature(creature));
+      }
+    } else {
+      creaturesById.set(creature.id, creature);
+    }
+  }
+
   // A dead splitter leaves swarm children at its exact path position (spec/02). They are not part of the
   // wave's spawn count, so creaturesToSpawn is unaffected, but the wave only ends once they are dead.
   private splitCreature(parent: Creature): Creature[] {
@@ -869,9 +936,15 @@ export class MatchSimulation {
         continue;
       }
 
+      const towerStats = TOWER_TYPE_STATS[tower.towerType];
+      // Slow-firing towers skip the tick without a roll (the roll is a pure hash, so nothing else shifts).
+      if (this.state.waveTick % towerStats.fireEveryTicks !== 0) {
+        continue;
+      }
+
       // Misses are decided by the match seed, so replays and tower order never change the outcome.
       const roll = rollShot(this.state.map.seed, this.state.wave, this.state.waveTick, tower.id);
-      if (roll >= getTowerAccuracy(tower.upgrades.accuracy)) {
+      if (roll >= getTowerAccuracy(tower.upgrades.accuracy, tower.towerType)) {
         this.state.events.push({
           type: "tower-miss",
           wave: this.state.wave,
@@ -885,47 +958,30 @@ export class MatchSimulation {
         continue;
       }
 
-      const damage = getDamageAgainst(this.getTowerDamage(tower), tower.damageType, creature.archetype);
-      creature.hp -= damage;
-      this.state.telemetry.currentWave.towerDamageDealt += damage;
-      this.updateCurrentWaveTelemetryTick();
+      const towerDamage = this.getTowerDamage(tower);
+      const damage = getDamageAgainst(towerDamage, tower.damageType, creature.archetype);
+      this.applyTowerDamageToCreature(tower, creature, damage, creaturesById, splitChildren, false);
+      if (creature.hp > 0 && towerStats.slowBaseTicks > 0) {
+        // Refreshes, never stacks: the end tick is recomputed from now.
+        creature.slowedUntilTick = this.state.waveTick + towerStats.slowBaseTicks + tower.upgrades.damage;
+      }
 
-      this.state.events.push({
-        type: "tower-hit",
-        wave: this.state.wave,
-        tick: this.state.waveTick,
-        towerId: tower.id,
-        playerId: tower.playerId,
-        creatureId: creature.id,
-        x: creature.x,
-        y: creature.y,
-        damage,
-        damageType: tower.damageType,
-        remainingHp: Math.max(0, creature.hp)
-      });
-
-      if (creature.hp <= 0) {
-        creaturesById.delete(creature.id);
-        const rewardPoints = this.awardCreatureKillIncome(tower.playerId, creature.archetype, creature.id);
-        this.state.telemetry.currentWave.creaturesDefeated += 1;
-        this.state.telemetry.currentWave.killsByArchetype[creature.archetype] += 1;
-        this.updateCurrentWaveTelemetryTick();
-        this.state.events.push({
-          type: "creature-defeated",
-          wave: this.state.wave,
-          tick: this.state.waveTick,
-          towerId: tower.id,
-          playerId: tower.playerId,
-          creatureId: creature.id,
-          x: creature.x,
-          y: creature.y,
-          rewardPoints
-        });
-        if (creature.archetype === "splitter") {
-          splitChildren.push(...this.splitCreature(creature));
+      if (towerStats.splashRadius > 0) {
+        // Fixed id order keeps the splash deterministic. Protected creatures and the target itself are skipped.
+        const splashDamage = Math.max(1, Math.round(damage * towerStats.splashFactor));
+        const victims = [...creaturesById.values()]
+          .filter(
+            (other) =>
+              other.id !== creature.id
+              && other.hp > 0
+              && !this.isSpawnProtected(other)
+              && (creature.x - other.x) ** 2 + (creature.y - other.y) ** 2 <= towerStats.splashRadius * towerStats.splashRadius
+          )
+          .sort((a, b) => a.id.localeCompare(b.id));
+        for (const victim of victims) {
+          const victimDamage = getDamageAgainst(splashDamage, tower.damageType, victim.archetype);
+          this.applyTowerDamageToCreature(tower, victim, victimDamage, creaturesById, splitChildren, true);
         }
-      } else {
-        creaturesById.set(creature.id, creature);
       }
     }
 
@@ -995,7 +1051,7 @@ export class MatchSimulation {
 
   private selectCreatureTargetForTower(tower: Tower): Creature | undefined {
     // Squared comparison keeps the range check free of sqrt and float drift.
-    const range = getTowerRange(tower.upgrades.range);
+    const range = getTowerRange(tower.upgrades.range, tower.towerType);
     const creatures = this.state.creatures
       .filter((creature) => !this.isSpawnProtected(creature) && getSquaredDistance(tower, creature) <= range * range)
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -1030,7 +1086,7 @@ export class MatchSimulation {
   }
 
   private getTowerDamage(tower: Tower): number {
-    return getTowerDamage(tower.upgrades.damage);
+    return getTowerDamage(tower.upgrades.damage, tower.towerType);
   }
 
   private applyCreatureAttack(creature: Creature, tower: Tower, damage: number, towersById: Map<string, Tower>): void {

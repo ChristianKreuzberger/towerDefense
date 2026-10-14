@@ -101,7 +101,7 @@ test("creature tower selection among in-range towers breaks ties by distance, th
     maxHealth: 100,
     level: 1,
     upgrades: { range: 1, damage: 1, accuracy: 1 },
-    targetMode: "first", damageType: "physical"
+    targetMode: "first", damageType: "physical", towerType: "arrow"
   });
   const towers = (...entries: Tower[]): Map<string, Tower> => new Map(entries.map((entry) => [entry.id, entry]));
   // "tower-missing" means no sticky target, like after the assigned tower died.

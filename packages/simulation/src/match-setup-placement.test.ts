@@ -227,7 +227,7 @@ test("rejects placements that newly block left-to-right path connectivity", () =
       maxHealth: 100,
       level: 1,
       upgrades: { range: 1, damage: 1, accuracy: 1 },
-      targetMode: "first", damageType: "physical"
+      targetMode: "first", damageType: "physical", towerType: "arrow"
     },
     {
       id: "t-2",
@@ -238,7 +238,7 @@ test("rejects placements that newly block left-to-right path connectivity", () =
       maxHealth: 100,
       level: 1,
       upgrades: { range: 1, damage: 1, accuracy: 1 },
-      targetMode: "first", damageType: "physical"
+      targetMode: "first", damageType: "physical", towerType: "arrow"
     }
   ];
 
@@ -278,7 +278,7 @@ test("allows placements when an alternate path remains", () => {
       maxHealth: 100,
       level: 1,
       upgrades: { range: 1, damage: 1, accuracy: 1 },
-      targetMode: "first", damageType: "physical"
+      targetMode: "first", damageType: "physical", towerType: "arrow"
     }
   ];
 

@@ -125,4 +125,6 @@ export interface Creature {
   targetTowerId: string;
   // Which half of the 2-wide road the creature is drawn on (render offset only; the route is shared).
   lane: number;
+  // Wave tick up to which frost keeps the creature slowed (inclusive). Missing means not slowed.
+  slowedUntilTick?: number;
 }

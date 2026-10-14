@@ -85,7 +85,8 @@ determinism are not affected; lite is a serialization concern of the host only.
 - `tower-hit.damage` is the damage after the creature's multiplier; telemetry `towerDamageDealt` sums the same value
 - `tower-hit` also carries `damageType` so clients can tint the shot without looking up the tower
 - Snapshot `towers[].towerType` is the tower's type. Snapshot creatures carry an optional `slowedUntilTick` while frost slows them
-- Cannon splash victims are reported as extra `tower-hit` events with `splash: true` (the final shape is confirmed when the tower types are implemented, and this file is updated in that commit if it differs)
+- Cannon splash victims are reported as extra `tower-hit` events with `splash: true`, after the main hit and in creature id order. There is no separate splash event
+- `place-tower` with a missing `towerType` places an `arrow`. An unknown or non-string `towerType` is a normal command rejection (`invalid-tower-type`, HTTP 200, `result.accepted = false`) decided by the simulation, not a 400
 
 ## Error strategy
 

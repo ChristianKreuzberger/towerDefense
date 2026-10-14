@@ -1,4 +1,4 @@
-import type { MapCell, MatchEvent, MatchSnapshot } from "@tower-defense/shared";
+import type { MapCell, MatchEvent, MatchSnapshot, TowerType } from "@tower-defense/shared";
 import type { PLAYBACK_SPEEDS } from "./constants";
 
 export interface MapCache {
@@ -53,6 +53,8 @@ export const store = {
   playbackErrors: 0,
   // While on, the next tile click moves the player's tower (the one free move, spec/02).
   moveMode: false,
+  // Type for the next tower this client places; a tower's type is fixed once placed (spec/02).
+  towerType: "arrow" as TowerType,
   // Whether the player picked a tile (click or arrows) since this match began; see resolvePlacementCell.
   cursorChosen: false,
   playerSignature: "",

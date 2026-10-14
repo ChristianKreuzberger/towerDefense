@@ -37,6 +37,8 @@ export const el = {
   y: must<HTMLInputElement>("y"),
   mode: must<HTMLSelectElement>("mode"),
   damageType: must<HTMLSelectElement>("damageType"),
+  towerTypePicker: must<HTMLElement>("towerTypePicker"),
+  towerTypeBlurb: must<HTMLElement>("towerTypeBlurb"),
   playerCards: must<HTMLElement>("playerCards"),
   phaseBanner: must<HTMLElement>("phaseBanner"),
   phaseLabel: must<HTMLElement>("phaseLabel"),

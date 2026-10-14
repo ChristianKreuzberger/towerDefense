@@ -88,7 +88,7 @@ export function handleCellSelected(tappedX: number, tappedY: number): void {
 
   const alreadyHasTower = store.current.towers.some((tower) => tower.playerId === playerId);
   if (store.current.phase === "placement" && !alreadyHasTower) {
-    void sendCommand({ type: "place-tower", playerId, x, y });
+    void sendCommand({ type: "place-tower", playerId, x, y, towerType: store.towerType });
   }
 }
 
@@ -117,7 +117,8 @@ export function placeTowerForSelectedPlayer(): void {
     type: "place-tower",
     playerId,
     x: coords.x,
-    y: coords.y
+    y: coords.y,
+    towerType: store.towerType
   });
 }
 
