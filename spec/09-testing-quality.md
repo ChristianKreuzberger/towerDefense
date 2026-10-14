@@ -66,3 +66,5 @@ Result log (fill in per device; empty until someone runs it):
 | Date | Device and browser | Effects | Avg FPS | Min FPS | Notes |
 | --- | --- | --- | --- | --- | --- |
 |  |  |  |  |  |  |
+
+Playtest: the 20-minute script, feedback form and findings template are in `12-playtest.md`. A session needs real people, so its results are recorded there by whoever runs it.
