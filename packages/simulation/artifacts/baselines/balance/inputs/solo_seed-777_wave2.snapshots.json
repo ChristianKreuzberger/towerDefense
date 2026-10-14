@@ -30,7 +30,9 @@
           "runner": 2,
           "swarm": 1,
           "armored": 1,
-          "tank": 1
+          "tank": 1,
+          "splitter": 0,
+          "juggernaut": 0
         },
         "towerDamageDealt": 23,
         "towerDamageIntake": 0,
@@ -50,7 +52,9 @@
           "runner": 2,
           "swarm": 1,
           "armored": 1,
-          "tank": 1
+          "tank": 1,
+          "splitter": 0,
+          "juggernaut": 0
         },
         "towerDamageDealt": 23,
         "towerDamageIntake": 0,
@@ -118,7 +122,9 @@
           "runner": 2,
           "swarm": 2,
           "armored": 1,
-          "tank": 1
+          "tank": 1,
+          "splitter": 0,
+          "juggernaut": 0
         },
         "towerDamageDealt": 25,
         "towerDamageIntake": 0,
@@ -138,7 +144,9 @@
           "runner": 4,
           "swarm": 3,
           "armored": 2,
-          "tank": 2
+          "tank": 2,
+          "splitter": 0,
+          "juggernaut": 0
         },
         "towerDamageDealt": 48,
         "towerDamageIntake": 0,
