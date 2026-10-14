@@ -47,3 +47,22 @@
 - Basic load simulation for 8-player local matches. Phase 3 adds a second perf scenario: 8 players with a mix of arrow, cannon and frost towers over 6 waves, so it includes the splitter (wave 4+) and the boss (wave 5), with the same budget. Phase 3 rules are tested beside the source: waves 1 to 3 unchanged, split and boss rules, splash, slow, determinism (same seed gives the same events) and bot-only matches finishing
 - Repeated map-generation and match-restart stability check (without relying on
 	machine-specific heap thresholds)
+
+## Phase 3 performance check
+
+Automated (`npm run test:perf`): the two simulation scenarios above. Pass bar: the slowest tick stays under 100 ms, active creatures stay under 300, and the average tick is printed against the 16 ms target. The second scenario fails if the splitter or the juggernaut never appears, so it cannot silently stop covering the new content.
+
+Manual, not automated (needs a real mid-range phone; it cannot run in CI or in a headless browser): frame rate with the Phase 3 effects.
+1. Device: a mid-range Android or iPhone from the last 4 years. Note the model, OS and browser version, and whether battery saver is on.
+2. Serve the game on the local network (`npm run dev:game`, open `http://<computer-ip>:4173/?perf=1` on the phone). `?perf=1` shows the in-game overlay with the current and minimum FPS and the snapshot apply time; or attach Chrome remote debugging and read `window.__perf`.
+3. Start a match with 8 seats, all of them bots (as many bots as the menu allows; one human to place a tower first is fine), so the busiest board is on screen. Leave Settings at the defaults: visual effects on, sound on, music off.
+4. Let it play through wave 5 (splitters and the juggernaut). Call `window.__perf.reset()` when wave 5 starts if you use remote debugging.
+5. Record minimum and average FPS over wave 5, and note any visible stutter.
+6. Repeat once with "Visual effects" off in Settings to see how much the extras cost.
+7. Pass bar: average at least 30 FPS and minimum at least 20 FPS with effects on. If it misses, file an issue with the numbers and device before tuning.
+
+Result log (fill in per device; empty until someone runs it):
+
+| Date | Device and browser | Effects | Avg FPS | Min FPS | Notes |
+| --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |
