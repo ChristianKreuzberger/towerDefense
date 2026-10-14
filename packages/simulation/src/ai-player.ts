@@ -3,12 +3,15 @@ import {
   CREATURE_PROXIMITY_DAMAGE_BANDS,
   DAMAGE_TYPES,
   MAX_TOWER_LEVEL,
+  SPLITTER_CHILD_COUNT,
+  TOWER_TYPES,
   UPGRADE_TRACKS,
   getDamageAgainst,
   getDamageMultiplier,
   getTowerAccuracy,
   getTowerDamage,
   getTowerRange,
+  TOWER_TYPE_STATS,
   getTowerUpgradeCost,
   getWaveComposition,
   isValidTowerPlacement,
@@ -20,6 +23,7 @@ import {
   type SimulationCommand,
   type Tower,
   type TowerTargetMode,
+  type TowerType,
   type UpgradeTrack
 } from "@tower-defense/shared";
 import type { MatchSimulation } from "./match-simulation.js";
@@ -38,6 +42,15 @@ const MOVE_SCORE_MARGIN = 5;
 const EASY_SAVE_CHANCE = 0.3;
 // Medium buys the cheapest-to-level track first in this order when levels tie.
 const MEDIUM_TRACK_PRIORITY: readonly UpgradeTrack[] = ["accuracy", "damage", "range"];
+
+// Medium picks a cannon on this share of seeded rolls; everything else is an arrow tower.
+const MEDIUM_CANNON_CHANCE = 0.3;
+// Hard picks a cannon when this share of the coming creatures are swarms (a splitter counts as itself plus its children).
+const HARD_CANNON_SWARM_SHARE = 0.4;
+// How many waves ahead hard looks when picking a tower type.
+const HARD_TYPE_LOOKAHEAD_WAVES = 5;
+// Hard picks frost when the spot covers this many times more road than any other free spot.
+const HARD_FROST_COVERAGE_RATIO = 1.3;
 
 // Deterministic 0..1 value that depends only on the match seed, wave, the player and a salt for repeated draws.
 function aiRoll(snapshot: MatchSnapshot, playerId: string, salt: number): number {
@@ -125,8 +138,56 @@ function rankSpots(
 }
 
 function expectedDamageRate(lane: readonly Spot[], tower: Tower, upgrades: Tower["upgrades"]): number {
-  return getTowerAccuracy(upgrades.accuracy) * getTowerDamage(upgrades.damage)
-    * laneCoverage(lane, tower, getTowerRange(upgrades.range));
+  return getTowerAccuracy(upgrades.accuracy, tower.towerType) * getTowerDamage(upgrades.damage, tower.towerType)
+    * laneCoverage(lane, tower, getTowerRange(upgrades.range, tower.towerType)) / TOWER_TYPE_STATS[tower.towerType].fireEveryTicks;
+}
+
+// Share of swarm-like creatures in the next few waves; a splitter counts as itself plus the swarms it leaves behind.
+function upcomingSwarmShare(wave: number): number {
+  let swarmLike = 0;
+  let total = 0;
+  for (let ahead = 0; ahead < HARD_TYPE_LOOKAHEAD_WAVES; ahead += 1) {
+    for (const entry of getWaveComposition(wave + ahead)) {
+      if (entry.archetype === "swarm") {
+        swarmLike += entry.count;
+        total += entry.count;
+      } else if (entry.archetype === "splitter") {
+        swarmLike += entry.count * (1 + SPLITTER_CHILD_COUNT);
+        total += entry.count * (1 + SPLITTER_CHILD_COUNT);
+      } else {
+        total += entry.count;
+      }
+    }
+  }
+  return total === 0 ? 0 : swarmLike / total;
+}
+
+// The type is chosen once, when the tower is placed (types are fixed afterwards). Easy and medium use their own
+// seeded rolls (new salts, so no existing roll changes); hard compares the coming waves and the spot.
+function chooseTowerType(
+  snapshot: MatchSnapshot,
+  playerId: string,
+  difficulty: AiDifficulty,
+  spot: Spot,
+  allSpots: readonly Spot[],
+  lane: readonly Spot[]
+): TowerType {
+  if (difficulty === "easy") {
+    const pick = Math.floor(aiRoll(snapshot, playerId, 4000) * TOWER_TYPES.length);
+    return TOWER_TYPES[Math.min(pick, TOWER_TYPES.length - 1)] ?? "arrow";
+  }
+  if (difficulty === "medium") {
+    return aiRoll(snapshot, playerId, 4001) < MEDIUM_CANNON_CHANCE ? "cannon" : "arrow";
+  }
+  if (upcomingSwarmShare(snapshot.wave) >= HARD_CANNON_SWARM_SHARE) {
+    return "cannon";
+  }
+  const range = getTowerRange(1, "frost");
+  const here = laneCoverage(lane, spot, range);
+  const bestOther = allSpots
+    .filter((other) => other.x !== spot.x || other.y !== spot.y)
+    .reduce((best, other) => Math.max(best, laneCoverage(lane, other, range)), 0);
+  return here > 0 && here >= HARD_FROST_COVERAGE_RATIO * bestOther ? "frost" : "arrow";
 }
 
 function chooseUpgrade(
@@ -188,7 +249,7 @@ function chooseDamageType(snapshot: MatchSnapshot, tower: Tower, difficulty: AiD
   }
 
   // Hard: reward points per tower damage over the whole wave, using the real rounding at the current damage level.
-  const damage = getTowerDamage(tower.upgrades.damage);
+  const damage = getTowerDamage(tower.upgrades.damage, tower.towerType);
   let best: { type: DamageType; value: number } | null = null;
   for (const type of DAMAGE_TYPES) {
     let value = 0;
@@ -211,7 +272,9 @@ function chooseTargetMode(snapshot: MatchSnapshot, tower: Tower, difficulty: AiD
     return "nearest";
   }
   const composition = getWaveComposition(snapshot.wave);
-  return composition.some((entry) => entry.archetype === "tank" || entry.archetype === "armored") ? "strongest" : "first";
+  return composition.some((entry) => entry.archetype === "tank" || entry.archetype === "armored" || entry.archetype === "juggernaut")
+    ? "strongest"
+    : "first";
 }
 
 // Alternatives for the bot's next step, best first: the host applies the first one the rules accept. Placement is the
@@ -225,8 +288,15 @@ export function planAiCommands(snapshot: MatchSnapshot, playerId: string, diffic
 
   const tower = snapshot.towers.find((entry) => entry.playerId === playerId);
   if (!tower) {
-    return rankSpots(snapshot, playerId, difficulty, snapshot.towers)
-      .map((spot) => ({ type: "place-tower", playerId, x: spot.x, y: spot.y }));
+    const ranked = rankSpots(snapshot, playerId, difficulty, snapshot.towers);
+    const lane = laneCells(snapshot.map);
+    return ranked.map((spot): SimulationCommand => ({
+      type: "place-tower",
+      playerId,
+      x: spot.x,
+      y: spot.y,
+      towerType: chooseTowerType(snapshot, playerId, difficulty, spot, ranked, lane)
+    }));
   }
 
   if (difficulty === "hard" && player.towerMoveAvailable) {

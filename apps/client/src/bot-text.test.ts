@@ -53,3 +53,8 @@ test("bot actions read as short toasts", () => {
   assert.equal(describeBotAction("Bot 1", { type: "upgrade-tower", playerId: "p2", towerId: "t", track: "damage" }), "Bot 1 upgraded damage");
   assert.equal(describeBotAction("Bot 1", { type: "ready-for-wave", playerId: "p2" }), "Bot 1 is ready");
 });
+
+test("a bot placement names the tower type, arrow when none is sent", () => {
+  assert.equal(describeBotAction("Bot 1", { type: "place-tower", playerId: "p1", x: 1, y: 1, towerType: "cannon" }), "Bot 1 placed a tower (cannon)");
+  assert.equal(describeBotAction("Bot 1", { type: "place-tower", playerId: "p1", x: 1, y: 1 }), "Bot 1 placed a tower (arrow)");
+});
