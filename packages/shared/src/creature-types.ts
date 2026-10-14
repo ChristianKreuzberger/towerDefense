@@ -30,7 +30,7 @@ export const CREATURE_ARCHETYPE_STATS: Record<CreatureArchetype, CreatureArchety
   tank: { hp: 8, rewardPoints: 20, attackDamage: 3, attackRange: 3.5 },
   // Phase 3 placeholders, tuned in the balance pass (spec/06).
   splitter: { hp: 6, rewardPoints: 12, attackDamage: 1, attackRange: 2.5 },
-  juggernaut: { hp: 30, rewardPoints: 80, attackDamage: 4, attackRange: 3.5 }
+  juggernaut: { hp: 20, rewardPoints: 60, attackDamage: 4, attackRange: 3.5 }
 };
 
 // Closer is stronger: the first band whose distance covers the tower multiplies the base attack damage.

@@ -6,6 +6,7 @@ import {
   isInSpawnProtection,
   type SimulationCommand,
   type TowerTargetMode,
+  type TowerType,
   type UpgradeTrack
 } from "@tower-defense/shared";
 
@@ -22,6 +23,8 @@ interface BaselineScenario {
     maxAdvanceSteps: number;
   };
   waveStartActions?: Record<number, WaveStartAction[]>;
+  // Missing players get the default tower type (arrow), so the original scenarios stay unchanged.
+  towerTypes?: Record<string, TowerType>;
 }
 
 type WaveStartAction =
@@ -90,6 +93,46 @@ const BASELINE_SCENARIOS: BaselineScenario[] = [
         { type: "set-target-mode", playerId: "p2", mode: "strongest" }
       ],
       3: [
+        { type: "upgrade-tower", playerId: "p1", track: "damage" }
+      ]
+    }
+  },
+  {
+    id: "solo_seed-777_wave5_boss",
+    description: "Single player through wave 5, the first splitter wave (4) and the first juggernaut boss (5)",
+    seed: 777,
+    players: [{ id: "p1", name: "Alpha" }],
+    waveLoop: {
+      completedWaves: 5,
+      maxAdvanceSteps: 900
+    },
+    waveStartActions: {
+      2: [{ type: "upgrade-tower", playerId: "p1", track: "damage" }],
+      3: [{ type: "upgrade-tower", playerId: "p1", track: "accuracy" }],
+      4: [{ type: "upgrade-tower", playerId: "p1", track: "damage" }],
+      5: [{ type: "upgrade-tower", playerId: "p1", track: "range" }]
+    }
+  },
+  {
+    id: "duo_seed-42_wave4_cannon-frost",
+    description: "Two players, cannon and frost towers through wave 4 (first splitter wave)",
+    seed: 42,
+    players: [
+      { id: "p1", name: "Alpha" },
+      { id: "p2", name: "Beta" }
+    ],
+    towerTypes: { p1: "frost", p2: "cannon" },
+    waveLoop: {
+      completedWaves: 4,
+      maxAdvanceSteps: 600
+    },
+    waveStartActions: {
+      2: [
+        { type: "upgrade-tower", playerId: "p2", track: "range" },
+        { type: "upgrade-tower", playerId: "p1", track: "accuracy" }
+      ],
+      3: [
+        { type: "upgrade-tower", playerId: "p2", track: "damage" },
         { type: "upgrade-tower", playerId: "p1", track: "damage" }
       ]
     }
@@ -226,7 +269,8 @@ function placeTowersDeterministically(
         type: "place-tower",
         playerId,
         x: cell.x,
-        y: cell.y
+        y: cell.y,
+        ...(scenario.towerTypes?.[playerId] ? { towerType: scenario.towerTypes[playerId] } : {})
       });
       if (result.accepted) {
         placed = true;

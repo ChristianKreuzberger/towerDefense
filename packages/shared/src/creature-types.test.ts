@@ -20,7 +20,7 @@ test("every archetype has exactly one weakness and one resistance", () => {
 
 test("Phase 3 archetype stats and multipliers", () => {
   assert.deepEqual(CREATURE_ARCHETYPE_STATS.splitter, { hp: 6, rewardPoints: 12, attackDamage: 1, attackRange: 2.5 });
-  assert.deepEqual(CREATURE_ARCHETYPE_STATS.juggernaut, { hp: 30, rewardPoints: 80, attackDamage: 4, attackRange: 3.5 });
+  assert.deepEqual(CREATURE_ARCHETYPE_STATS.juggernaut, { hp: 20, rewardPoints: 60, attackDamage: 4, attackRange: 3.5 });
   assert.equal(getDamageAgainst(1, "explosive", "splitter"), 2);
   assert.equal(getDamageAgainst(1, "magic", "splitter"), 1);
   assert.equal(getDamageAgainst(1, "physical", "splitter"), 1);
