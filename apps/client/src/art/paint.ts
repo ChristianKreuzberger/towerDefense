@@ -510,6 +510,46 @@ export function paintCreature(ctx: Ctx, archetype: CreatureArchetype, s: number)
       outline(ctx, accent, lw * 0.7);
       break;
     }
+    case "splitter": {
+      // Two joined blobs with a seam, hinting that it falls apart into two swarm creatures.
+      circle(ctx, s * 0.34, s * 0.34, s * 0.24);
+      outline(ctx, body, lw);
+      circle(ctx, s * 0.34, s * 0.66, s * 0.24);
+      outline(ctx, body, lw);
+      circle(ctx, s * 0.62, c, s * 0.26);
+      outline(ctx, body, lw);
+      ctx.strokeStyle = hex(accent);
+      ctx.lineWidth = lw * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(s * 0.5, s * 0.22);
+      ctx.lineTo(s * 0.58, c);
+      ctx.lineTo(s * 0.5, s * 0.78);
+      ctx.stroke();
+      circle(ctx, s * 0.76, s * 0.42, s * 0.05);
+      ctx.fillStyle = hex(accent);
+      ctx.fill();
+      circle(ctx, s * 0.76, s * 0.58, s * 0.05);
+      ctx.fill();
+      break;
+    }
+    case "juggernaut": {
+      // Spiked armoured hulk: jagged ring, heavy body, glowing core.
+      ctx.beginPath();
+      for (let i = 0; i < 12; i += 1) {
+        const a = (Math.PI / 6) * i;
+        const r = i % 2 === 0 ? s * 0.48 : s * 0.38;
+        const px = c + Math.cos(a) * r;
+        const py = c + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      outline(ctx, shade(body, 0.8), lw);
+      circle(ctx, c, c, s * 0.3);
+      outline(ctx, body, lw);
+      circle(ctx, c + s * 0.04, c, s * 0.13);
+      outline(ctx, accent, lw * 0.8);
+      break;
+    }
   }
 }
 

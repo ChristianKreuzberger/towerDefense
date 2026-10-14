@@ -78,7 +78,7 @@ test("aggregates deterministic telemetry snapshot from movement, combat, and rep
       totals[spawned.archetype] += 1;
       return totals;
     },
-    { runner: 0, swarm: 0, armored: 0, tank: 0 }
+    { runner: 0, swarm: 0, armored: 0, tank: 0, splitter: 0, juggernaut: 0 }
   );
 
   assert.equal(waveOneTelemetry.movementProgressUnits, expectedMovementProgressUnits);

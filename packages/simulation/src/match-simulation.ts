@@ -37,6 +37,8 @@ import {
   getCatchUpBonus,
   type CreatureArchetype,
   SWARM_KILL_INCOME_CAP_PER_WAVE,
+  SPLITTER_CHILD_ARCHETYPE,
+  SPLITTER_CHILD_COUNT,
   getWaveCreatureArchetype,
   getWaveCreatureCount,
   WAVE_SPAWN_INTERVAL_TICKS,
@@ -635,7 +637,7 @@ export class MatchSimulation {
     const spawnOrdinal = this.currentWaveSpawned + 1;
     // Round robin over the live towers (sorted by id) spreads the preferred targets across players.
     const liveTowers = [...this.state.towers].sort((a, b) => a.id.localeCompare(b.id));
-    const archetype = getWaveCreatureArchetype(spawnOrdinal);
+    const archetype = getWaveCreatureArchetype(spawnOrdinal, this.state.wave);
     const creature: Creature = {
       id: `wave-${this.state.wave}-creature-${spawnOrdinal}`,
       archetype,
@@ -804,6 +806,38 @@ export class MatchSimulation {
     });
   }
 
+  // A dead splitter leaves swarm children at its exact path position (spec/02). They are not part of the
+  // wave's spawn count, so creaturesToSpawn is unaffected, but the wave only ends once they are dead.
+  private splitCreature(parent: Creature): Creature[] {
+    const children: Creature[] = [];
+    for (let index = 0; index < SPLITTER_CHILD_COUNT; index += 1) {
+      children.push({
+        id: `${parent.id}-s${index + 1}`,
+        archetype: SPLITTER_CHILD_ARCHETYPE,
+        hp: getCreatureBaseHp(SPLITTER_CHILD_ARCHETYPE),
+        x: parent.x,
+        y: parent.y,
+        pathIndex: parent.pathIndex,
+        pathProgressUnits: parent.pathProgressUnits,
+        spawnTick: this.state.waveTick,
+        targetTowerId: parent.targetTowerId,
+        lane: index % PATH_WIDTH
+      });
+    }
+    this.state.telemetry.currentWave.creaturesSpawned += children.length;
+    this.updateCurrentWaveTelemetryTick();
+    this.state.events.push({
+      type: "creature-split",
+      wave: this.state.wave,
+      tick: this.state.waveTick,
+      creatureId: parent.id,
+      childIds: children.map((child) => child.id),
+      x: parent.x,
+      y: parent.y
+    });
+    return children;
+  }
+
   private resolveCombatForCurrentTick(): void {
     if (this.state.targetAssignments.length === 0 || this.state.creatures.length === 0) {
       return;
@@ -816,6 +850,8 @@ export class MatchSimulation {
     const sortedAssignments = [...this.state.targetAssignments].sort((a, b) =>
       a.towerId.localeCompare(b.towerId)
     );
+
+    const splitChildren: Creature[] = [];
 
     for (const assignment of sortedAssignments) {
       if (!assignment.targetCreatureId) {
@@ -885,11 +921,18 @@ export class MatchSimulation {
           y: creature.y,
           rewardPoints
         });
+        if (creature.archetype === "splitter") {
+          splitChildren.push(...this.splitCreature(creature));
+        }
       } else {
         creaturesById.set(creature.id, creature);
       }
     }
 
+    // Children join after the loop, so towers later in this tick cannot hit them and no draw order changes.
+    for (const child of splitChildren) {
+      creaturesById.set(child.id, child);
+    }
     this.state.creatures = [...creaturesById.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
 

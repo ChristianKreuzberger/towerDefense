@@ -20,7 +20,7 @@ import {
 
 // Sprites are baked at 2x and displayed at 1/SS so they stay crisp when the board is scaled up.
 export const SS = 2;
-export const CREATURE_SCALE: Record<CreatureArchetype, number> = { runner: 1.05, swarm: 0.85, armored: 1.15, tank: 1.45 };
+export const CREATURE_SCALE: Record<CreatureArchetype, number> = { runner: 1.05, swarm: 0.85, armored: 1.15, tank: 1.45, splitter: 1.15, juggernaut: 2 };
 export const TOWER_SCALE = 2;
 
 export const KEY = {

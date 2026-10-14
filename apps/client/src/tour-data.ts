@@ -28,7 +28,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   {
     title: "Combat",
     body: [
-      "Waves play out on their own. Waves get bigger as the match goes on (wave 1 has 5 creatures): runners, swarms, armored and tanks, all walking one lane.",
+      "Waves play out on their own. Waves get bigger as the match goes on (wave 1 has 5 creatures): runners, swarms, armored and tanks, all walking one lane. From wave 4 splitters break into swarms when shot, and every 5th wave ends with a boss.",
       "Towers shoot creatures, never each other. Creatures hurt towers near the lane, and hit harder the closer they get.",
       "You can pause, or run at 2x or 4x speed."
     ]

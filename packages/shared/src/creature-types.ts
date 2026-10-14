@@ -1,6 +1,19 @@
 import { DAMAGE_TYPES, type DamageType } from "./tower-types.js";
 
-export type CreatureArchetype = "runner" | "tank" | "armored" | "swarm";
+export type CreatureArchetype = "runner" | "tank" | "armored" | "swarm" | "splitter" | "juggernaut";
+
+export const CREATURE_ARCHETYPES: readonly CreatureArchetype[] = [
+  "runner",
+  "swarm",
+  "armored",
+  "tank",
+  "splitter",
+  "juggernaut"
+];
+
+// What a splitter becomes when it dies: this many plain swarm creatures (spec/02).
+export const SPLITTER_CHILD_ARCHETYPE: CreatureArchetype = "swarm";
+export const SPLITTER_CHILD_COUNT = 2;
 
 export interface CreatureArchetypeStats {
   hp: number;
@@ -14,7 +27,10 @@ export const CREATURE_ARCHETYPE_STATS: Record<CreatureArchetype, CreatureArchety
   runner: { hp: 3, rewardPoints: 10, attackDamage: 1, attackRange: 2.5 },
   swarm: { hp: 2, rewardPoints: 8, attackDamage: 1, attackRange: 2.5 },
   armored: { hp: 5, rewardPoints: 14, attackDamage: 2, attackRange: 3.5 },
-  tank: { hp: 8, rewardPoints: 20, attackDamage: 3, attackRange: 3.5 }
+  tank: { hp: 8, rewardPoints: 20, attackDamage: 3, attackRange: 3.5 },
+  // Phase 3 placeholders, tuned in the balance pass (spec/06).
+  splitter: { hp: 6, rewardPoints: 12, attackDamage: 1, attackRange: 2.5 },
+  juggernaut: { hp: 30, rewardPoints: 80, attackDamage: 4, attackRange: 3.5 }
 };
 
 // Closer is stronger: the first band whose distance covers the tower multiplies the base attack damage.
@@ -34,7 +50,9 @@ export const CREATURE_DAMAGE_MULTIPLIERS: Record<CreatureArchetype, Record<Damag
   runner: { physical: 1.5, explosive: 1, magic: 0.5 },
   swarm: { physical: 0.5, explosive: 1.5, magic: 1 },
   armored: { physical: 0.5, explosive: 1, magic: 1.5 },
-  tank: { physical: 1.5, explosive: 0.5, magic: 1 }
+  tank: { physical: 1.5, explosive: 0.5, magic: 1 },
+  splitter: { physical: 1, explosive: 1.5, magic: 0.5 },
+  juggernaut: { physical: 1, explosive: 0.5, magic: 1.5 }
 };
 
 export function getDamageMultiplier(archetype: CreatureArchetype, damageType: DamageType): number {

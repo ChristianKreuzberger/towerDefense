@@ -1,9 +1,11 @@
-import type {
-  BalanceAnalysisPlayerSnapshot,
-  BalanceAnalysisSnapshot,
-  TelemetryKillsByArchetype,
-  WaveTelemetrySnapshot
+import {
+  CREATURE_ARCHETYPES,
+  type BalanceAnalysisPlayerSnapshot,
+  type BalanceAnalysisSnapshot,
+  type TelemetryKillsByArchetype,
+  type WaveTelemetrySnapshot
 } from "@tower-defense/shared";
+import { createEmptyKillsByArchetype } from "./telemetry.js";
 
 export interface BalanceReportWaveSummary {
   wave: number;
@@ -145,12 +147,7 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
     };
   });
 
-  const cumulativeKills = {
-    runner: 0,
-    swarm: 0,
-    armored: 0,
-    tank: 0
-  };
+  const cumulativeKills = createEmptyKillsByArchetype();
   let totalTicks = 0;
   let towerDamageDealt = 0;
   let towerDamageIntake = 0;
@@ -167,10 +164,9 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
     waveClearBonusAwarded += toNumber(wave.waveTelemetry.waveClearBonusAwarded);
     catchUpBonusAwarded += toNumber(wave.waveTelemetry.catchUpBonusAwarded);
     swarmIncomeCapped += toNumber(wave.waveTelemetry.swarmIncomeCapped);
-    cumulativeKills.runner += toNumber(wave.waveTelemetry.killsByArchetype.runner);
-    cumulativeKills.swarm += toNumber(wave.waveTelemetry.killsByArchetype.swarm);
-    cumulativeKills.armored += toNumber(wave.waveTelemetry.killsByArchetype.armored);
-    cumulativeKills.tank += toNumber(wave.waveTelemetry.killsByArchetype.tank);
+    for (const archetype of CREATURE_ARCHETYPES) {
+      cumulativeKills[archetype] += toNumber(wave.waveTelemetry.killsByArchetype[archetype]);
+    }
   }
 
   const finalSnapshot = orderedSnapshots[orderedSnapshots.length - 1];
@@ -209,7 +205,13 @@ export function deriveBalanceReport(snapshots: BalanceAnalysisSnapshot[]): Balan
 }
 
 function formatKills(kills: TelemetryKillsByArchetype): string {
-  return `runner=${kills.runner} swarm=${kills.swarm} armored=${kills.armored} tank=${kills.tank}`;
+  const base = `runner=${kills.runner} swarm=${kills.swarm} armored=${kills.armored} tank=${kills.tank}`;
+  // Phase 3 archetypes only show up once they were killed, so older reports keep their exact text.
+  const extra = (["splitter", "juggernaut"] as const)
+    .filter((archetype) => (kills[archetype] ?? 0) > 0)
+    .map((archetype) => ` ${archetype}=${kills[archetype]}`)
+    .join("");
+  return base + extra;
 }
 
 function formatPlayerLine(prefix: string, player: BalanceAnalysisPlayerSnapshot): string {

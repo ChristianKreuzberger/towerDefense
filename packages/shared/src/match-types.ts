@@ -53,12 +53,7 @@ export interface PathCellRepairState {
   wearAfter: number;
 }
 
-export interface TelemetryKillsByArchetype {
-  runner: number;
-  swarm: number;
-  armored: number;
-  tank: number;
-}
+export type TelemetryKillsByArchetype = Record<CreatureArchetype, number>;
 
 export interface WaveTelemetrySnapshot {
   wave: number;
@@ -161,6 +156,16 @@ export type MatchEvent =
       creatureId: string;
       archetype: CreatureArchetype;
       pathIndex: number;
+      x: number;
+      y: number;
+    }
+  | {
+      // A splitter died and left child creatures at its position (spec/02).
+      type: "creature-split";
+      wave: number;
+      tick: number;
+      creatureId: string;
+      childIds: string[];
       x: number;
       y: number;
     }
