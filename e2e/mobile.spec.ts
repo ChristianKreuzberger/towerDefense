@@ -34,10 +34,11 @@ async function boardBox(page: Page): Promise<{ x: number; y: number; width: numb
 
 for (const size of [
   { name: "phone", viewport: { width: 390, height: 844 } },
+  { name: "small phone", viewport: { width: 360, height: 640 }, touch: true },
   { name: "desktop", viewport: { width: 1280, height: 720 } }
 ]) {
   test.describe(`${size.name} shell`, () => {
-    test.use({ viewport: size.viewport, hasTouch: size.name === "phone" });
+    test.use({ viewport: size.viewport, hasTouch: size.name !== "desktop" });
 
     test("the page never scrolls and the board does not move when text appears", async ({ page }) => {
       await startMatch(page, "/");
@@ -47,7 +48,7 @@ for (const size of [
 
       // Placement rewrites the guide, the next-wave line, the meta line and shows toasts and the turn banner.
       await clickTowerSpot(page);
-      if (size.name === "phone") {
+      if (size.name !== "desktop") {
         // Compact layout: the first tap only selects the spot, the second confirms.
         await clickTowerSpot(page);
       }

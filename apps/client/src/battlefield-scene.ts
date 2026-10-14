@@ -816,7 +816,7 @@ class BattlefieldScene extends Phaser.Scene {
     }
     return {
       container, base, turret, pips, hpBg, hpFill, flash,
-      player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, damageType: tower.damageType, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
+      player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, damageType: tower.damageType, towerType: tower.towerType, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,
       baseX: cx, baseY: cy, flashUntil: 0, shakeUntil: 0, recoilUntil: 0
     };
   }

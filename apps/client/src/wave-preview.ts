@@ -1,4 +1,4 @@
-import { getCreatureWeaknesses, getWaveComposition, type CreatureArchetype } from "@tower-defense/shared";
+import { DAMAGE_TYPES, getCreatureWeaknesses, getDamageMultiplier, getWaveComposition, type CreatureArchetype } from "@tower-defense/shared";
 
 const LABEL: Record<CreatureArchetype, string> = {
   runner: "Runner",
@@ -9,11 +9,13 @@ const LABEL: Record<CreatureArchetype, string> = {
   juggernaut: "Juggernaut (boss)"
 };
 
-// "Next wave 3: 2x Runner (weak: physical), 1x Swarm (weak: explosive), ..." from the shared wave rule and damage data.
+// "Next wave 3: 2x Runner (weak: physical, resists: magic), ..." from the shared wave rule and damage data.
 export function formatWavePreview(wave: number): string {
   const parts = getWaveComposition(wave).map((entry) => {
     const weak = getCreatureWeaknesses(entry.archetype);
-    return `${entry.count}x ${LABEL[entry.archetype]}${weak.length > 0 ? ` (weak: ${weak.join("/")})` : ""}`;
+    const resists = DAMAGE_TYPES.filter((type) => getDamageMultiplier(entry.archetype, type) < 1);
+    const hints = [weak.length > 0 ? `weak: ${weak.join("/")}` : "", resists.length > 0 ? `resists: ${resists.join("/")}` : ""].filter(Boolean);
+    return `${entry.count}x ${LABEL[entry.archetype]}${hints.length > 0 ? ` (${hints.join(", ")})` : ""}`;
   });
   return `Next wave ${wave}: ${parts.join(", ")}`;
 }

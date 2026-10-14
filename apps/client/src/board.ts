@@ -79,7 +79,8 @@ export function syncPlacementContext(snapshot: MatchSnapshot | null): void {
     phase: snapshot.phase,
     playerId,
     hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId),
-    moveMode: store.moveMode
+    moveMode: store.moveMode,
+    towerType: snapshot.towers.find((tower) => tower.playerId === playerId)?.towerType ?? store.towerType
   });
 }
 

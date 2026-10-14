@@ -3,6 +3,7 @@ import type { MatchSnapshot, Tower, UpgradeTrack } from "@tower-defense/shared";
 import { battlefieldMount } from "./board";
 import { el } from "./dom";
 import { store } from "./state";
+import { TOWER_TYPE_LABEL } from "./tower-type-info";
 import type { ToolbarState } from "./toolbar-state";
 
 // Upgrade popover for a tapped tower. It is only a second face for the toolbar upgrade buttons: the buttons click
@@ -42,7 +43,9 @@ export function syncTowerMenu(snapshot: MatchSnapshot, tower: Tower | undefined,
     return;
   }
   const owner = snapshot.players.find((player) => player.id === tower.playerId);
-  el.towerMenuTitle.textContent = `${owner?.name ?? tower.playerId} · Level ${getTowerStats(tower.upgrades).level}`;
+  const stats = getTowerStats(tower.upgrades, tower.towerType);
+  el.towerMenuTitle.textContent = `${owner?.name ?? tower.playerId} · ${TOWER_TYPE_LABEL[tower.towerType]} · Level ${stats.level}`;
+  el.towerMenuInfo.textContent = `HP ${tower.health}/${tower.maxHealth} · Range ${stats.range} · Accuracy ${Math.round(stats.accuracy * 100)}%`;
   for (const track of UPGRADE_TRACKS) {
     const button = trackButtons.get(track);
     if (!button) {
