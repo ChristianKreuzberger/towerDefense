@@ -16,9 +16,10 @@
 - A bot is a normal player (id `p{n}`, name "Bot N", not editable) with a difficulty. It uses the same commands as a human (place-tower, upgrade-tower, set-damage-type, set-target-mode, move-tower, ready-for-wave), so every rule and rejection applies to it. It reads only the snapshot a human sees
 - Bots act in prep only. They place their tower after all human players have placed theirs (immediately when there are no humans), then spend points, pick a damage type and target mode, and ready up. Bots can win at 1000 points like anyone else
 - Decisions are a pure function of the snapshot and the match seed (no `Math.random`, no `Date`), so the same setup gives the same match. The pause between bot actions is pacing done by the client and never changes outcomes
-- Easy: seeded random valid tower spot, buys a seeded random affordable track and sometimes saves instead, keeps physical damage and target `first`
-- Medium: places by lane coverage, buys accuracy, then damage, then range whenever affordable, picks the damage type that is strongest against the next wave
-- Hard: like medium, but weighs tower danger and the upgrade with the best expected damage per point, matches damage type to the whole next wave, switches target mode (strongest against tanks), and uses the free tower move when a clearly better spot exists
+- Easy: seeded random valid tower spot, seeded random tower type (uniform over arrow, cannon, frost), buys a seeded random affordable track and sometimes saves instead, keeps physical damage and target `first`
+- Medium: places by lane coverage, buys accuracy, then damage, then range whenever affordable, picks the damage type that is strongest against the next wave. Tower type: `arrow`, except a seeded roll below 0.3 picks `cannon`
+- Hard: like medium, but weighs tower danger and the upgrade with the best expected damage per point, matches damage type to the whole next wave, switches target mode (strongest against tanks and against waves with a juggernaut), and uses the free tower move when a clearly better spot exists. Tower type: `cannon` when splitters plus swarms are at least 40% of the creatures in waves 4 to 8, otherwise `frost` when the chosen spot has at least 1.3x the lane coverage of the best other spot (a long lane stretch in range), otherwise `arrow`. Hard does not score spots for splash
+- Bots choose a tower type only when they place (types are fixed afterwards). The new seeded rolls use their own salts, so existing bot choices for arrow towers do not change
 - A match with zero humans runs on its own: no placement prompt, the player only watches
 
 ## Shared objectives
@@ -44,8 +45,19 @@
 - Cannot shoot other towers under any condition
 - Can shoot invading creatures based on tower range and targeting rules
 - Range is limited and measured in grid cells (Euclidean distance, inclusive); a creature exactly at range distance can be targeted
-- Base range is 6 cells (range level 1) and grows by 1.5 cells per range level
-- A tower fires at most once per tick. Whether the shot hits is decided deterministically from the match seed, wave, tick and tower id (no hidden randomness), against the tower's accuracy: 70% at accuracy level 1, +7.5 percentage points per level, 100% at level 5. A miss deals no damage and emits a `tower-miss` event
+- Tower types (Phase 3, `TOWER_TYPES` in `packages/shared/src/tower-types.ts`): `arrow`, `cannon`, `frost`. The owner picks one in `place-tower` (`towerType`, default `arrow`). It is fixed for the life of the tower (no selling) and kept by `move-tower`. All types use the same tower spots, the same three upgrade tracks, `MAX_TOWER_LEVEL` and upgrade costs, and 175 HP. Placing costs nothing. The upgrade formulas below are for `arrow`; the other types change base values and add one effect each:
+
+| Type | Base range | Base accuracy | Fires | Damage per shot | Effect |
+|------|-----------|---------------|-------|-----------------|--------|
+| arrow (default) | 6 | 0.70 | every tick | damage level | none |
+| cannon | 5 | 0.60 | every 2nd tick (`waveTick % 2 === 0`) | 2 x damage level | splash |
+| frost | 6 | 0.80 | every tick | max(1, round(0.5 x damage level)) | slow |
+
+  Accuracy per level (+0.075, cap 1.0) and range per level (+1.5) are the same for every type
+- Cannon splash: after the main hit, every other creature within 1.5 cells of the target takes max(1, round(main damage x 0.5)), with its own archetype multiplier applied first. Splash never includes towers, skips creatures inside spawn protection, can kill (the points go to the cannon's owner), and needs no extra accuracy roll (the one roll covers the shot). Victims are processed in creature id order
+- Frost slow: a hit slows the creature to 60% speed for 2 + damage level ticks. A new hit refreshes the duration and never stacks. The factor multiplies movement speed units after path wear and the floor, with a minimum of 20 units
+- Base range is 6 cells for `arrow` (range level 1) and grows by 1.5 cells per range level
+- A tower fires at most once per tick (cannon: at most once per 2 ticks; a skipped tick makes no roll). Whether the shot hits is decided deterministically from the match seed, wave, tick and tower id (no hidden randomness), against the tower's accuracy: 70% at accuracy level 1, +7.5 percentage points per level, 100% at level 5. A miss deals no damage and emits a `tower-miss` event
 - Damage per shot is 1 at damage level 1 and +1 per damage level
 - A tower with no creature in range has no target and does not fire
 - Starts with 175 HP (raised from 100 when waves grew to 1.5x size, see spec/06) and takes damage from creature attacks
@@ -59,10 +71,13 @@
 - Attack range (reach): a per-archetype distance in grid cells (see spec/06). It is Euclidean, measured from the creature's current cell to the tower cell, and inclusive (a target exactly at range can be hit)
 - Closer is stronger: the damage of each hit is the archetype's base attack damage times a distance band multiplier (x3 within 1.5 cells, x2 within 2.5, x1 within 3.5), scaled by 1.2 and rounded (see spec/06). Each tower in reach is hit with the band for its own distance, so clustered towers all take damage. The worst single hit is a tank next to a tower: round(3 x 3 x 1.2) = 11 HP
 - Hits are resolved in a fixed order (creatures by id, then towers by id) and one `creature-attack` event is emitted per creature and tower hit. The `creature-targets-selected` event still reports one primary target per creature: its preferred tower while that is in reach, otherwise the nearest tower in reach (ties: lower health, then id). It is informational only; damage does not depend on it
-- Archetypes: runner, tank, armored, swarm
+- Archetypes: runner, tank, armored, swarm, splitter, juggernaut (the last two arrive in Phase 3)
 - Wave size and composition are fixed and public: wave N has ceil(1.5 x (N + 2)) creatures (wave 1 = 5, wave 2 = 6, wave 5 = 11), spawned one every 2 ticks, cycling runner, swarm, armored, tank in that order (so wave 1 is two runners, a swarm, an armored and a tank). The same rule gives the composition shown in the next-wave preview. The snapshot carries `creaturesToSpawn`, the number of creatures of the current wave that have not spawned yet
+- Phase 3 wave rules (still a pure function of the wave number; waves 1 to 3 are unchanged): from `WAVE_SPLITTER_FROM_WAVE` = 4, every 5th creature of the wave (ordinals 5, 10, 15, ...) is a splitter instead of the cycle's creature. When the wave number is a multiple of `BOSS_WAVE_INTERVAL` = 5 (waves 5, 10, 15, ...), one juggernaut is appended after the last normal creature, so the count is the normal count + 1. The spawn interval stays 2 ticks
+- Splitter: when it is killed it spawns 2 swarm creatures at its exact path position (same `pathIndex` and progress, lanes 0 and 1). Children get ids `<parentId>-s1` and `<parentId>-s2`, `spawnTick` = the current tick, and the parent's preferred tower. They do not count toward the wave's spawn count (`creaturesToSpawn` is unaffected), but the wave is not complete until they are dead. Rewards are paid for the splitter and for each swarm; the swarm income cap still applies to the children's kills. A splitter that leaves the map alive splits nothing. Children are added after the combat loop of that tick and sorted by id, so no existing step is reordered
+- Juggernaut (boss): moves at normal speed, hits hard at close range through the normal proximity bands
 - Spawn protection: a creature is untargetable and takes no damage while it is inside the protected area around the monster cave (every cell within `SPAWN_PROTECTION_RADIUS`, 5 cells Euclidean, of the cave; see spec/05). The rule is by location, not by age: it ends the moment the creature walks outside the area. It still moves and can attack normally; towers just skip it while it is inside
-- Later archetypes can include shield or split-on-death
+- Later archetypes can include shield (split-on-death is the splitter)
 
 ## Damage and targeting
 
@@ -78,8 +93,10 @@
 | swarm     | 0.5      | 1.5       | 1     |
 | armored   | 0.5      | 1         | 1.5   |
 | tank      | 1.5      | 0.5       | 1     |
+| splitter  | 1        | 1.5       | 0.5   |
+| juggernaut | 1       | 0.5       | 1.5   |
 
-- Damage per hit = `max(1, round(towerDamage * multiplier))`, where `towerDamage` is the damage-track value (1 to 5). The minimum is 1, so a resisted hit always does something and a level-1 tower can kill every archetype. The accuracy roll happens before damage and is unaffected by the type. `tower-hit.damage` and the `towerDamageDealt` telemetry both carry the damage actually applied
+- Damage per hit = `max(1, round(towerDamage * multiplier))`, where `towerDamage` is the tower's damage per shot (the damage-track value 1 to 5 for arrow; see the tower type table for the other types). The minimum is 1, so a resisted hit always does something and a level-1 tower can kill every archetype. The accuracy roll happens before damage and is unaffected by the type. `tower-hit.damage` and the `towerDamageDealt` telemetry both carry the damage actually applied
 - Friendly fire is disabled between towers
 
 ## Scoring and economy

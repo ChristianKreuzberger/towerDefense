@@ -54,7 +54,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 
 ## Realtime command contracts
 
-- placeTower { tileX, tileY, towerType }
+- placeTower { tileX, tileY, towerType } where towerType is `arrow`, `cannon` or `frost` and optional on the wire (missing means `arrow`; wire command `place-tower`)
 - moveTower { towerId, x, y } (once per player, unlocked after 5 completed rounds, prep phase only and before the player is ready; accepted moves emit a `tower-moved` event)
 - upgradeTower { towerId, track } where track is `range`, `damage` or `accuracy` (prep phase only, rejected once the player is ready or during the wave)
 - setDamageType { towerId, damageType } where damageType is `physical`, `explosive` or `magic` (prep phase only, rejected once the player is ready; wire command `set-damage-type`)
@@ -75,7 +75,7 @@ determinism are not affected; lite is a serialization concern of the host only.
 - towerDamaged
 - towerDestroyed
 - towersAutoRepaired
-- towerMissed (`tower-miss`: a shot that missed), towerMoved (`tower-moved`), catchUpBonus (`catch-up-bonus`), swarmIncomeCapped (`swarm-income-capped`), waveClearBonus (`wave-clear-bonus`)
+- creatureSplit (`creature-split`: parent id, child ids, x, y), towerMissed (`tower-miss`: a shot that missed), towerMoved (`tower-moved`), catchUpBonus (`catch-up-bonus`), swarmIncomeCapped (`swarm-income-capped`), waveClearBonus (`wave-clear-bonus`)
 - commandRejected
 - matchEnded
 
@@ -84,6 +84,8 @@ determinism are not affected; lite is a serialization concern of the host only.
 - Snapshot `towers[].damageType` is the tower's `DamageType` (`physical` | `explosive` | `magic`)
 - `tower-hit.damage` is the damage after the creature's multiplier; telemetry `towerDamageDealt` sums the same value
 - `tower-hit` also carries `damageType` so clients can tint the shot without looking up the tower
+- Snapshot `towers[].towerType` is the tower's type. Snapshot creatures carry an optional `slowedUntilTick` while frost slows them
+- Cannon splash victims are reported as extra `tower-hit` events with `splash: true` (the final shape is confirmed when the tower types are implemented, and this file is updated in that commit if it differs)
 
 ## Error strategy
 
@@ -104,6 +106,7 @@ Common rejection reasons:
 - TOWER_MAX_LEVEL (upgrade track at max level; wire code `tower-max-level`)
 - Note: `move-tower` target cells are judged by the normal placement reasons (`not-tower-spot`, `spawn-protected`, `tower-overlap`, `path-blocked`, `out-of-bounds`). `PlayerState.towerMoveAvailable` means "the free move is usable right now" (unlocked, unused, prep phase, not ready). `MatchSetup.map` (a prebuilt map) exists for the simulation and tests only; the host API does not read it from request bodies
 - INVALID_UPGRADE_TRACK (wire code `invalid-upgrade-track`)
+- INVALID_TOWER_TYPE (`place-tower` with an unknown `towerType`; wire code `invalid-tower-type`, never coerced to `arrow`)
 - DAMAGE_TYPE_PHASE_NOT_ACTIVE, INVALID_DAMAGE_TYPE_TARGET, INVALID_DAMAGE_TYPE (wire codes `damage-type-phase-not-active`, `invalid-damage-type-target`, `invalid-damage-type`)
 - TOWER_MOVE_LOCKED, TOWER_MOVE_USED, MOVE_PHASE_NOT_ACTIVE, INVALID_MOVE_TARGET (wire codes `tower-move-locked`, `tower-move-used`, `move-phase-not-active`, `invalid-move-target`; the target cell itself is judged by the normal placement reasons)
 

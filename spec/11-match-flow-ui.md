@@ -140,6 +140,7 @@ Settings dialog
 
 Next-wave preview and HUD
 - During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic), 1x Tank (weak: physical)" (each archetype's weaknesses are the damage types whose multiplier is above 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
+- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed; the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (polish later). The picker is a segmented control with no new hotkey
 - The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
 - The ended status text names the winner (never the raw id)
 
