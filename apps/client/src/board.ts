@@ -22,10 +22,17 @@ export function setViewChangeHandler(handler: () => void): void {
   viewChangeHandler = handler;
 }
 
+let effectsEnabledProvider: () => boolean = () => true;
+
+export function setEffectsEnabledProvider(provider: () => boolean): void {
+  effectsEnabledProvider = provider;
+}
+
 function mountBattlefield(): BattlefieldMount {
   return createBattlefieldMount(el.board, {
     onCellClick: (x, y) => cellClickHandler(x, y),
-    onViewChange: () => viewChangeHandler()
+    onViewChange: () => viewChangeHandler(),
+    effectsEnabled: () => effectsEnabledProvider()
   });
 }
 

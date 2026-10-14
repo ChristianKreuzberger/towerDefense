@@ -124,6 +124,12 @@ Effects (driven by snapshot events, presentation only)
 - `creature-attack`: tower flash and shake
 - `tower-destroyed`: explosion (flash, fireball, debris, smoke) played on the tower; the tower vanishes only once the explosion has peaked and leaves ruins behind (see Ruins). With `prefers-reduced-motion` the explosion is a single short static flash
 - `wave-end`: wave-clear banner
+- `wave-start`: wave banner ("Wave N", or "Wave N: boss incoming" when the wave has a juggernaut)
+- `tower-hit` extras: a spark at the creature in the damage type's colour (physical bone, explosive orange, magic violet); a cannon shot and each splash hit add an orange ring, a frost hit adds an ice-blue ring
+- `creature-defeated` extras: kills worth 20 points or more (tank, juggernaut) add a second white burst and a wider glow in the owner's colour
+- `creature-split`: a green ring and puff where the splitter died
+- `creature-attack`: the tower shake lasts longer the harder the hit (up to twice as long)
+- Visual effects setting: the settings dialog has a "Visual effects" toggle (default on, stored with the other settings, spec/08). Off keeps only the essential cues (shot, kill burst and points, tower flash and shake, explosion, wave-clear banner) and drops the extras listed above and the wave-start banner. It is independent of `prefers-reduced-motion`, which always applies
 - `tower-hit` and `creature-defeated` carry the cell the creature was in. Strong towers can kill a creature within the same batched response that spawned it, so it never appears in a snapshot; the client falls back to that cell so shots and kills are still shown
 - Events of one batched response are spread across the glide time of that response so they do not all fire at once; the number of effects per snapshot is capped
 - With `prefers-reduced-motion` there is no shake, no particle burst and no banner animation; flashes become short static highlights

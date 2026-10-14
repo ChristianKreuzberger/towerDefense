@@ -22,7 +22,7 @@ test("settings from the menu persist volume and mute across reload", async ({ pa
   await expect(opener).toBeFocused();
 
   const stored = await page.evaluate(() => localStorage.getItem("towerDefense.settings.v1"));
-  expect(JSON.parse(stored ?? "null")).toEqual({ version: 1, effectsVolume: 0.35, muted: true });
+  expect(JSON.parse(stored ?? "null")).toEqual({ version: 1, effectsVolume: 0.35, muted: true, effects: true });
 
   await page.reload();
   await page.locator("#settingsBtn").click();
@@ -119,4 +119,38 @@ test("the guide close button has an accessible name and the shortcut bar matches
   for (const text of ["ready", "tower", "upgrade", "switch player", "pause", "mute", "move cursor"]) {
     await expect(bar).toContainText(text);
   }
+});
+
+test("the visual effects toggle persists across reload", async ({ page }) => {
+  await startMatch(page, "/");
+  await page.locator("#settingsBtn").click();
+  const toggle = page.locator("#settingsEffectsBtn");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Escape");
+  const stored = await page.evaluate(() => localStorage.getItem("towerDefense.settings.v1"));
+  expect(JSON.parse(stored ?? "null")).toMatchObject({ effects: false });
+  await page.reload();
+  await page.locator("#settingsBtn").click();
+  await expect(page.locator("#settingsEffectsBtn")).toHaveAttribute("aria-pressed", "false");
+});
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("a match still plays through its first wave without page errors", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await startMatch(page, "/");
+    // Two hot-seat players: after the first ready the active player hands over to the second.
+    await clickTowerSpot(page, 0);
+    await page.locator("#readyBtn").click();
+    await expect(page.locator("#playerId")).toHaveValue("p2");
+    await clickTowerSpot(page, 1);
+    await page.locator("#readyBtn").click();
+    await expect(page.locator("#phaseLabel")).toHaveText("WAVE 1 COMBAT");
+    await expect(page.locator("#phaseLabel")).toHaveText("PLACEMENT PHASE", { timeout: 30_000 });
+    expect(errors).toEqual([]);
+  });
 });

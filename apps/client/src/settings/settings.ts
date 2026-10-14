@@ -1,6 +1,8 @@
 export interface AudioSettings {
   effectsVolume: number;
   muted: boolean;
+  // Optional visual extras (hit sparks, big-kill glow, wave and boss banners). Essential cues always show.
+  effects: boolean;
 }
 
 export interface StorageLike {
@@ -8,7 +10,7 @@ export interface StorageLike {
   setItem(key: string, value: string): void;
 }
 
-export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = Object.freeze({ effectsVolume: 0.7, muted: false });
+export const DEFAULT_AUDIO_SETTINGS: Readonly<AudioSettings> = Object.freeze({ effectsVolume: 0.7, muted: false, effects: true });
 export const SETTINGS_STORAGE_KEY = "towerDefense.settings.v1";
 
 export function clampVolume(value: unknown): number {
@@ -36,12 +38,13 @@ export function parseSettings(raw: string | null): AudioSettings {
   return {
     // Out-of-range stored values are invalid per the schema, so they fall back instead of clamping.
     effectsVolume: isValidVolume(record.effectsVolume) ? record.effectsVolume : DEFAULT_AUDIO_SETTINGS.effectsVolume,
-    muted: typeof record.muted === "boolean" ? record.muted : DEFAULT_AUDIO_SETTINGS.muted
+    muted: typeof record.muted === "boolean" ? record.muted : DEFAULT_AUDIO_SETTINGS.muted,
+    effects: typeof record.effects === "boolean" ? record.effects : DEFAULT_AUDIO_SETTINGS.effects
   };
 }
 
 export function serializeSettings(settings: AudioSettings): string {
-  return JSON.stringify({ version: 1, effectsVolume: settings.effectsVolume, muted: settings.muted });
+  return JSON.stringify({ version: 1, effectsVolume: settings.effectsVolume, muted: settings.muted, effects: settings.effects });
 }
 
 export interface SettingsStore {
@@ -75,7 +78,8 @@ export function createSettingsStore(storage: StorageLike | null = defaultStorage
     set(patch) {
       settings = {
         effectsVolume: patch.effectsVolume === undefined ? settings.effectsVolume : clampVolume(patch.effectsVolume),
-        muted: patch.muted === undefined ? settings.muted : patch.muted === true
+        muted: patch.muted === undefined ? settings.muted : patch.muted === true,
+        effects: patch.effects === undefined ? settings.effects : patch.effects === true
       };
       try {
         storage?.setItem(SETTINGS_STORAGE_KEY, serializeSettings(settings));

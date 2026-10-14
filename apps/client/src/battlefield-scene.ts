@@ -99,6 +99,7 @@ class BattlefieldScene extends Phaser.Scene {
   private pendingCursor: { x: number; y: number } | null = null;
   private onCellClick: ((x: number, y: number) => void) | undefined;
   private onViewChange: (() => void) | undefined;
+  private effectsEnabled: () => boolean = () => true;
   private view: View = FIT_VIEW;
   private worldWidth = 1;
   private worldHeight = 1;
@@ -191,6 +192,10 @@ class BattlefieldScene extends Phaser.Scene {
 
   getView(): View {
     return this.view;
+  }
+
+  setEffectsEnabled(provider: () => boolean): void {
+    this.effectsEnabled = provider;
   }
 
   setOnViewChange(callback: (() => void) | undefined): void {
@@ -367,7 +372,7 @@ class BattlefieldScene extends Phaser.Scene {
       visual.flash.setVisible(false);
     }
     if (now < visual.shakeUntil && !this.reducedMotion) {
-      const power = (visual.shakeUntil - now) / SHAKE_MS;
+      const power = Math.min(1, (visual.shakeUntil - now) / SHAKE_MS);
       visual.container.setPosition(
         visual.baseX + Math.sin(now * 0.09) * cellSize * 0.09 * power,
         visual.baseY + Math.cos(now * 0.11) * cellSize * 0.06 * power
@@ -396,7 +401,8 @@ class BattlefieldScene extends Phaser.Scene {
       lastWaveTick: this.lastWaveTick,
       towerVisuals: this.towerVisuals,
       creatureVisuals: this.creatureVisuals,
-      pendingDeaths: this.pendingDeaths
+      pendingDeaths: this.pendingDeaths,
+      extras: this.effectsEnabled()
     };
   }
 
@@ -1007,6 +1013,8 @@ export interface BattlefieldMountOptions {
   onCellClick?: (x: number, y: number) => void;
   // Fired when zoom or pan changes, so anything pinned to a cell (the tower popover) can follow.
   onViewChange?: () => void;
+  // Reads the "Effects" setting each snapshot, so toggling it applies at once.
+  effectsEnabled?: () => boolean;
 }
 
 export interface BattlefieldMount {
@@ -1039,6 +1047,9 @@ export function createBattlefieldMount(container: HTMLElement, options: Battlefi
   const scene = new BattlefieldScene();
   scene.setOnCellClick(options.onCellClick);
   scene.setOnViewChange(options.onViewChange);
+  if (options.effectsEnabled) {
+    scene.setEffectsEnabled(options.effectsEnabled);
+  }
   game.scene.add("battlefield", scene, true);
 
   return {

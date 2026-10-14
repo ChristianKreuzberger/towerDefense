@@ -46,11 +46,13 @@ test("parseSettings falls back field-wise and on corrupt input", () => {
   assert.deepEqual(parseSettings("[1]"), DEFAULT_AUDIO_SETTINGS);
   assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume: 0.3, muted: "yes" })), {
     effectsVolume: 0.3,
-    muted: false
+    muted: false,
+    effects: true
   });
   assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume: "loud", muted: true })), {
     effectsVolume: DEFAULT_AUDIO_SETTINGS.effectsVolume,
-    muted: true
+    muted: true,
+    effects: true
   });
 });
 
@@ -58,14 +60,15 @@ test("parseSettings falls back to the default for out-of-range stored volumes", 
   for (const effectsVolume of [-1, 7]) {
     assert.deepEqual(parseSettings(JSON.stringify({ version: 1, effectsVolume, muted: true })), {
       effectsVolume: DEFAULT_AUDIO_SETTINGS.effectsVolume,
-      muted: true
+      muted: true,
+      effects: true
     });
   }
 });
 
 test("serializeSettings round-trips through parseSettings", () => {
-  const settings = { effectsVolume: 0.25, muted: true };
-  assert.deepEqual(JSON.parse(serializeSettings(settings)), { version: 1, effectsVolume: 0.25, muted: true });
+  const settings = { effectsVolume: 0.25, muted: true, effects: false };
+  assert.deepEqual(JSON.parse(serializeSettings(settings)), { version: 1, effectsVolume: 0.25, muted: true, effects: false });
   assert.deepEqual(parseSettings(serializeSettings(settings)), settings);
 });
 
@@ -74,8 +77,8 @@ test("store loads defaults and persists changes", () => {
   const store = createSettingsStore(storage);
   assert.deepEqual(store.get(), DEFAULT_AUDIO_SETTINGS);
   store.set({ effectsVolume: 0.4 });
-  assert.deepEqual(parseSettings(storage.data.get(SETTINGS_STORAGE_KEY) ?? null), { effectsVolume: 0.4, muted: false });
-  assert.deepEqual(createSettingsStore(storage).get(), { effectsVolume: 0.4, muted: false });
+  assert.deepEqual(parseSettings(storage.data.get(SETTINGS_STORAGE_KEY) ?? null), { effectsVolume: 0.4, muted: false, effects: true });
+  assert.deepEqual(createSettingsStore(storage).get(), { effectsVolume: 0.4, muted: false, effects: true });
 });
 
 test("mute keeps the volume and zeroes the effective gain", () => {
@@ -105,4 +108,18 @@ test("subscribe notifies on change and stops after unsubscribe", () => {
   off();
   store.set({ effectsVolume: 0.9 });
   assert.deepEqual(seen, [0.2]);
+});
+
+test("the visual effects setting defaults to on, persists, and survives bad stored values", () => {
+  assert.equal(parseSettings(null).effects, true);
+  assert.equal(parseSettings(JSON.stringify({ version: 1, effects: "no" })).effects, true);
+  assert.equal(parseSettings(JSON.stringify({ version: 1, effects: false })).effects, false);
+  const storage = memoryStorage();
+  const store = createSettingsStore(storage);
+  store.set({ effects: false });
+  assert.equal(store.get().effects, false);
+  assert.equal(createSettingsStore(storage).get().effects, false);
+  // Effects never touch the audio gain.
+  assert.equal(store.effectiveGain(), DEFAULT_AUDIO_SETTINGS.effectsVolume);
+  assert.doesNotThrow(() => createSettingsStore(throwingStorage).set({ effects: false }));
 });
