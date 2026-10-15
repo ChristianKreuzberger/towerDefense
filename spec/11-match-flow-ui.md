@@ -125,7 +125,7 @@ Effects (driven by snapshot events, presentation only)
 - `tower-destroyed`: explosion (flash, fireball, debris, smoke) played on the tower; the tower vanishes only once the explosion has peaked and leaves ruins behind (see Ruins). With `prefers-reduced-motion` the explosion is a single short static flash
 - `wave-end`: wave-clear banner
 - `wave-start`: wave banner ("Wave N", or "Wave N: boss incoming" when the wave has a juggernaut)
-- `tower-hit` extras: a spark at the creature in the damage type's colour (physical bone, explosive orange, magic violet); a cannon shot and each splash hit add an orange ring, a frost hit adds an ice-blue ring
+- `tower-hit` extras: a spark at the creature in the damage type's colour (physical bone, explosive orange, magic violet); a cannon shot adds an orange ring at its target, and each splash hit shows only its own impact (spark plus orange ring, no extra bolt or recoil, and it does not count against the per-snapshot effects budget), a frost hit adds an ice-blue ring
 - `creature-defeated` extras: kills worth 20 points or more (tank, juggernaut) add a second white burst and a wider glow in the owner's colour
 - `creature-split`: a green ring and puff where the splitter died
 - `creature-attack`: the tower shake lasts longer the harder the hit (up to twice as long)
@@ -149,7 +149,7 @@ Settings dialog
 
 Next-wave preview and HUD
 - During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical, resists: magic), 1x Swarm (weak: explosive, resists: physical), ..." (weaknesses are the damage types whose multiplier is above 1 and resistances those below 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
-- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed; the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (see the event to sound table). The picker is a segmented control with no new hotkey
+- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed (picking a type updates the range circle of the placement ghost; the pick resets to Arrow when the active player changes and on a new match or rematch); the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (see the event to sound table). The picker is a segmented control with no new hotkey
 - The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
 - The ended status text names the winner (never the raw id)
 

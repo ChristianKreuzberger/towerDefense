@@ -2,7 +2,7 @@ import { UPGRADE_TRACKS } from "@tower-defense/shared";
 import type { TowerTargetMode } from "@tower-defense/shared";
 import { handleCellSelected, placeTowerForSelectedPlayer, runGuideAction } from "./actions";
 import type { SoundId } from "./audio/index";
-import { setCellClickHandler, setMoveMode, setViewChangeHandler } from "./board";
+import { setCellClickHandler, setMoveMode, syncPlacementContext, setViewChangeHandler } from "./board";
 import { DAMAGE_TYPE_OPTIONS, PLAYBACK_SPEEDS, TARGET_MODES } from "./constants";
 import { demo } from "./demo-instance";
 import { app, el, must } from "./dom";
@@ -173,6 +173,8 @@ export function installControls(): void {
     }
     store.towerType = towerType;
     renderToolbar(store.current);
+    // The range circle follows the picked type.
+    syncPlacementContext(store.current);
   });
 
   el.placeTowerBtn.addEventListener("click", () => {

@@ -1,4 +1,4 @@
-import type { MatchSetup, MatchSnapshot, SimulationCommand } from "@tower-defense/shared";
+import { DEFAULT_TOWER_TYPE, type MatchSetup, type MatchSnapshot, type SimulationCommand } from "@tower-defense/shared";
 import { getJson, postJson } from "./api";
 import type {
   ApiAdvanceManyPayload,
@@ -82,6 +82,7 @@ export function startFreshMatch(wire: WireSnapshot): void {
   store.current = null;
   rebuildBattlefield();
   store.cursorChosen = false;
+  store.towerType = DEFAULT_TOWER_TYPE;
   resetTouchSelection();
   store.guideDismissedKey = null;
   store.playing = true;

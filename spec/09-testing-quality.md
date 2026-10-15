@@ -44,7 +44,7 @@
 
 ## Non-functional checks
 
-- Basic load simulation for 8-player local matches. Phase 3 adds a second perf scenario: 8 players with a mix of arrow, cannon and frost towers over 6 waves, so it includes the splitter (wave 4+) and the boss (wave 5), with the same budget. Phase 3 rules are tested beside the source: waves 1 to 3 unchanged, split and boss rules, splash, slow, determinism (same seed gives the same events) and bot-only matches finishing
+- Basic load simulation for 8-player local matches. Phase 3 adds a second perf scenario: 8 players with a mix of arrow, cannon and frost towers over 6 waves, so it includes the splitter (wave 4+) and the boss (wave 5), with the same budget. A third scenario runs 8 un-upgraded frost towers to the end of the match (about wave 13), where the board is fullest (peak 19 creatures against 12 in the other scenarios; a match ends on points before waves get larger). Phase 3 rules are tested beside the source: waves 1 to 3 unchanged, split and boss rules, splash, slow, determinism (same seed gives the same events) and bot-only matches finishing
 - Repeated map-generation and match-restart stability check (without relying on
 	machine-specific heap thresholds)
 

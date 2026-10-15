@@ -41,7 +41,7 @@ export function towerTooltipRows(tower: TowerTooltipInput): Array<[string, strin
     ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
     ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
     ["Type", tower.damageType],
-    ["DPS", String(Math.round((stats.damagePerSecond / typeStats.fireEveryTicks) * 10) / 10)],
+    ["DPS", String(Math.round(stats.damagePerSecond * 10) / 10)],
     ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
   ];
   if (typeStats.splashRadius > 0) {

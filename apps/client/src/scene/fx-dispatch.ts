@@ -49,6 +49,17 @@ export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: Match
       case "tower-hit": {
         const tower = ctx.towerVisuals.get(event.towerId);
         const creature = ctx.creatureVisuals.get(event.creatureId);
+        if (event.splash) {
+          // A splash victim shows only its impact: the cannon's one shot already drew its bolt and recoil,
+          // and the extra hits must not eat the effects budget.
+          if (ctx.extras) {
+            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
+            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
+            fx.spark(x, y, DAMAGE_TYPE_FX_COLOR[event.damageType], delay + 90);
+            fx.ring(x, y, DAMAGE_TYPE_FX_COLOR.explosive, 1.5, delay + 90);
+          }
+          break;
+        }
         if (tower) {
           const color = colorForPlayer(event.playerId);
           const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
@@ -59,9 +70,7 @@ export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: Match
           if (ctx.extras) {
             // Hit spark in the damage type's colour, landing after the bolt has flown.
             fx.spark(x, y, DAMAGE_TYPE_FX_COLOR[event.damageType], delay + 90);
-            if (event.splash) {
-              fx.ring(x, y, DAMAGE_TYPE_FX_COLOR.explosive, 1.5, delay + 90);
-            } else if (tower.towerType === "frost") {
+            if (tower.towerType === "frost") {
               fx.ring(x, y, FROST_FX_COLOR, 0.8, delay + 90);
             } else if (tower.towerType === "cannon") {
               fx.ring(x, y, DAMAGE_TYPE_FX_COLOR.explosive, 1.5, delay + 90);
