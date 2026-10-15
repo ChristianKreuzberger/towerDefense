@@ -167,7 +167,7 @@ export function getTowerStats(upgrades: TowerUpgrades, towerType: TowerType = DE
     upgrades,
     range: getTowerRange(upgrades.range, towerType),
     damagePerShot,
-    damagePerSecond: damagePerShot * TICKS_PER_SECOND,
+    damagePerSecond: (damagePerShot / TOWER_TYPE_STATS[towerType].fireEveryTicks) * TICKS_PER_SECOND,
     accuracy: getTowerAccuracy(upgrades.accuracy, towerType)
   };
 }
