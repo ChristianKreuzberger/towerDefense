@@ -157,8 +157,8 @@ test("cannon splash hits creatures within 1.5 cells at half damage, not farther 
   const byId = Object.fromEntries(hits(events).map((hit) => [hit.creatureId, hit]));
   assert.equal(byId["a-target"]!.damage, 3);
   assert.equal(byId["a-target"]!.splash, undefined);
-  // max(1, round(3 x 0.5)) = 2, then physical x1.5 against a tank = 3.
-  assert.equal(byId["b-near"]!.damage, 3);
+  // Victim's own multiplier first (2 x 1.5 = 3), then half: round(1.5) = 2.
+  assert.equal(byId["b-near"]!.damage, 2);
   assert.equal(byId["b-near"]!.splash, true);
   assert.equal(byId["c-far"], undefined);
   assert.equal(live(internals, "c-far")?.hp, getCreatureBaseHp("tank"));
@@ -238,6 +238,7 @@ test("frost hits slow for 2 + damage level ticks, refresh instead of stacking, a
   internals.state.waveTick = 10;
   internals.moveCreaturesForCurrentTick();
   assert.equal(progress("s"), progress("n"));
+  assert.equal(internals.state.creatures.find((entry) => entry.id === "s")!.slowedUntilTick, undefined, "an expired slow is cleared from the snapshot");
 });
 
 test("same seed and tower mix give identical events (determinism)", () => {

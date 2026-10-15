@@ -697,7 +697,11 @@ export class MatchSimulation {
       const sourceWear = this.getCellPathWear(currentPathNode.x, currentPathNode.y);
       const wearSpeedUnits = getCreatureMovementSpeedUnits(sourceWear);
       // Frost slow: a fraction of the normal speed while the slow lasts, never below the slow floor.
-      const speedUnits = creature.slowedUntilTick !== undefined && creature.slowedUntilTick >= this.state.waveTick
+      if (creature.slowedUntilTick !== undefined && creature.slowedUntilTick < this.state.waveTick) {
+        // Snapshots only carry a slow while it is active.
+        delete creature.slowedUntilTick;
+      }
+      const speedUnits = creature.slowedUntilTick !== undefined
         ? Math.max(SLOW_MIN_SPEED_UNITS, Math.floor(wearSpeedUnits * TOWER_TYPE_STATS.frost.slowSpeedFactor))
         : wearSpeedUnits;
       const fromPathIndex = creature.pathIndex;
