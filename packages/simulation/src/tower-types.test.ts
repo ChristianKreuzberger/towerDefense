@@ -165,6 +165,20 @@ test("cannon splash hits creatures within 1.5 cells at half damage, not farther 
   assert.equal(sim.getSnapshot().towers.length, 1);
 });
 
+test("splash uses the victim's own multiplier on half the base damage, not half of the main hit", () => {
+  const { internals } = createWaveMatch(["cannon"]);
+  internals.state.towers[0]!.upgrades.damage = 3; // cannon damage 2 x 3 = 6
+  const base = firstOpenIndex(internals) + 2;
+  const target = creatureAt(internals, "a-target", "tank", base);
+  creatureAt(internals, "b-swarm", "swarm", base + 1);
+  const events = shoot(internals, "tower-p1", target, 4);
+  const byId = Object.fromEntries(hits(events).map((hit) => [hit.creatureId, hit]));
+  // Main: physical x1.5 against a tank = 9.
+  assert.equal(byId["a-target"]!.damage, 9);
+  // Victim: physical x0.5 against a swarm = 3, then half = round(1.5) = 2 (half of the main hit would give 3).
+  assert.equal(byId["b-swarm"]!.damage, 2);
+});
+
 test("splash kills pay the cannon's owner and never touch spawn-protected creatures", () => {
   const { internals } = createWaveMatch(["cannon", "arrow"]);
   const open = firstOpenIndex(internals);

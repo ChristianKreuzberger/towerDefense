@@ -968,7 +968,6 @@ export class MatchSimulation {
 
       if (towerStats.splashRadius > 0) {
         // Fixed id order keeps the splash deterministic. Protected creatures and the target itself are skipped.
-        const splashDamage = Math.max(1, Math.round(damage * towerStats.splashFactor));
         const victims = [...creaturesById.values()]
           .filter(
             (other) =>
@@ -979,7 +978,9 @@ export class MatchSimulation {
           )
           .sort((a, b) => a.id.localeCompare(b.id));
         for (const victim of victims) {
-          const victimDamage = getDamageAgainst(splashDamage, tower.damageType, victim.archetype);
+          // The victim's own multiplier applies to the tower's base damage, then the splash factor: the target's
+          // weakness or resistance never leaks onto its neighbours.
+          const victimDamage = Math.max(1, Math.round(getDamageAgainst(towerDamage, tower.damageType, victim.archetype) * towerStats.splashFactor));
           this.applyTowerDamageToCreature(tower, victim, victimDamage, creaturesById, splitChildren, true);
         }
       }
