@@ -151,3 +151,52 @@ test("8-player mixed-tower match reports tick runtime over six waves including s
   assert.ok(maxTickMs < 100, `single tick should not catastrophically exceed 100ms: ${maxTickMs.toFixed(2)}ms`);
   assert.ok(maxCreatures < 300, "active creatures should stay below the MVP limit");
 });
+
+// The scenarios above stop after 3 or 6 waves (peak ~12 creatures alive). Here the towers are weak (frost, never
+// upgraded) and the match runs to its end (about wave 13), where waves are the biggest the rules allow (a match
+// ends on points before waves get much larger), so the late-game per-tick cost with splitter children is measured.
+test("crowded board: 8 weak un-upgraded towers play to the end of the match with a fuller board", () => {
+  const playerIds = Array.from({ length: 8 }, (_, index) => `p${index + 1}`);
+  const simulation = createMatch({
+    players: playerIds.map((id) => ({ id, name: `Player ${id.slice(1)}` })),
+    seed: 2024
+  });
+  const candidates = getTowerSpotsNearSpawn(2024).slice(3);
+  playerIds.forEach((playerId) => {
+    const placed = candidates.some((cell) => simulation.applyCommand({ type: "place-tower", playerId, x: cell.x, y: cell.y, towerType: "frost" }).accepted);
+    assert.equal(placed, true, `${playerId} should receive a valid placement`);
+  });
+
+  const durations: number[] = [];
+  let maxCreatures = 0;
+  let safetyTicks = 0;
+  while (simulation.getSnapshot().wave <= 14) {
+    const before = simulation.getSnapshot();
+    if (before.phase === "ended") {
+      break;
+    }
+    if (before.phase === "placement") {
+      for (const player of before.players.filter((entry) => !entry.eliminated)) {
+        simulation.applyCommand({ type: "ready-for-wave", playerId: player.id });
+      }
+    } else {
+      const start = performance.now();
+      assert.equal(simulation.applyCommand({ type: "advance-wave" }).accepted, true);
+      durations.push(performance.now() - start);
+      maxCreatures = Math.max(maxCreatures, simulation.getSnapshot().creatures.length);
+    }
+    safetyTicks += 1;
+    assert.ok(safetyTicks < 3000, "performance scenario should complete without stalling");
+  }
+
+  const maxTickMs = Math.max(...durations);
+  const averageTickMs = durations.reduce((total, duration) => total + duration, 0) / durations.length;
+  console.log(
+    `crowded board: ${durations.length} ticks, max=${maxTickMs.toFixed(2)}ms, avg=${averageTickMs.toFixed(2)}ms, ` +
+    `target=16ms, peak creatures=${maxCreatures}`
+  );
+
+  assert.ok(maxCreatures >= 15, `the scenario should crowd the board more than the other scenarios (peak ${maxCreatures})`);
+  assert.ok(maxTickMs < 100, `single tick should not catastrophically exceed 100ms: ${maxTickMs.toFixed(2)}ms`);
+  assert.ok(maxCreatures < 300, "active creatures should stay below the MVP limit");
+});
