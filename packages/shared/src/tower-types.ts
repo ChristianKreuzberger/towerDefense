@@ -23,7 +23,7 @@ export interface TowerTypeStats {
   fireEveryTicks: number;
   // Damage per shot = max(1, round(damage level * damageScale)).
   damageScale: number;
-  // Splash: other creatures within splashRadius cells of the target take max(1, round(main damage * splashFactor)). 0 = none.
+  // Splash: other creatures within splashRadius cells of the target take max(1, round(damage against that victim * splashFactor)). 0 = none.
   splashRadius: number;
   splashFactor: number;
   // Slow: a hit slows the creature to slowSpeedFactor of its speed for slowBaseTicks + damage level ticks. 0 ticks = none.

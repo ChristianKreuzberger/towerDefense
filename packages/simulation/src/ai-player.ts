@@ -45,11 +45,13 @@ const MEDIUM_TRACK_PRIORITY: readonly UpgradeTrack[] = ["accuracy", "damage", "r
 
 // Medium picks a cannon on this share of seeded rolls; everything else is an arrow tower.
 const MEDIUM_CANNON_CHANCE = 0.3;
-// Hard picks a cannon when this share of the coming creatures are swarms (a splitter counts as itself plus its children).
+// Hard considers a cannon when this share of the coming creatures are swarms (a splitter counts as itself plus its children).
 const HARD_CANNON_SWARM_SHARE = 0.4;
 // How many waves ahead hard looks when picking a tower type.
-const HARD_TYPE_LOOKAHEAD_WAVES = 5;
-// Hard picks frost when the spot covers this many times more road than any other free spot.
+const HARD_TYPE_LOOKAHEAD_WAVES = 8;
+// Cannon needs a clearly good spot (this many times the median free spot's lane coverage), since its range is short.
+const HARD_CANNON_COVERAGE_RATIO = 1.3;
+// Frost has weak shots, so it also needs a clearly good spot (it lost to plain arrows at a ratio of 1).
 const HARD_FROST_COVERAGE_RATIO = 1.3;
 
 // Deterministic 0..1 value that depends only on the match seed, wave, the player and a salt for repeated draws.
@@ -179,15 +181,30 @@ function chooseTowerType(
   if (difficulty === "medium") {
     return aiRoll(snapshot, playerId, 4001) < MEDIUM_CANNON_CHANCE ? "cannon" : "arrow";
   }
-  if (upcomingSwarmShare(snapshot.wave) >= HARD_CANNON_SWARM_SHARE) {
-    return "cannon";
+  // Bots place at wave 1, so the look-ahead covers waves 1-8. Both types need a good lane stretch in range, judged
+  // against the typical free spot (the median), not the best one, which would almost never be the chosen spot.
+  const swarmHeavy = upcomingSwarmShare(snapshot.wave) >= HARD_CANNON_SWARM_SHARE;
+  const others = allSpots.filter((other) => other.x !== spot.x || other.y !== spot.y);
+  const coverageVsMedian = (type: TowerType): { here: number; median: number } => {
+    const range = getTowerRange(1, type);
+    return { here: laneCoverage(lane, spot, range), median: median(others.map((other) => laneCoverage(lane, other, range))) };
+  };
+  if (swarmHeavy) {
+    const { here, median: typical } = coverageVsMedian("cannon");
+    if (here > 0 && here >= HARD_CANNON_COVERAGE_RATIO * typical) {
+      return "cannon";
+    }
   }
-  const range = getTowerRange(1, "frost");
-  const here = laneCoverage(lane, spot, range);
-  const bestOther = allSpots
-    .filter((other) => other.x !== spot.x || other.y !== spot.y)
-    .reduce((best, other) => Math.max(best, laneCoverage(lane, other, range)), 0);
-  return here > 0 && here >= HARD_FROST_COVERAGE_RATIO * bestOther ? "frost" : "arrow";
+  const frost = coverageVsMedian("frost");
+  return frost.here > 0 && frost.here >= HARD_FROST_COVERAGE_RATIO * frost.median ? "frost" : "arrow";
+}
+
+function median(values: readonly number[]): number {
+  if (values.length === 0) {
+    return 0;
+  }
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)] ?? 0;
 }
 
 function chooseUpgrade(
@@ -272,7 +289,8 @@ function chooseTargetMode(snapshot: MatchSnapshot, tower: Tower, difficulty: AiD
     return "nearest";
   }
   const composition = getWaveComposition(snapshot.wave);
-  return composition.some((entry) => entry.archetype === "tank" || entry.archetype === "armored" || entry.archetype === "juggernaut")
+  // Every boss wave also carries tanks and armored creatures, so those two decide.
+  return composition.some((entry) => entry.archetype === "tank" || entry.archetype === "armored")
     ? "strongest"
     : "first";
 }

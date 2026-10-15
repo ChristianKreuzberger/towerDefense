@@ -697,7 +697,11 @@ export class MatchSimulation {
       const sourceWear = this.getCellPathWear(currentPathNode.x, currentPathNode.y);
       const wearSpeedUnits = getCreatureMovementSpeedUnits(sourceWear);
       // Frost slow: a fraction of the normal speed while the slow lasts, never below the slow floor.
-      const speedUnits = creature.slowedUntilTick !== undefined && creature.slowedUntilTick >= this.state.waveTick
+      if (creature.slowedUntilTick !== undefined && creature.slowedUntilTick < this.state.waveTick) {
+        // Snapshots only carry a slow while it is active.
+        delete creature.slowedUntilTick;
+      }
+      const speedUnits = creature.slowedUntilTick !== undefined
         ? Math.max(SLOW_MIN_SPEED_UNITS, Math.floor(wearSpeedUnits * TOWER_TYPE_STATS.frost.slowSpeedFactor))
         : wearSpeedUnits;
       const fromPathIndex = creature.pathIndex;
@@ -968,7 +972,6 @@ export class MatchSimulation {
 
       if (towerStats.splashRadius > 0) {
         // Fixed id order keeps the splash deterministic. Protected creatures and the target itself are skipped.
-        const splashDamage = Math.max(1, Math.round(damage * towerStats.splashFactor));
         const victims = [...creaturesById.values()]
           .filter(
             (other) =>
@@ -979,7 +982,9 @@ export class MatchSimulation {
           )
           .sort((a, b) => a.id.localeCompare(b.id));
         for (const victim of victims) {
-          const victimDamage = getDamageAgainst(splashDamage, tower.damageType, victim.archetype);
+          // The victim's own multiplier applies to the tower's base damage, then the splash factor: the target's
+          // weakness or resistance never leaks onto its neighbours.
+          const victimDamage = Math.max(1, Math.round(getDamageAgainst(towerDamage, tower.damageType, victim.archetype) * towerStats.splashFactor));
           this.applyTowerDamageToCreature(tower, victim, victimDamage, creaturesById, splitChildren, true);
         }
       }

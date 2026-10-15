@@ -40,6 +40,15 @@ test("tower stats combine the three tracks", () => {
   assert.equal(stats.accuracy, 1);
 });
 
+test("damage per second accounts for the fire rate of the tower type", () => {
+  const upgrades = { range: 1, damage: 3, accuracy: 1 };
+  // Cannon: 2 x 3 = 6 per shot, one shot every 2nd tick.
+  const cannon = getTowerStats(upgrades, "cannon");
+  assert.equal(cannon.damagePerShot, 6);
+  assert.equal(cannon.damagePerSecond, (6 / 2) * TICKS_PER_SECOND);
+  assert.equal(getTowerStats(upgrades, "arrow").damagePerSecond, 3 * TICKS_PER_SECOND);
+});
+
 test("overall level is 1 plus the upgrades bought", () => {
   assert.equal(getTowerOverallLevel({ range: 1, damage: 1, accuracy: 1 }), 1);
   assert.equal(getTowerOverallLevel({ range: 2, damage: 3, accuracy: 1 }), 4);

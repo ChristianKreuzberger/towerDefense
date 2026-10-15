@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AI_DIFFICULTIES, TOWER_MOVE_AFTER_WAVES, TOWER_TYPES, type AiDifficulty, type SimulationCommand, type TowerType } from "@tower-defense/shared";
+import { AI_DIFFICULTIES, getWaveComposition, TOWER_MOVE_AFTER_WAVES, TOWER_TYPES, type AiDifficulty, type SimulationCommand, type TowerType } from "@tower-defense/shared";
 import { areBotsPending, planAiCommands, stepAiPlayers } from "./ai-player.js";
 import { createMatch, type MatchSimulation } from "./match-simulation.js";
 
@@ -195,27 +195,29 @@ test("medium places an arrow tower except for a seeded minority of cannons, neve
   assert.ok(arrows > SEEDS.length / 2, "arrow is the usual pick");
 });
 
-test("hard picks a cannon when the coming waves are swarm heavy, otherwise frost or arrow", () => {
-  // Waves 4 to 8 carry splitters and swarms (51% counting split children).
-  assert.deepEqual([...placedTypes("hard", SEEDS, 4)], ["cannon"]);
-  const opening = placedTypes("hard", SEEDS);
-  assert.ok(!opening.has("cannon"), "the opening waves are below the 40% swarm share");
-  for (const type of opening) {
-    assert.ok(type === "arrow" || type === "frost");
+test("hard mixes tower types over real seeds: cannon and frost trigger, arrow still happens", () => {
+  const seeds = Array.from({ length: 50 }, (_, index) => index + 1);
+  const counts = new Map<string, number>();
+  for (const seed of seeds) {
+    const type = [...placedTypes("hard", [seed])][0] as string;
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
+  for (const type of TOWER_TYPES) {
+    assert.ok((counts.get(type) ?? 0) > 0, `hard picked ${type} on at least one seed (${JSON.stringify([...counts])})`);
   }
 });
 
-test("hard targets the strongest creature on boss waves", () => {
+test("hard targets the strongest creature on boss waves (they always carry tanks and armored creatures)", () => {
   const simulation = botMatch(5, ["hard"]);
   const place = planAiCommands(simulation.getSnapshot(), "p1", "hard")[0];
   assert.equal(simulation.applyCommand(place as SimulationCommand).accepted, true);
-  // Damage type is judged first; settle it, then the target mode follows.
   const bossWave = { ...simulation.getSnapshot(), wave: 5 };
   // Damage type is judged first: apply what the bot would pick, then the target mode follows.
   const first = planAiCommands(bossWave, "p1", "hard")[0];
   const settled = first?.type === "set-damage-type"
     ? { ...bossWave, towers: bossWave.towers.map((tower) => ({ ...tower, damageType: first.damageType })) }
     : bossWave;
+  assert.ok(getWaveComposition(5).some((entry) => entry.archetype === "juggernaut"), "wave 5 is a boss wave");
   const next = planAiCommands(settled, "p1", "hard")[0];
   assert.equal(next?.type === "set-target-mode" ? next.mode : null, "strongest");
 });
