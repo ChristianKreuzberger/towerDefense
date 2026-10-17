@@ -1,5 +1,5 @@
 import { getMapCell, isInSpawnProtection, isTowerSpot, type GameMap } from "./map-types.js";
-import { DAMAGE_TYPES, TOWER_TARGET_MODES, UPGRADE_TRACKS, type DamageType, type Tower, type TowerTargetMode, type UpgradeTrack } from "./tower-types.js";
+import { DAMAGE_TYPES, TOWER_TARGET_MODES, TOWER_TYPES, UPGRADE_TRACKS, type DamageType, type TowerType, type Tower, type TowerTargetMode, type UpgradeTrack } from "./tower-types.js";
 import type { TowerPlacement, CommandRejectReason } from "./match-types.js";
 
 export interface TowerPlacementValidationResult {
@@ -247,6 +247,10 @@ export function isValidUpgradeTrack(track: unknown): track is UpgradeTrack {
 
 export function isValidDamageType(value: unknown): value is DamageType {
   return typeof value === "string" && (DAMAGE_TYPES as readonly string[]).includes(value);
+}
+
+export function isValidTowerType(value: unknown): value is TowerType {
+  return typeof value === "string" && (TOWER_TYPES as readonly string[]).includes(value);
 }
 
 export function isValidTowerTargetMode(mode: string): mode is TowerTargetMode {

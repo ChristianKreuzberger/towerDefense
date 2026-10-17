@@ -62,6 +62,8 @@ Hand-built `GameMap` objects in tests are not validated unless a test calls `val
 
 ## Tower spots
 
+Towers of every type (arrow, cannon, frost; spec/02) use the same tower spots, and splitter children (spec/02) walk the same shared lane. No map change is needed for Phase 3 content.
+
 - Spots may touch the road: creatures only attack towers within about 1 cell, so some spots must be within reach of passing creatures for tower damage, repair and ruins to matter.
 - Towers can only be placed on `towerSpots`. Clicking the road or any other cell is rejected with `not-tower-spot`.
 - Generation picks up to `TOWER_SPOT_TOTAL` (32) spots: the base `TOWER_SPOT_COUNT` (16) first, then up to `TOWER_SPOT_EXTRA_COUNT` (16) extras appended after them. They are picked among non-walkable cells that: lie outside the cave's protected area, are within `TOWER_SPOT_MAX_LANE_DISTANCE` (4) cells of the route creatures walk (the shortest route from the cave), and keep at least `TOWER_SPOT_MIN_SPACING` (3) cells (Chebyshev) from each other.

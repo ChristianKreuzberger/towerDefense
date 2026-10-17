@@ -1,9 +1,10 @@
 import { UPGRADE_TRACKS, getTowerUpgradeCost } from "@tower-defense/shared";
-import type { MatchSnapshot } from "@tower-defense/shared";
+import type { MatchSnapshot, TowerType } from "@tower-defense/shared";
 import { setMoveMode } from "./board";
 import { el } from "./dom";
 import { store } from "./state";
 import { getToolbarState } from "./toolbar-state";
+import { describeTowerType } from "./tower-type-info";
 import { syncTowerMenu } from "./tower-menu";
 
 // Costs come from the shared cost functions so the UI can never drift from what the simulation charges.
@@ -13,6 +14,19 @@ export function setAvailability(button: HTMLButtonElement, enabled: boolean, end
   button.classList.toggle("dim", !enabled);
   button.setAttribute("aria-disabled", String(!enabled));
   button.disabled = ended;
+}
+
+// The picker is for the next placement; once the tower exists it only shows that tower's fixed type.
+function syncTowerTypePicker(snapshot: MatchSnapshot, placedType: TowerType | null, eliminated: boolean): void {
+  const shown = placedType ?? store.towerType;
+  const locked = placedType !== null || snapshot.phase !== "placement" || eliminated;
+  for (const button of el.towerTypePicker.querySelectorAll<HTMLButtonElement>("button[data-tower-type]")) {
+    const selected = button.dataset.towerType === shown;
+    button.setAttribute("aria-checked", String(selected));
+    button.classList.toggle("selected", selected);
+    button.disabled = locked;
+  }
+  el.towerTypeBlurb.textContent = describeTowerType(shown);
 }
 
 export function isActionAvailable(button: HTMLButtonElement): boolean {
@@ -62,5 +76,6 @@ export function renderToolbar(snapshot: MatchSnapshot | null): void {
     el.mode.value = tower.targetMode;
     el.damageType.value = tower.damageType;
   }
+  syncTowerTypePicker(snapshot, tower?.towerType ?? null, Boolean(player?.eliminated));
   syncTowerMenu(snapshot, tower, state, points);
 }

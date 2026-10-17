@@ -11,6 +11,8 @@ import { addFeedback } from "./feedback";
 import { hideGuideOverlay } from "./guide";
 import type { GuideAction } from "./guide";
 import { renderMenuPlayerInputs, showGameScreen, showMenuScreen } from "./menu";
+import { renderToolbar } from "./toolbar";
+import { TOWER_TYPE_OPTIONS } from "./tower-type-info";
 import { installMobileMenu } from "./mobile-menu";
 import { configurePlayback, setPlaybackSpeed, setPlaying } from "./playback";
 import { playerTowerId, selectedPlayerId } from "./player-util";
@@ -160,6 +162,17 @@ export function installControls(): void {
     }
     const playerId = selectedPlayerId();
     void sendCommand({ type: "set-damage-type", playerId, towerId: playerTowerId(playerId), damageType });
+  });
+
+  el.towerTypePicker.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-tower-type]");
+    const requested = button?.dataset.towerType;
+    const towerType = TOWER_TYPE_OPTIONS.find((candidate) => candidate === requested);
+    if (!towerType || button?.disabled) {
+      return;
+    }
+    store.towerType = towerType;
+    renderToolbar(store.current);
   });
 
   el.placeTowerBtn.addEventListener("click", () => {

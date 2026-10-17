@@ -33,7 +33,9 @@ export const ENEMY = {
   runner: { body: 0x4b3a5a, accent: 0xff9f43 },
   swarm: { body: 0x3f4a5a, accent: 0xa7e05f },
   armored: { body: 0x514a58, accent: 0xa9bccf },
-  tank: { body: 0x3d3a44, accent: 0xe0675a }
+  tank: { body: 0x3d3a44, accent: 0xe0675a },
+  splitter: { body: 0x5a4a6e, accent: 0xf2d95f },
+  juggernaut: { body: 0x4a2f33, accent: 0xff5a3c }
 };
 
 export const UI_COLORS = {

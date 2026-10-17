@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AI_DIFFICULTIES, TOWER_MOVE_AFTER_WAVES, type AiDifficulty, type SimulationCommand } from "@tower-defense/shared";
+import { AI_DIFFICULTIES, getWaveComposition, TOWER_MOVE_AFTER_WAVES, TOWER_TYPES, type AiDifficulty, type SimulationCommand, type TowerType } from "@tower-defense/shared";
 import { areBotsPending, planAiCommands, stepAiPlayers } from "./ai-player.js";
 import { createMatch, type MatchSimulation } from "./match-simulation.js";
 
@@ -161,4 +161,70 @@ test("over fixed seeds, hard outscores medium and medium outscores easy", () => 
   }
   assert.ok(totals.hard > totals.medium, `hard ${totals.hard} should beat medium ${totals.medium}`);
   assert.ok(totals.medium > totals.easy, `medium ${totals.medium} should beat easy ${totals.easy}`);
+});
+
+function placedTypes(difficulty: AiDifficulty, seeds: number[], wave?: number): Set<string> {
+  const types = new Set<string>();
+  for (const seed of seeds) {
+    const simulation = botMatch(seed, [difficulty]);
+    const snapshot = wave === undefined ? simulation.getSnapshot() : { ...simulation.getSnapshot(), wave };
+    const plan = planAiCommands(snapshot, "p1", difficulty);
+    assert.ok(plan.length > 0);
+    for (const command of plan) {
+      assert.equal(command.type, "place-tower");
+      if (command.type === "place-tower") {
+        assert.ok(TOWER_TYPES.includes(command.towerType as TowerType), "a valid tower type is always sent");
+        types.add(command.towerType as string);
+      }
+    }
+  }
+  return types;
+}
+
+const SEEDS = Array.from({ length: 30 }, (_, index) => index + 1);
+
+test("easy picks any tower type by seeded roll, and the same snapshot gives the same plan", () => {
+  assert.deepEqual([...placedTypes("easy", SEEDS)].sort(), ["arrow", "cannon", "frost"]);
+  const snapshot = botMatch(4, ["easy"]).getSnapshot();
+  assert.deepEqual(planAiCommands(snapshot, "p1", "easy"), planAiCommands(snapshot, "p1", "easy"));
+});
+
+test("medium places an arrow tower except for a seeded minority of cannons, never frost", () => {
+  assert.deepEqual([...placedTypes("medium", SEEDS)].sort(), ["arrow", "cannon"]);
+  const arrows = SEEDS.filter((seed) => placedTypes("medium", [seed]).has("arrow")).length;
+  assert.ok(arrows > SEEDS.length / 2, "arrow is the usual pick");
+});
+
+test("hard mixes tower types over real seeds: cannon and frost trigger, arrow still happens", () => {
+  const seeds = Array.from({ length: 50 }, (_, index) => index + 1);
+  const counts = new Map<string, number>();
+  for (const seed of seeds) {
+    const type = [...placedTypes("hard", [seed])][0] as string;
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
+  for (const type of TOWER_TYPES) {
+    assert.ok((counts.get(type) ?? 0) > 0, `hard picked ${type} on at least one seed (${JSON.stringify([...counts])})`);
+  }
+});
+
+test("hard targets the strongest creature on boss waves (they always carry tanks and armored creatures)", () => {
+  const simulation = botMatch(5, ["hard"]);
+  const place = planAiCommands(simulation.getSnapshot(), "p1", "hard")[0];
+  assert.equal(simulation.applyCommand(place as SimulationCommand).accepted, true);
+  const bossWave = { ...simulation.getSnapshot(), wave: 5 };
+  // Damage type is judged first: apply what the bot would pick, then the target mode follows.
+  const first = planAiCommands(bossWave, "p1", "hard")[0];
+  const settled = first?.type === "set-damage-type"
+    ? { ...bossWave, towers: bossWave.towers.map((tower) => ({ ...tower, damageType: first.damageType })) }
+    : bossWave;
+  assert.ok(getWaveComposition(5).some((entry) => entry.archetype === "juggernaut"), "wave 5 is a boss wave");
+  const next = planAiCommands(settled, "p1", "hard")[0];
+  assert.equal(next?.type === "set-target-mode" ? next.mode : null, "strongest");
+});
+
+test("bot-only matches with every difficulty and tower type reach a winner on several seeds", () => {
+  for (const seed of [2, 8, 13]) {
+    const result = playToEnd(botMatch(seed, ["easy", "easy", "medium", "medium", "hard", "hard", "easy", "hard"]));
+    assert.ok(result.winnerId, `seed ${seed}: someone won`);
+  }
 });

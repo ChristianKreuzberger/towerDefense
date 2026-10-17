@@ -182,3 +182,24 @@ test("starting further matches replaces the board instead of leaking canvases an
   await expect(page.locator("#status")).toHaveText("accepted");
   expect(pageErrors).toEqual([]);
 });
+
+test("the tower type picker places a cannon and then locks to the placed type", async ({ page }) => {
+  await startMatch(page, "/");
+  const picker = page.locator("#towerTypePicker");
+  await expect(picker.locator("button[aria-checked=true]")).toHaveText("Arrow");
+
+  await picker.getByRole("radio", { name: "Cannon" }).click();
+  await expect(picker.locator("button[aria-checked=true]")).toHaveText("Cannon");
+  await expect(page.locator("#towerTypeBlurb")).toContainText("splash");
+
+  await clickCellNearSpawn(page, 0);
+  await expect(page.locator("#playerCards")).toContainText("Tower 175/175");
+
+  const { snapshot } = (await (await page.request.get("/api/snapshot")).json()) as {
+    snapshot: { towers: Array<{ playerId: string; towerType: string }> };
+  };
+  expect(snapshot.towers.find((tower) => tower.playerId === "p1")?.towerType).toBe("cannon");
+  // Fixed after placement: the picker shows the placed type and cannot change it.
+  await expect(picker.getByRole("radio", { name: "Cannon" })).toBeDisabled();
+  await expect(picker.locator("button[aria-checked=true]")).toHaveText("Cannon");
+});

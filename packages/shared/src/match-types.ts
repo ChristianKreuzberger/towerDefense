@@ -1,6 +1,6 @@
 import type { Creature, CreatureArchetype } from "./creature-types.js";
 import type { GameMap } from "./map-types.js";
-import type { DamageType, Tower, TowerTargetMode, UpgradeTrack } from "./tower-types.js";
+import type { DamageType, Tower, TowerTargetMode, TowerType, UpgradeTrack } from "./tower-types.js";
 
 export const AI_DIFFICULTIES = ["easy", "medium", "hard"] as const;
 export type AiDifficulty = (typeof AI_DIFFICULTIES)[number];
@@ -53,12 +53,7 @@ export interface PathCellRepairState {
   wearAfter: number;
 }
 
-export interface TelemetryKillsByArchetype {
-  runner: number;
-  swarm: number;
-  armored: number;
-  tank: number;
-}
+export type TelemetryKillsByArchetype = Record<CreatureArchetype, number>;
 
 export interface WaveTelemetrySnapshot {
   wave: number;
@@ -165,6 +160,16 @@ export type MatchEvent =
       y: number;
     }
   | {
+      // A splitter died and left child creatures at its position (spec/02).
+      type: "creature-split";
+      wave: number;
+      tick: number;
+      creatureId: string;
+      childIds: string[];
+      x: number;
+      y: number;
+    }
+  | {
       type: "creature-exited";
       wave: number;
       tick: number;
@@ -255,6 +260,8 @@ export type MatchEvent =
       damage: number;
       damageType: DamageType;
       remainingHp: number;
+      // True for the extra hits a cannon's splash deals to creatures near its target.
+      splash?: boolean;
     }
   | {
       // The tower fired but missed; no damage. x/y is the creature cell, like tower-hit.
@@ -387,6 +394,7 @@ export type CommandRejectReason =
   | "damage-type-phase-not-active"
   | "invalid-damage-type-target"
   | "invalid-damage-type"
+  | "invalid-tower-type"
   | "out-of-bounds"
   | "not-tower-spot"
   | "tower-overlap"
@@ -406,6 +414,8 @@ export type SimulationCommand =
       playerId: string;
       x: number;
       y: number;
+      // Defaults to "arrow" when missing.
+      towerType?: TowerType;
     }
   | {
       type: "move-tower";

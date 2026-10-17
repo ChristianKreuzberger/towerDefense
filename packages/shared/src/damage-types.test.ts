@@ -32,7 +32,9 @@ test("the documented multiplier table (physical, explosive, magic)", () => {
     runner: [1.5, 1, 0.5],
     swarm: [0.5, 1.5, 1],
     armored: [0.5, 1, 1.5],
-    tank: [1.5, 0.5, 1]
+    tank: [1.5, 0.5, 1],
+    splitter: [1, 1.5, 0.5],
+    juggernaut: [1, 0.5, 1.5]
   });
 });
 

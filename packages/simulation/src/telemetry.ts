@@ -1,16 +1,12 @@
-import type {
-  CumulativeTelemetrySnapshot,
-  TelemetryKillsByArchetype,
-  WaveTelemetrySnapshot
+import {
+  CREATURE_ARCHETYPES,
+  type CumulativeTelemetrySnapshot,
+  type TelemetryKillsByArchetype,
+  type WaveTelemetrySnapshot
 } from "@tower-defense/shared";
 
 export function createEmptyKillsByArchetype(): TelemetryKillsByArchetype {
-  return {
-    runner: 0,
-    swarm: 0,
-    armored: 0,
-    tank: 0
-  };
+  return Object.fromEntries(CREATURE_ARCHETYPES.map((archetype) => [archetype, 0])) as TelemetryKillsByArchetype;
 }
 
 export function createWaveTelemetrySnapshot(wave: number, tick: number): WaveTelemetrySnapshot {
@@ -67,10 +63,9 @@ export function accumulateWaveTelemetry(
   target.creaturesSpawned += waveTelemetry.creaturesSpawned;
   target.creaturesDefeated += waveTelemetry.creaturesDefeated;
   target.creaturesExited += waveTelemetry.creaturesExited;
-  target.killsByArchetype.runner += waveTelemetry.killsByArchetype.runner;
-  target.killsByArchetype.swarm += waveTelemetry.killsByArchetype.swarm;
-  target.killsByArchetype.armored += waveTelemetry.killsByArchetype.armored;
-  target.killsByArchetype.tank += waveTelemetry.killsByArchetype.tank;
+  for (const archetype of CREATURE_ARCHETYPES) {
+    target.killsByArchetype[archetype] += waveTelemetry.killsByArchetype[archetype] ?? 0;
+  }
   target.towerDamageDealt += waveTelemetry.towerDamageDealt;
   target.towerDamageIntake += waveTelemetry.towerDamageIntake;
   target.towerRepairApplied += waveTelemetry.towerRepairApplied;

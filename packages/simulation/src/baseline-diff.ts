@@ -81,12 +81,7 @@ function roundDps(value: number): number {
 }
 
 function cloneKills(kills: TelemetryKillsByArchetype): TelemetryKillsByArchetype {
-  return {
-    runner: kills.runner,
-    swarm: kills.swarm,
-    armored: kills.armored,
-    tank: kills.tank
-  };
+  return { ...kills };
 }
 
 function cloneWaveTelemetry(snapshot: WaveTelemetrySnapshot): WaveTelemetrySnapshot {

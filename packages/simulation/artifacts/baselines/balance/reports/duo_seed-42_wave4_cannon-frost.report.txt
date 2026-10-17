@@ -1,0 +1,66 @@
+Tower Defense Balance Report
+schemaVersion=1
+matchSeed=42
+snapshots=4
+
+=== Wave 1 (export=1, tick=24) ===
+DPS proxy: 1.00 dmg/tick (dealt=24, ticks=24)
+Kills by archetype: runner=2 swarm=1 armored=1 tank=1 (defeated=5, spawned=5, exited=0)
+Damage intake: towers=45
+Repairs: towers=35
+Economy delta: awarded=92 spentUpgrades=0 net=92
+Wave-clear bonus: awarded=30
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
+Players:
+- p1 (Alpha) status=active delta=67 bonus=15 catchUp=0 swarmCapped=0 total=67 ending=167 towerLv=1 towerHp=175
+- p2 (Beta) status=active delta=25 bonus=15 catchUp=0 swarmCapped=0 total=25 ending=125 towerLv=1 towerHp=165
+
+=== Wave 2 (export=2, tick=26) ===
+DPS proxy: 1.04 dmg/tick (dealt=27, ticks=26)
+Kills by archetype: runner=2 swarm=2 armored=1 tank=1 (defeated=6, spawned=6, exited=0)
+Damage intake: towers=14
+Repairs: towers=24
+Economy delta: awarded=100 spentUpgrades=109 net=-9
+Wave-clear bonus: awarded=30
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
+Players:
+- p1 (Alpha) status=active delta=22 bonus=15 catchUp=0 swarmCapped=0 total=89 ending=189 towerLv=2 towerHp=175
+- p2 (Beta) status=active delta=-31 bonus=15 catchUp=0 swarmCapped=0 total=-6 ending=94 towerLv=2 towerHp=175
+
+=== Wave 3 (export=3, tick=32) ===
+DPS proxy: 1.56 dmg/tick (dealt=50, ticks=32)
+Kills by archetype: runner=2 swarm=2 armored=2 tank=2 (defeated=8, spawned=8, exited=0)
+Damage intake: towers=44
+Repairs: towers=35
+Economy delta: awarded=134 spentUpgrades=192 net=-58
+Wave-clear bonus: awarded=30
+Anti-snowball: catchUp=0 swarmIncomeCapped=0
+Players:
+- p1 (Alpha) status=active delta=-51 bonus=15 catchUp=0 swarmCapped=0 total=38 ending=138 towerLv=3 towerHp=175
+- p2 (Beta) status=active delta=-7 bonus=15 catchUp=0 swarmCapped=0 total=-11 ending=89 towerLv=3 towerHp=166
+
+=== Wave 4 (export=4, tick=44) ===
+DPS proxy: 1.18 dmg/tick (dealt=52, ticks=44)
+Kills by archetype: runner=2 swarm=4 armored=2 tank=2 splitter=1 (defeated=11, spawned=11, exited=0)
+Damage intake: towers=180
+Repairs: towers=70
+Economy delta: awarded=174 spentUpgrades=0 net=174
+Wave-clear bonus: awarded=30
+Anti-snowball: catchUp=12 swarmIncomeCapped=0
+Players:
+- p1 (Alpha) status=active delta=117 bonus=15 catchUp=0 swarmCapped=0 total=155 ending=255 towerLv=3 towerHp=98
+- p2 (Beta) status=active delta=57 bonus=15 catchUp=12 swarmCapped=0 total=46 ending=146 towerLv=3 towerHp=133
+
+=== Cumulative Summary ===
+Waves completed: 4
+DPS proxy: 1.21 dmg/tick (dealt=153, ticks=126)
+Kills by archetype: runner=8 swarm=9 armored=6 tank=6 splitter=1
+Damage intake totals: towers=283
+Repairs totals: towers=164
+Wave-clear bonus total: 120
+Anti-snowball totals: catchUp=12 swarmIncomeCapped=0
+Economy totals: awarded=502 spentUpgrades=301 net=201 ending=401
+Structures: livingTowers=2 towerHp=231 pathWearTotal=41
+Players (final):
+- p1 (Alpha) status=active delta=117 bonus=15 catchUp=0 swarmCapped=0 total=155 ending=255 towerLv=3 towerHp=98
+- p2 (Beta) status=active delta=57 bonus=15 catchUp=12 swarmCapped=0 total=46 ending=146 towerLv=3 towerHp=133

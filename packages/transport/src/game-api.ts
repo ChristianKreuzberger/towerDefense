@@ -15,7 +15,8 @@ import {
   type MatchSetup,
   type MatchSnapshot,
   type TowerTargetMode,
-  type SimulationCommand
+  type SimulationCommand,
+  type TowerType
 } from "@tower-defense/shared";
 import type { WireSnapshot } from "./wire-types.js";
 
@@ -161,7 +162,15 @@ function parseCommand(body: unknown): SimulationCommand {
     if (type === "move-tower") {
       return { type, playerId: text("playerId"), towerId: text("towerId"), x, y };
     }
-    return { type, playerId: text("playerId"), x, y };
+    // An unknown type is judged by the simulation (rejection "invalid-tower-type"), never coerced to arrow.
+    const towerType = commandSource.towerType;
+    return {
+      type,
+      playerId: text("playerId"),
+      x,
+      y,
+      ...(towerType !== undefined ? { towerType: towerType as TowerType } : {})
+    };
   }
 
   if (type === "upgrade-tower") {

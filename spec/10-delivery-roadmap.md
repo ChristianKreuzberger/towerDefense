@@ -31,7 +31,7 @@ Exit criteria:
 
 ## Phase 3: Content and polish (Weeks 6 to 7)
 
-- Additional enemy archetypes and tower variety
+- Additional enemy archetypes and tower variety (planned in spec: splitter, juggernaut boss, cannon and frost towers, bot support; see spec/02 and spec/06)
 - HUD clarity and game feedback effects
 - Audio and visual readability improvements
 

@@ -46,7 +46,7 @@ export function botsCanAct(snapshot: MatchSnapshot | null): boolean {
 export function describeBotAction(name: string, command: SimulationCommand): string {
   switch (command.type) {
     case "place-tower":
-      return `${name} placed a tower`;
+      return `${name} placed a tower (${command.towerType ?? "arrow"})`;
     case "move-tower":
       return `${name} moved its tower`;
     case "upgrade-tower":

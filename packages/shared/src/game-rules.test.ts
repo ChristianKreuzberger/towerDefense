@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  BASE_TOWER_ACCURACY,
+  BASE_TOWER_RANGE,
   DEFAULT_TOWER_HEALTH,
   MAX_TOWER_LEVEL,
   getBetweenWaveTowerRepairAmount,
@@ -15,13 +17,14 @@ import {
   TOWER_STYLE_TIERS,
   getTowerUpgradeCost
 } from "./game-rules.js";
-import { UPGRADE_TRACKS } from "./tower-types.js";
+import { DEFAULT_TOWER_TYPE, TOWER_TYPE_STATS, UPGRADE_TRACKS } from "./tower-types.js";
+import { isValidTowerType } from "./validation.js";
 
 test("each track scales on its own: range, damage and accuracy", () => {
-  assert.deepEqual([1, 2, 3, 5].map(getTowerRange), [6, 7.5, 9, 12]);
-  assert.deepEqual([1, 2, 5].map(getTowerDamage), [1, 2, 5]);
+  assert.deepEqual([1, 2, 3, 5].map((level) => getTowerRange(level)), [6, 7.5, 9, 12]);
+  assert.deepEqual([1, 2, 5].map((level) => getTowerDamage(level)), [1, 2, 5]);
   assert.equal(getTowerDamage(0), 1);
-  assert.deepEqual([1, 2, 3, 4, 5].map(getTowerAccuracy), [0.7, 0.775, 0.85, 0.925, 1]);
+  assert.deepEqual([1, 2, 3, 4, 5].map((level) => getTowerAccuracy(level)), [0.7, 0.775, 0.85, 0.925, 1]);
 });
 
 test("accuracy never exceeds 100% even past the cap", () => {
@@ -35,6 +38,15 @@ test("tower stats combine the three tracks", () => {
   assert.equal(stats.damagePerShot, 2);
   assert.equal(stats.damagePerSecond, 2 * TICKS_PER_SECOND);
   assert.equal(stats.accuracy, 1);
+});
+
+test("damage per second accounts for the fire rate of the tower type", () => {
+  const upgrades = { range: 1, damage: 3, accuracy: 1 };
+  // Cannon: 2 x 3 = 6 per shot, one shot every 2nd tick.
+  const cannon = getTowerStats(upgrades, "cannon");
+  assert.equal(cannon.damagePerShot, 6);
+  assert.equal(cannon.damagePerSecond, (6 / 2) * TICKS_PER_SECOND);
+  assert.equal(getTowerStats(upgrades, "arrow").damagePerSecond, 3 * TICKS_PER_SECOND);
 });
 
 test("overall level is 1 plus the upgrades bought", () => {
@@ -75,4 +87,27 @@ test("the style tier never exceeds the last tier and tolerates bad levels", () =
 test("towers start with 175 HP and repair 35 HP between waves", () => {
   assert.equal(DEFAULT_TOWER_HEALTH, 175);
   assert.equal(getBetweenWaveTowerRepairAmount(DEFAULT_TOWER_HEALTH), 35);
+});
+
+test("tower types change base stats and damage per shot, with the same per-level steps", () => {
+  assert.equal(getTowerRange(1, "cannon"), 5);
+  assert.equal(getTowerRange(3, "cannon"), 8);
+  assert.equal(getTowerRange(1, "frost"), 6);
+  assert.equal(getTowerAccuracy(1, "cannon"), 0.6);
+  assert.equal(getTowerAccuracy(5, "cannon"), 0.9);
+  assert.equal(getTowerAccuracy(1, "frost"), 0.8);
+  assert.equal(getTowerAccuracy(3, "frost"), 0.95);
+  assert.equal(getTowerAccuracy(5, "frost"), 1);
+  assert.deepEqual([1, 2, 3, 4, 5].map((level) => getTowerDamage(level, "cannon")), [2, 4, 6, 8, 10]);
+  assert.deepEqual([1, 2, 3, 4, 5].map((level) => getTowerDamage(level, "frost")), [1, 1, 2, 2, 3]);
+});
+
+test("the arrow type matches the original single tower and the default type is arrow", () => {
+  assert.equal(TOWER_TYPE_STATS.arrow.baseRange, BASE_TOWER_RANGE);
+  assert.equal(TOWER_TYPE_STATS.arrow.baseAccuracy, BASE_TOWER_ACCURACY);
+  assert.equal(DEFAULT_TOWER_TYPE, "arrow");
+  assert.equal(getTowerRange(2), getTowerRange(2, "arrow"));
+  assert.equal(isValidTowerType("frost"), true);
+  assert.equal(isValidTowerType("laser"), false);
+  assert.equal(isValidTowerType(undefined), false);
 });

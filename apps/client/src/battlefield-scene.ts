@@ -15,6 +15,7 @@ import { Effects } from "./art/fx";
 import { INK, UI_COLORS, playerIndex } from "./art/palette";
 import { paintTerrain } from "./art/paint";
 import type { RuinInfo } from "./ruins";
+import { TOWER_TYPE_COLOR } from "./tower-type-info";
 import { KEY, SS, TOWER_SCALE, ensureTextures } from "./art/textures";
 import { RECOIL_MS, FLASH_MS, SHAKE_MS, playEvents } from "./scene/fx-dispatch";
 import type { FxContext } from "./scene/fx-dispatch";
@@ -808,6 +809,11 @@ class BattlefieldScene extends Phaser.Scene {
     const hpFill = this.add.image(-barWidth / 2, -cellSize * 1.22, KEY.px).setOrigin(0, 0.5).setDisplaySize(barWidth, barHeight);
 
     container.add([shadow, base, flash, turret, badge, pips, hpBg, hpFill]);
+    if (tower.towerType !== "arrow") {
+      // Small marker so the type reads at a glance: orange for cannon, ice blue for frost. Fixed for the tower's life.
+      const marker = this.add.circle(-cellSize * 0.74, cellSize * 0.7, cellSize * 0.2, TOWER_TYPE_COLOR[tower.towerType]).setStrokeStyle(2, INK);
+      container.add(marker);
+    }
     return {
       container, base, turret, pips, hpBg, hpFill, flash,
       player, level: tower.level, tier: getTowerStyleTier(tower.level), upgrades: { ...tower.upgrades }, damageType: tower.damageType, hp: -1, maxHp: tower.maxHealth, angle: 0, targetId: null,

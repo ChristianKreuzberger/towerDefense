@@ -94,3 +94,24 @@ kbd {
   border-radius: 5px;
 }
 
+
+/* Tower type picker (Arrow / Cannon / Frost): a segmented control, 44px tall for touch. */
+.segmented {
+  display: flex;
+  gap: 4px;
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 44px;
+}
+
+.segmented button.selected {
+  outline: 2px solid var(--accent, #f2b84b);
+}
+
+#towerTypeBlurb {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  min-height: 2.6em;
+}

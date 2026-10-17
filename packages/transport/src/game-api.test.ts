@@ -183,3 +183,33 @@ test("ai-step plays one bot command per call and waits for humans to place", () 
   // The human has not readied yet, so the wave is still in prep.
   assert.equal(last.snapshot.phase, "placement");
 });
+
+test("place-tower carries the tower type: missing means arrow, an unknown type is a normal rejection, the snapshot shows it", () => {
+  const api = startedApi();
+  const snapshot = () =>
+    (api({ method: "GET", pathname: "/api/snapshot", searchParams: new URLSearchParams(), body: {} }).payload) as {
+      snapshot: { map: { towerSpots: Array<{ x: number; y: number }> }; towers: Array<{ towerType: string }> };
+    };
+  const spot = snapshot().snapshot.map.towerSpots[0]!;
+
+  const bad = command(api, { type: "place-tower", playerId: "p1", ...spot, towerType: "laser" });
+  assert.equal(bad.status, 200);
+  assert.deepEqual((bad.payload as { result: unknown }).result, { accepted: false, reason: "invalid-tower-type" });
+  const notAString = command(api, { type: "place-tower", playerId: "p1", ...spot, towerType: 3 });
+  assert.deepEqual((notAString.payload as { result: unknown }).result, { accepted: false, reason: "invalid-tower-type" });
+  assert.equal(snapshot().snapshot.towers.length, 0);
+
+  const ok = command(api, { type: "place-tower", playerId: "p1", ...spot, towerType: "cannon" });
+  assert.equal((ok.payload as { result: { accepted: boolean } }).result.accepted, true);
+  assert.equal(snapshot().snapshot.towers[0]?.towerType, "cannon");
+
+  const fresh = startedApi();
+  const freshSpot = (fresh({ method: "GET", pathname: "/api/snapshot", searchParams: new URLSearchParams(), body: {} }).payload as {
+    snapshot: { map: { towerSpots: Array<{ x: number; y: number }> } };
+  }).snapshot.map.towerSpots[0]!;
+  command(fresh, { type: "place-tower", playerId: "p1", ...freshSpot });
+  const towers = (fresh({ method: "GET", pathname: "/api/snapshot", searchParams: new URLSearchParams(), body: {} }).payload as {
+    snapshot: { towers: Array<{ towerType: string }> };
+  }).snapshot.towers;
+  assert.equal(towers[0]?.towerType, "arrow");
+});

@@ -1,4 +1,4 @@
-import type { TowerUpgrades, UpgradeTrack } from "./tower-types.js";
+import { DEFAULT_TOWER_TYPE, TOWER_TYPE_STATS, type TowerType, type TowerUpgrades, type UpgradeTrack } from "./tower-types.js";
 
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 8;
@@ -126,20 +126,20 @@ export function getCatchUpBonus(gap: number): number {
 }
 
 // Range is measured in grid cells (Euclidean) and grows with each range level.
-export function getTowerRange(rangeLevel: number): number {
-  return BASE_TOWER_RANGE + (Math.max(1, rangeLevel) - 1) * TOWER_RANGE_PER_LEVEL;
+export function getTowerRange(rangeLevel: number, towerType: TowerType = DEFAULT_TOWER_TYPE): number {
+  return TOWER_TYPE_STATS[towerType].baseRange + (Math.max(1, rangeLevel) - 1) * TOWER_RANGE_PER_LEVEL;
 }
 
 // Simulation ticks per second of game time at 1x playback; towers fire once per tick.
 export const TICKS_PER_SECOND = 5;
 
-export function getTowerDamage(damageLevel: number): number {
-  return Math.max(1, damageLevel);
+export function getTowerDamage(damageLevel: number, towerType: TowerType = DEFAULT_TOWER_TYPE): number {
+  return Math.max(1, Math.round(Math.max(1, damageLevel) * TOWER_TYPE_STATS[towerType].damageScale));
 }
 
 // 0..1 chance that a shot hits; 100% at the max accuracy level.
-export function getTowerAccuracy(accuracyLevel: number): number {
-  const accuracy = BASE_TOWER_ACCURACY + (Math.max(1, accuracyLevel) - 1) * TOWER_ACCURACY_PER_LEVEL;
+export function getTowerAccuracy(accuracyLevel: number, towerType: TowerType = DEFAULT_TOWER_TYPE): number {
+  const accuracy = TOWER_TYPE_STATS[towerType].baseAccuracy + (Math.max(1, accuracyLevel) - 1) * TOWER_ACCURACY_PER_LEVEL;
   return Math.min(1, Math.round(accuracy * 1000) / 1000);
 }
 
@@ -160,15 +160,15 @@ export function getTowerOverallLevel(upgrades: TowerUpgrades): number {
   return 1 + (upgrades.range - 1) + (upgrades.damage - 1) + (upgrades.accuracy - 1);
 }
 
-export function getTowerStats(upgrades: TowerUpgrades): TowerStats {
-  const damagePerShot = getTowerDamage(upgrades.damage);
+export function getTowerStats(upgrades: TowerUpgrades, towerType: TowerType = DEFAULT_TOWER_TYPE): TowerStats {
+  const damagePerShot = getTowerDamage(upgrades.damage, towerType);
   return {
     level: getTowerOverallLevel(upgrades),
     upgrades,
-    range: getTowerRange(upgrades.range),
+    range: getTowerRange(upgrades.range, towerType),
     damagePerShot,
-    damagePerSecond: damagePerShot * TICKS_PER_SECOND,
-    accuracy: getTowerAccuracy(upgrades.accuracy)
+    damagePerSecond: (damagePerShot / TOWER_TYPE_STATS[towerType].fireEveryTicks) * TICKS_PER_SECOND,
+    accuracy: getTowerAccuracy(upgrades.accuracy, towerType)
   };
 }
 

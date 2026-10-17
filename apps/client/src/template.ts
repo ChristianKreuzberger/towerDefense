@@ -163,6 +163,16 @@ export const APP_TEMPLATE = `
         </select>
       </div>
 
+      <div class="panel-block">
+        <label id="towerTypeLabel">Tower Type</label>
+        <div id="towerTypePicker" class="segmented" role="radiogroup" aria-labelledby="towerTypeLabel">
+          <button type="button" role="radio" data-tower-type="arrow" aria-checked="true">Arrow</button>
+          <button type="button" role="radio" data-tower-type="cannon" aria-checked="false">Cannon</button>
+          <button type="button" role="radio" data-tower-type="frost" aria-checked="false">Frost</button>
+        </div>
+        <p id="towerTypeBlurb" class="hint"></p>
+      </div>
+
       <div class="stack debug-only">
         <button id="advanceBtn" class="primary">Advance Wave Tick</button>
         <button id="autoBtn">Advance Wave (Auto)</button>
