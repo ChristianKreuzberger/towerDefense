@@ -15,6 +15,7 @@
 }
 
 .menu-card {
+  position: relative;
   margin: auto;
   width: min(760px, 100%);
   border: 1px solid var(--line);

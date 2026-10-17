@@ -1,11 +1,12 @@
 import Phaser from "phaser";
 
-import { BASE_TOWER_UPGRADES, MAX_TOWER_LEVEL, getTowerStats, isInSpawnProtection } from "@tower-defense/shared";
+import { BASE_TOWER_UPGRADES, getTowerStats, isInSpawnProtection } from "@tower-defense/shared";
 import type { MapCell, MatchSnapshot } from "@tower-defense/shared";
 
-import { CREAM, UI_COLORS, playerIndex } from "../art/palette";
+import { CREAM, UI_COLORS, colorForPlayer, playerIndex } from "../art/palette";
 import { KEY } from "../art/textures";
 import { describeRuin } from "../ruins";
+import { towerTooltipRows } from "../tower-type-info";
 import { cellCenter } from "./geometry";
 import type { View } from "../viewport";
 import type { PlacementContext, RuinVisual, TowerVisual } from "./types";
@@ -80,15 +81,18 @@ export function drawHoverAndGhost(s: OverlayState, env: OverlayEnv): void {
   const activeId = s.placementContext ? `tower-${s.placementContext.playerId}` : null;
   const activeTower = activeId ? env.towerVisuals.get(activeId) : undefined;
   if (activeTower) {
+    // Cream ring plus an outer ring in the player's own colour, so "whose turn" is not carried by colour alone.
     hover.lineStyle(Math.max(2, cellSize * 0.07), CREAM, 0.85);
     hover.strokeCircle(activeTower.baseX, activeTower.baseY, cellSize * 1.0);
+    hover.lineStyle(Math.max(2, cellSize * 0.09), colorForPlayer(s.placementContext!.playerId), 0.95);
+    hover.strokeCircle(activeTower.baseX, activeTower.baseY, cellSize * 1.18);
   }
   if (s.hoverTowerId) {
     const hovered = env.towerVisuals.get(s.hoverTowerId);
     if (hovered) {
       hover.lineStyle(Math.max(2, cellSize * 0.08), UI_COLORS.hover, 0.95);
       hover.strokeCircle(hovered.baseX, hovered.baseY, cellSize * 1.08);
-      drawRangeCircle(env, hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.upgrades).range);
+      drawRangeCircle(env, hover, hovered.baseX, hovered.baseY, getTowerStats(hovered.upgrades, hovered.towerType).range);
     }
   }
   updateTowerTooltip(s, env);
@@ -111,7 +115,7 @@ export function drawHoverAndGhost(s: OverlayState, env: OverlayEnv): void {
     ghostBase.setTexture(KEY.towerBase(index)).setPosition(cx, cy).setVisible(true);
     ghostTurret.setTexture(KEY.turret(index, 0)).setPosition(cx, cy).setVisible(true);
     // Placement is one-shot, so show the coverage before the player commits.
-    drawRangeCircle(env, hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES).range);
+    drawRangeCircle(env, hover, cx, cy, getTowerStats(BASE_TOWER_UPGRADES, s.placementContext.towerType).range);
   }
 }
 
@@ -136,17 +140,7 @@ function updateTowerTooltip(s: OverlayState, env: OverlayEnv): void {
     tooltip.hidden = true;
     return;
   }
-  const stats = getTowerStats(tower.upgrades);
-  const trackLevel = (level: number): string => `${level}/${MAX_TOWER_LEVEL}`;
-  const rows: Array<[string, string]> = [
-    ["Level", String(stats.level)],
-    ["Health", `${tower.hp}/${tower.maxHp}`],
-    ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
-    ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
-    ["Type", tower.damageType],
-    ["DPS", String(stats.damagePerSecond)],
-    ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
-  ];
+  const rows = towerTooltipRows(tower);
   tooltip.replaceChildren(
     ...rows.map(([label, value]) => {
       const row = document.createElement("div");

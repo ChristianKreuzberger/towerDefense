@@ -23,7 +23,20 @@ export function mountSettingsDialog(options: { root: HTMLElement; settings: Sett
         </div>
       </div>
       <div class="settings-row">
-        <button id="settingsMuteBtn" type="button" aria-pressed="false">Mute effects</button>
+        <button id="settingsMuteBtn" type="button" aria-pressed="false">Mute sound</button>
+      </div>
+      <div class="settings-row">
+        <label for="settingsMusicVolume">Music volume</label>
+        <div class="settings-slider">
+          <input id="settingsMusicVolume" type="range" min="0" max="100" step="1" />
+          <output id="settingsMusicVolumeValue" for="settingsMusicVolume"></output>
+        </div>
+      </div>
+      <div class="settings-row">
+        <button id="settingsMusicBtn" type="button" aria-pressed="false">Music: off</button>
+      </div>
+      <div class="settings-row">
+        <button id="settingsEffectsBtn" type="button" aria-pressed="true">Visual effects: on</button>
       </div>
       <div class="stack">
         <button id="settingsCloseBtn" type="button" class="primary">Close</button>
@@ -40,6 +53,10 @@ export function mountSettingsDialog(options: { root: HTMLElement; settings: Sett
   const slider = query<HTMLInputElement>("settingsVolume");
   const valueLabel = query<HTMLOutputElement>("settingsVolumeValue");
   const muteBtn = query<HTMLButtonElement>("settingsMuteBtn");
+  const musicSlider = query<HTMLInputElement>("settingsMusicVolume");
+  const musicValueLabel = query<HTMLOutputElement>("settingsMusicVolumeValue");
+  const musicBtn = query<HTMLButtonElement>("settingsMusicBtn");
+  const effectsBtn = query<HTMLButtonElement>("settingsEffectsBtn");
   const closeBtn = query<HTMLButtonElement>("settingsCloseBtn");
   let opener: HTMLElement | null = null;
   let release: (() => void) | null = null;
@@ -55,13 +72,21 @@ export function mountSettingsDialog(options: { root: HTMLElement; settings: Sett
   }
 
   function render(): void {
-    const { effectsVolume, muted } = settings.get();
+    const { effectsVolume, muted, effects, musicEnabled, musicVolume } = settings.get();
+    const musicPercent = Math.round(musicVolume * 100);
+    musicSlider.value = String(musicPercent);
+    musicSlider.setAttribute("aria-valuetext", `${musicPercent} percent`);
+    musicValueLabel.textContent = `${musicPercent}%`;
+    musicBtn.setAttribute("aria-pressed", String(musicEnabled));
+    musicBtn.textContent = musicEnabled ? "Music: on" : "Music: off";
     const percent = Math.round(effectsVolume * 100);
     slider.value = String(percent);
     slider.setAttribute("aria-valuetext", `${percent} percent`);
     valueLabel.textContent = `${percent}%`;
     muteBtn.setAttribute("aria-pressed", String(muted));
-    muteBtn.textContent = muted ? "Unmute effects" : "Mute effects";
+    muteBtn.textContent = muted ? "Unmute sound" : "Mute sound";
+    effectsBtn.setAttribute("aria-pressed", String(effects));
+    effectsBtn.textContent = effects ? "Visual effects: on" : "Visual effects: off";
   }
 
   function close(): void {
@@ -80,6 +105,9 @@ export function mountSettingsDialog(options: { root: HTMLElement; settings: Sett
     engine.previewVolume();
   });
   muteBtn.addEventListener("click", () => settings.set({ muted: !settings.get().muted }));
+  musicSlider.addEventListener("input", () => settings.set({ musicVolume: Number(musicSlider.value) / 100 }));
+  musicBtn.addEventListener("click", () => settings.set({ musicEnabled: !settings.get().musicEnabled }));
+  effectsBtn.addEventListener("click", () => settings.set({ effects: !settings.get().effects }));
   closeBtn.addEventListener("click", close);
   root.addEventListener("pointerdown", (event) => {
     if (event.target === root) {

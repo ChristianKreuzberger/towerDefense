@@ -142,6 +142,22 @@ export class Effects {
     }
   }
 
+  // Expanding tinted glow of a given radius in cells: cannon splash, frost chill, split and boss cues.
+  ring(x: number, y: number, color: number, radiusCells: number, delayMs: number): void {
+    const sprite = this.acquireSprite("puff", KEY.soft, color);
+    if (!sprite) {
+      return;
+    }
+    sprite.start = performance.now() + delayMs;
+    sprite.duration = this.reducedMotion ? 160 : 380;
+    sprite.x0 = x;
+    sprite.y0 = y;
+    sprite.x1 = x;
+    sprite.y1 = y;
+    sprite.scale0 = (this.cellSize * (this.reducedMotion ? radiusCells * 1.6 : radiusCells * 0.4)) / 32;
+    sprite.scale1 = (this.cellSize * radiusCells * 1.6) / 32;
+  }
+
   spark(x: number, y: number, color: number, delayMs: number): void {
     const sprite = this.acquireSprite("spark", KEY.spark, color);
     if (!sprite) {

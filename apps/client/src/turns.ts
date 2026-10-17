@@ -1,4 +1,4 @@
-import type { MatchSnapshot } from "@tower-defense/shared";
+import { DEFAULT_TOWER_TYPE, type MatchSnapshot } from "@tower-defense/shared";
 import { setMoveMode, syncCursorToTowerSpot, updateBattlefield } from "./board";
 import { el } from "./dom";
 import { hideGuideOverlay, syncGuideOverlay } from "./guide";
@@ -36,6 +36,8 @@ export function applyActivePlayerChange(): void {
   if (store.moveMode) {
     setMoveMode(false);
   }
+  // The picker choice belongs to the player who made it; the next hot-seat player starts on the default.
+  store.towerType = DEFAULT_TOWER_TYPE;
   store.guideDismissedKey = null;
   hideGuideOverlay();
   syncCursorToTowerSpot(store.current);

@@ -19,6 +19,9 @@ export interface SoundEngineOptions {
   isHidden?: () => boolean;
   /** Where `visibilitychange` is observed; defaults to `document`. */
   visibilityTarget?: EventTarget | undefined;
+  /** Repeating timer for the music scheduler; defaults to setInterval. Injectable so tests stay deterministic. */
+  startTimer?: (callback: () => void, ms: number) => unknown;
+  stopTimer?: (handle: unknown) => void;
 }
 
 interface Throttle {
@@ -27,17 +30,34 @@ interface Throttle {
 }
 
 // Priority sounds carry game-critical information, so they are never dropped by throttling.
-const PRIORITY: ReadonlySet<SoundId> = new Set(["wave-start", "wave-clear", "win", "lose", "tower-destroyed"]);
+const PRIORITY: ReadonlySet<SoundId> = new Set(["wave-start", "wave-clear", "win", "lose", "tower-destroyed", "boss-spawn", "boss-defeated"]);
 const DEFAULT_THROTTLE: Throttle = { minIntervalMs: 50, maxVoices: 2 };
 const THROTTLES: Partial<Record<SoundId, Throttle>> = {
-  "tower-shot": { minIntervalMs: 60, maxVoices: 4 },
+  "tower-shot": { minIntervalMs: 60, maxVoices: 3 },
+  "cannon-shot": { minIntervalMs: 120, maxVoices: 2 },
+  "frost-shot": { minIntervalMs: 90, maxVoices: 2 },
+  "cannon-splash": { minIntervalMs: 150, maxVoices: 1 },
+  "creature-split": { minIntervalMs: 120, maxVoices: 2 },
+  "boss-hit": { minIntervalMs: 200, maxVoices: 1 },
   "creature-kill": { minIntervalMs: 80, maxVoices: 3 },
   "tower-damaged": { minIntervalMs: 120, maxVoices: 3 },
   repair: { minIntervalMs: 200, maxVoices: 1 },
   "wave-clear-bonus": { minIntervalMs: 200, maxVoices: 1 }
 };
-const GLOBAL_VOICE_CAP = 16;
+// Lower than before: dense 8-player waves sounded harsh when every shot and kill stacked up.
+const GLOBAL_VOICE_CAP = 12;
 const HEADROOM = 0.6;
+// Music: a quiet looping arpeggio over a four-chord bass line, generated with oscillators (no audio files).
+const MUSIC_STEP_SECONDS = 0.5;
+const MUSIC_LOOKAHEAD_SECONDS = 1.2;
+const MUSIC_TICK_MS = 400;
+const MUSIC_BASS_ROOTS = [110, 87.31, 130.81, 98];
+const MUSIC_ARPEGGIO = [1, 1.5, 2, 1.5];
+const MUSIC_STEPS_PER_BAR = 8;
+// The music bus sits well below effects so a busy wave is never masked by it.
+const MUSIC_LEVEL = 0.35;
+const MUSIC_DUCK_LEVEL = 0.3;
+
 const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16];
 
 // Pitch by player number lets players tell whose tower fired without looking; deterministic on purpose.
@@ -120,11 +140,49 @@ interface RecipeKit {
 // Each recipe returns its length in seconds so the engine can track live voices.
 const RECIPES: Record<SoundId, (kit: RecipeKit) => number> = {
   "tower-shot": ({ ctx, out, t, k, g }) => {
-    tone(ctx, out, { type: "square", freq: 880 * k, freqEnd: 330 * k, at: t, dur: 0.09, gain: 0.18 * g });
+    tone(ctx, out, { type: "square", freq: 880 * k, freqEnd: 330 * k, at: t, dur: 0.09, gain: 0.13 * g });
     return 0.11;
   },
+  // Cannon: a low thump so it sits under the arrow clicks.
+  "cannon-shot": ({ ctx, out, noiseBuffer, t, g }) => {
+    tone(ctx, out, { type: "sine", freq: 150, freqEnd: 50, at: t, dur: 0.18, gain: 0.3 * g });
+    noise(ctx, out, noiseBuffer, { at: t, dur: 0.08, gain: 0.12 * g, filter: "lowpass", freq: 300 });
+    return 0.2;
+  },
+  // Frost: a soft two-note chime.
+  "frost-shot": ({ ctx, out, t, k, g }) => {
+    tone(ctx, out, { type: "sine", freq: 1320 * k, at: t, dur: 0.16, gain: 0.1 * g });
+    tone(ctx, out, { type: "sine", freq: 1760 * k, at: t + 0.04, dur: 0.18, gain: 0.07 * g });
+    return 0.24;
+  },
+  "cannon-splash": ({ ctx, out, noiseBuffer, t, g }) => {
+    noise(ctx, out, noiseBuffer, { at: t, dur: 0.22, gain: 0.18 * g, filter: "lowpass", freq: 700 });
+    tone(ctx, out, { type: "sine", freq: 90, freqEnd: 45, at: t, dur: 0.2, gain: 0.2 * g });
+    return 0.24;
+  },
+  "creature-split": ({ ctx, out, t, g }) => {
+    tone(ctx, out, { type: "triangle", freq: 520, freqEnd: 780, at: t, dur: 0.07, gain: 0.14 * g });
+    tone(ctx, out, { type: "triangle", freq: 390, freqEnd: 600, at: t + 0.05, dur: 0.08, gain: 0.14 * g });
+    return 0.15;
+  },
+  "boss-hit": ({ ctx, out, noiseBuffer, t, g }) => {
+    tone(ctx, out, { type: "square", freq: 110, freqEnd: 80, at: t, dur: 0.08, gain: 0.12 * g });
+    noise(ctx, out, noiseBuffer, { at: t, dur: 0.05, gain: 0.1 * g, filter: "highpass", freq: 2000 });
+    return 0.1;
+  },
+  "boss-spawn": ({ ctx, out, t, g }) => {
+    tone(ctx, out, { type: "sawtooth", freq: 75, freqEnd: 55, at: t, dur: 0.9, gain: 0.22 * g });
+    tone(ctx, out, { type: "sawtooth", freq: 112, freqEnd: 82, at: t + 0.15, dur: 0.7, gain: 0.14 * g });
+    return 0.95;
+  },
+  "boss-defeated": ({ ctx, out, noiseBuffer, t, k, g }) => {
+    noise(ctx, out, noiseBuffer, { at: t, dur: 0.5, gain: 0.3 * g, filter: "lowpass", freq: 600 });
+    tone(ctx, out, { type: "sawtooth", freq: 120, freqEnd: 40, at: t, dur: 0.6, gain: 0.22 * g });
+    [392 * k, 523.25 * k, 659.25 * k].forEach((freq, i) => tone(ctx, out, { type: "triangle", freq, at: t + 0.45 + i * 0.1, dur: 0.3, gain: 0.18 * g }));
+    return 1.0;
+  },
   "creature-kill": ({ ctx, out, t, k, g }) => {
-    tone(ctx, out, { type: "triangle", freq: 440 * k, freqEnd: 880 * k, at: t, dur: 0.12, gain: 0.25 * g });
+    tone(ctx, out, { type: "triangle", freq: 440 * k, freqEnd: 880 * k, at: t, dur: 0.12, gain: 0.2 * g });
     return 0.14;
   },
   "tower-damaged": ({ ctx, out, noiseBuffer, t, k, g }) => {
@@ -225,6 +283,14 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
   }
   const voices = new Map<SoundId, Voice[]>();
   let allVoices: Voice[] = [];
+  let musicBus: GainNode | null = null;
+  let musicDuck: GainNode | null = null;
+  let mixInput: AudioNode | null = null;
+  let musicTimer: unknown = null;
+  let musicStep = 0;
+  let musicNextTime = 0;
+  const startTimer = options.startTimer ?? ((callback: () => void, ms: number) => setInterval(callback, ms));
+  const stopTimer = options.stopTimer ?? ((handle: unknown) => clearInterval(handle as ReturnType<typeof setInterval>));
   let unlockTarget: EventTarget | null = null;
   let gestureTarget: EventTarget | null = null;
 
@@ -233,6 +299,7 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
     if (isHidden()) {
       cancelPending();
     }
+    syncMusic();
   });
 
   const gesture = () => unlock();
@@ -285,6 +352,76 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
     }
     const volume = settings.effectiveGain();
     master.gain.setTargetAtTime(volume * volume, ctx.currentTime, 0.02);
+    syncMusic();
+  }
+
+  function scheduleMusic(): void {
+    if (!ctx || !musicDuck || !noiseBuffer) {
+      return;
+    }
+    while (musicNextTime < ctx.currentTime + MUSIC_LOOKAHEAD_SECONDS) {
+      const bar = Math.floor(musicStep / MUSIC_STEPS_PER_BAR) % MUSIC_BASS_ROOTS.length;
+      const inBar = musicStep % MUSIC_STEPS_PER_BAR;
+      const root = MUSIC_BASS_ROOTS[bar] ?? 110;
+      const at = Math.max(musicNextTime, ctx.currentTime);
+      if (inBar === 0) {
+        tone(ctx, musicDuck, { type: "sine", freq: root, at, dur: MUSIC_STEP_SECONDS * 6, gain: 0.5 });
+      }
+      if (inBar % 2 === 0) {
+        const ratio = MUSIC_ARPEGGIO[(inBar / 2) % MUSIC_ARPEGGIO.length] ?? 1;
+        tone(ctx, musicDuck, { type: "triangle", freq: root * 4 * ratio, at, dur: MUSIC_STEP_SECONDS * 1.6, gain: 0.16 });
+      }
+      musicStep += 1;
+      musicNextTime += MUSIC_STEP_SECONDS;
+    }
+  }
+
+  function stopMusic(): void {
+    if (musicTimer !== null) {
+      stopTimer(musicTimer);
+      musicTimer = null;
+    }
+    if (ctx && musicBus) {
+      // Already scheduled notes are silenced rather than cut, so there is no click.
+      musicBus.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+    }
+  }
+
+  // The loop runs only while it is enabled, audible, unlocked and the tab is visible. Otherwise no music nodes are made.
+  function syncMusic(): void {
+    const gain = settings.effectiveMusicGain();
+    const allowed = gain > 0 && !disabled && ctx !== null && ctx.state === "running" && !isHidden() && mixInput !== null;
+    if (!allowed || !ctx || !mixInput) {
+      stopMusic();
+      return;
+    }
+    if (!musicBus || !musicDuck) {
+      musicBus = ctx.createGain();
+      musicDuck = ctx.createGain();
+      musicBus.connect(musicDuck);
+      musicDuck.connect(mixInput);
+    }
+    musicBus.gain.setTargetAtTime(gain * gain * MUSIC_LEVEL, ctx.currentTime, 0.05);
+    if (musicTimer === null) {
+      musicNextTime = ctx.currentTime;
+      scheduleMusic();
+      musicTimer = startTimer(() => {
+        try {
+          scheduleMusic();
+        } catch {
+          stopMusic();
+        }
+      }, MUSIC_TICK_MS);
+    }
+  }
+
+  // Priority sounds briefly pull the music down so they stay clear.
+  function duckMusic(): void {
+    if (!ctx || !musicDuck || musicTimer === null) {
+      return;
+    }
+    musicDuck.gain.setTargetAtTime(MUSIC_DUCK_LEVEL, ctx.currentTime, 0.03);
+    musicDuck.gain.setTargetAtTime(1, ctx.currentTime + 0.9, 0.3);
   }
 
   function ensureContext(): AudioContext | null {
@@ -307,6 +444,7 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
       gain.connect(compressor);
       compressor.connect(headroom);
       headroom.connect(created.destination);
+      mixInput = compressor;
       ctx = created;
       master = gain;
       noiseBuffer = buildNoise(created);
@@ -320,6 +458,7 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
           arm();
           cancelPending();
         }
+        syncMusic();
       });
       return ctx;
     } catch {
@@ -337,6 +476,7 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
     }
     if (context.state === "running") {
       detach();
+      syncMusic();
       return;
     }
     try {
@@ -344,6 +484,7 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
         .then(() => {
           if (context.state === "running") {
             detach();
+            syncMusic();
           }
         })
         .catch(() => undefined);
@@ -393,6 +534,9 @@ export function createSoundEngine(options: SoundEngineOptions): SoundEngine {
       own.push(voice);
       voices.set(cue.id, own);
       allVoices.push(voice);
+      if (priority) {
+        duckMusic();
+      }
     } catch {
       disabled = true;
     }

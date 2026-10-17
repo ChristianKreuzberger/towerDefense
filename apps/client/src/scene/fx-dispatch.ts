@@ -3,6 +3,7 @@ import type { MatchEvent, MatchSnapshot } from "@tower-defense/shared";
 import type { Effects } from "../art/fx";
 import { colorForPlayer } from "../art/palette";
 import { ownerNameFor } from "../ruins";
+import { FROST_FX_COLOR, DAMAGE_TYPE_FX_COLOR, isBigKill, shakeScale } from "./fx-style";
 import type { CreatureVisual, PendingDeath, TowerVisual } from "./types";
 
 // Bounds the work one snapshot can cause even if a long batch (or a reconnect) delivers hundreds of events.
@@ -19,6 +20,8 @@ export interface FxContext {
   towerVisuals: Map<string, TowerVisual>;
   creatureVisuals: Map<string, CreatureVisual>;
   pendingDeaths: Map<string, PendingDeath>;
+  // The "Effects" setting: off keeps only the essential cues (shots, kills, points, tower damage).
+  extras: boolean;
 }
 
 export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: MatchSnapshot, glideMs: number): void {
@@ -46,6 +49,17 @@ export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: Match
       case "tower-hit": {
         const tower = ctx.towerVisuals.get(event.towerId);
         const creature = ctx.creatureVisuals.get(event.creatureId);
+        if (event.splash) {
+          // A splash victim shows only its impact: the cannon's one shot already drew its bolt and recoil,
+          // and the extra hits must not eat the effects budget.
+          if (ctx.extras) {
+            const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
+            const y = creature ? creature.curY * cellSize : (event.y + 0.5) * cellSize;
+            fx.spark(x, y, DAMAGE_TYPE_FX_COLOR[event.damageType], delay + 90);
+            fx.ring(x, y, DAMAGE_TYPE_FX_COLOR.explosive, 1.5, delay + 90);
+          }
+          break;
+        }
         if (tower) {
           const color = colorForPlayer(event.playerId);
           const x = creature ? creature.curX * cellSize : (event.x + 0.5) * cellSize;
@@ -53,6 +67,15 @@ export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: Match
           fx.projectile(tower.baseX, tower.baseY, x, y, color, delay, tower.tier);
           tower.recoilUntil = now + delay + RECOIL_MS;
           budget -= 1;
+          if (ctx.extras) {
+            // Hit spark in the damage type's colour, landing after the bolt has flown.
+            fx.spark(x, y, DAMAGE_TYPE_FX_COLOR[event.damageType], delay + 90);
+            if (tower.towerType === "frost") {
+              fx.ring(x, y, FROST_FX_COLOR, 0.8, delay + 90);
+            } else if (tower.towerType === "cannon") {
+              fx.ring(x, y, DAMAGE_TYPE_FX_COLOR.explosive, 1.5, delay + 90);
+            }
+          }
         }
         break;
       }
@@ -84,6 +107,11 @@ export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: Match
         fx.puff(x, y, 0xd9d2c0, delay + 120);
         fx.burst(x, y, color, delay + 120);
         fx.floatText(x, y - cellSize * 0.5, `+${event.rewardPoints}`, color, delay + 120);
+        if (ctx.extras && isBigKill(event.rewardPoints)) {
+          // Tanks and bosses: a second burst and a wider glow so a big kill stands out on a busy map.
+          fx.burst(x, y, 0xffffff, delay + 200);
+          fx.ring(x, y, color, 2.2, delay + 120);
+        }
         budget -= 1;
         break;
       }
@@ -91,8 +119,18 @@ export function playEvents(ctx: FxContext, events: MatchEvent[], snapshot: Match
         const tower = ctx.towerVisuals.get(event.targetTowerId);
         if (tower) {
           tower.flashUntil = now + delay + FLASH_MS;
-          tower.shakeUntil = now + delay + SHAKE_MS;
+          tower.shakeUntil = now + delay + SHAKE_MS * (ctx.extras ? shakeScale(event.damage) : 1);
           fx.spark(tower.baseX, tower.baseY, 0xff7a66, delay);
+          budget -= 1;
+        }
+        break;
+      }
+      case "creature-split": {
+        if (ctx.extras) {
+          const x = (event.x + 0.5) * cellSize;
+          const y = (event.y + 0.5) * cellSize;
+          fx.ring(x, y, 0x9be36b, 1.4, delay + 120);
+          fx.puff(x, y, 0x9be36b, delay + 120);
           budget -= 1;
         }
         break;

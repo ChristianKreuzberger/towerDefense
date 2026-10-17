@@ -1,6 +1,6 @@
 import type Phaser from "phaser";
 
-import type { CreatureArchetype, DamageType, MatchPhase, TowerUpgrades } from "@tower-defense/shared";
+import type { CreatureArchetype, DamageType, MatchPhase, TowerType, TowerUpgrades } from "@tower-defense/shared";
 
 import type { RuinInfo } from "../ruins";
 
@@ -10,6 +10,8 @@ export interface PlacementContext {
   hasTowerAlready: boolean;
   // Moving the tower: the ghost tower is shown even though the player already has one.
   moveMode?: boolean;
+  // Type that the next placement would build, for the ghost range circle.
+  towerType?: TowerType;
 }
 
 export interface TowerVisual {
@@ -25,6 +27,7 @@ export interface TowerVisual {
   tier: number;
   upgrades: TowerUpgrades;
   damageType: DamageType;
+  towerType: TowerType;
   hp: number;
   maxHp: number;
   angle: number;

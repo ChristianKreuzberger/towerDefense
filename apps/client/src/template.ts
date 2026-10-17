@@ -79,6 +79,7 @@ export const APP_TEMPLATE = `
                 <strong id="towerMenuTitle" class="tower-menu-title"></strong>
                 <button id="towerMenuClose" data-sfx="none" class="tower-menu-close" aria-label="Close upgrades" title="Close upgrades (Esc)">&times;</button>
               </div>
+              <div id="towerMenuInfo" class="tower-menu-info"></div>
               <div class="tower-menu-buttons">
                 ${["range", "damage", "accuracy"]
                   .map(

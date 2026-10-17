@@ -26,6 +26,8 @@ This folder contains planning documents for a multiplayer browser tower-defense 
    - answers: phased delivery plan and post-MVP candidates
 11. 11-match-flow-ui.md
    - answers: menu and match flow, HUD, playback, visuals, audio, guidance overlay, debug, endgame UX
+12. 12-playtest.md
+   - answers: the 20-minute playtest script, roles, feedback form and findings template (Phase 3 exit)
 
 ## Scope
 

@@ -1,3 +1,4 @@
+import { getWaveComposition } from "@tower-defense/shared";
 import type { MatchEvent, MatchSnapshot } from "@tower-defense/shared";
 import { BANNER_LIFETIME_MS, TURN_BANNER_LIFETIME_MS } from "./constants";
 import { el } from "./dom";
@@ -35,6 +36,16 @@ export function showTurnBanner(player: { id: string; name: string }): void {
     clearTimeout(store.turnBannerTimer);
   }
   store.turnBannerTimer = setTimeout(() => el.turnBanner.classList.remove("show"), TURN_BANNER_LIFETIME_MS);
+}
+
+// Wave start pulse; a boss wave gets its own warning. Skipped when the visual effects setting is off.
+export function announceWaveStart(events: MatchEvent[], extras: boolean): void {
+  const start = events.find((event) => event.type === "wave-start");
+  if (!start || !extras) {
+    return;
+  }
+  const boss = getWaveComposition(start.wave).some((entry) => entry.archetype === "juggernaut");
+  showWaveBanner(boss ? `Wave ${start.wave}: boss incoming` : `Wave ${start.wave}`, boss ? "A juggernaut leads the wave" : "Defend your tower");
 }
 
 export function announceWaveEnd(events: MatchEvent[]): void {

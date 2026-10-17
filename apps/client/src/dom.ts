@@ -80,6 +80,7 @@ export const el = {
   battlefieldMeta: must<HTMLElement>("battlefieldMeta"),
   towerMenu: must<HTMLElement>("towerMenu"),
   towerMenuTitle: must<HTMLElement>("towerMenuTitle"),
+  towerMenuInfo: must<HTMLElement>("towerMenuInfo"),
   towerMenuClose: must<HTMLButtonElement>("towerMenuClose"),
   zoomInBtn: must<HTMLButtonElement>("zoomInBtn"),
   zoomOutBtn: must<HTMLButtonElement>("zoomOutBtn"),

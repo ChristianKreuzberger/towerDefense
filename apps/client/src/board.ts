@@ -22,10 +22,17 @@ export function setViewChangeHandler(handler: () => void): void {
   viewChangeHandler = handler;
 }
 
+let effectsEnabledProvider: () => boolean = () => true;
+
+export function setEffectsEnabledProvider(provider: () => boolean): void {
+  effectsEnabledProvider = provider;
+}
+
 function mountBattlefield(): BattlefieldMount {
   return createBattlefieldMount(el.board, {
     onCellClick: (x, y) => cellClickHandler(x, y),
-    onViewChange: () => viewChangeHandler()
+    onViewChange: () => viewChangeHandler(),
+    effectsEnabled: () => effectsEnabledProvider()
   });
 }
 
@@ -79,7 +86,8 @@ export function syncPlacementContext(snapshot: MatchSnapshot | null): void {
     phase: snapshot.phase,
     playerId,
     hasTowerAlready: snapshot.towers.some((tower) => tower.playerId === playerId),
-    moveMode: store.moveMode
+    moveMode: store.moveMode,
+    towerType: snapshot.towers.find((tower) => tower.playerId === playerId)?.towerType ?? store.towerType
   });
 }
 

@@ -1,4 +1,5 @@
 import { createSoundEngine } from "./audio/index";
+import { setEffectsEnabledProvider } from "./board";
 import { must } from "./dom";
 import { createSettingsStore } from "./settings/settings";
 import { mountSettingsDialog } from "./settings/settings-dialog";
@@ -10,6 +11,7 @@ import { createTourStore } from "./tour-data";
 export const settingsStore = createSettingsStore();
 export const soundEngine = createSoundEngine({ settings: settingsStore });
 soundEngine.bindUnlock(document);
+setEffectsEnabledProvider(() => settingsStore.get().effects);
 export const tourStore = createTourStore();
 export const tour = mountTour({ root: must<HTMLElement>("tourRoot"), onDismiss: () => tourStore.markSeen() });
 export const settingsDialog = mountSettingsDialog({ root: must<HTMLElement>("settingsRoot"), settings: settingsStore, engine: soundEngine });

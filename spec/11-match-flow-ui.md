@@ -34,6 +34,8 @@ How-to-play tour
 - Turn banner: a big, centered banner (separate from the wave banner so both can show after a wave ends) with the player's name and "it's your turn". The text uses the player's colour, at least 40px on desktop (scaled down with the viewport on phones, never below 28px, wrapping instead of overflowing), and stays visible for about 3.5 seconds. It is `aria-live="polite"`, does not take pointer events, and under `prefers-reduced-motion` it appears without animation. It is only shown when more than one player is in the match. Generic action toasts are unchanged
 - The guide card title is larger (18px) so the turn message is readable from across the table
 - Show active wave and remaining creatures
+- Wave preview line (placement phase) lists each archetype with its count, the damage types it is weak to and the types it resists (for example "2x Runner (weak: physical, resists: magic)"); the full text is also the tooltip. The data comes from the shared multiplier table, never a client copy
+- Active player: the chip glow and arrow, plus a steady ring on that player's tower (cream ring and an outer ring in the player colour, so it never relies on colour alone)
 - Action toolbar (tower, move, three upgrade buttons, ready) with icon, cost and hotkey on each button; costs come from the shared cost functions, never a client copy; each upgrade button (Range `U`, Damage `I`, Accuracy `O`) is enabled only in prep for a player who has not readied and whose tower is below max level on that track (it then shows "MAX" instead of a cost; each shows its own cost); target-mode controls are enabled whenever the player has a living tower and the match is running (prep and combat)
 - Action feedback appears as short-lived toasts (stacked, auto-dismissed), not a persistent log
 
@@ -98,10 +100,11 @@ Towers
 - Tower style tiers: every 3rd upgrade (counted across all tracks, so by the tower's overall `level`) switches the tower to a new look. Tier = floor((level - 1) / 3), tiers 0 to 4 (level 13 is the highest). Each tier has its own turret art and its shots look different (longer, thicker bolts with a brighter muzzle flash from tier 2, a white core from tier 3). The level pips under the tower show progress to the next tier (0 to 2 pips)
 - Level-up: when an upgrade is bought the tower plays a short shine (gold ring, sparkles, a small pulse and a floating "Level up"); when the purchase starts a new tier it is bigger and says "New style!". Nothing plays on first render or reconnect, and with reduced motion only the floating text shows
 - Tapping or clicking a tower opens the upgrade popover (see Tower popover). It does not place or move anything; while move mode is on a click still moves the tower as before
-- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its level, the level of each upgrade track (range, damage, accuracy), health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats`, never a client copy. The tooltip also names the tower's damage type. Accuracy is the shared `getTowerAccuracy` value. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
+- The turret turns toward the creature in `targetAssignments`. Towers only target creatures within their range; hovering a tower highlights it, draws a translucent range circle (radius = range in cells at the tower's current level) and a line to its current target. Hovering also shows a tooltip above the tower with its type (arrow, cannon or frost), its level, the level of each upgrade track (range, damage, accuracy), health, range, damage per shot, damage per second (at 1x playback) and accuracy; the numbers come from the shared `getTowerStats` called with the tower's own type, never a client copy (a cannon shows its own range, damage and DPS). Cannon towers add a Splash row and frost towers a Slow row. The hover range circle and the placement ghost circle also use the tower's type. The tooltip also names the tower's damage type. Accuracy is the shared `getTowerAccuracy` value. While placing a tower, the ghost shows the level-1 range circle so the player can see what the tower will cover before committing
 
 Tower popover
 - A popover with three buttons (Range, Damage, Accuracy) shows the tower's level in each track and the next cost (`MAX` when maxed). It opens when a tower is tapped or clicked and stays open after a purchase so several upgrades can be bought in a row
+- The popover also shows the tower type, its health, range and accuracy under the title
 - Tapping another player's tower makes its owner the active player first (hot-seat), then shows that player's upgrades
 - The buttons use exactly the same command, costs and availability rules as the toolbar upgrade buttons (`getToolbarState`, shared cost functions); an unavailable upgrade is dimmed and a press explains the rejection with the usual toast
 - It closes on Esc, on a tap on any other cell, when the phase changes, when the tower is gone, or when another player becomes active. On desktop it floats above the tower, on narrow screens it docks to the bottom of the board so a finger does not hide it. Hovering still shows the stats tooltip on desktop
@@ -121,6 +124,12 @@ Effects (driven by snapshot events, presentation only)
 - `creature-attack`: tower flash and shake
 - `tower-destroyed`: explosion (flash, fireball, debris, smoke) played on the tower; the tower vanishes only once the explosion has peaked and leaves ruins behind (see Ruins). With `prefers-reduced-motion` the explosion is a single short static flash
 - `wave-end`: wave-clear banner
+- `wave-start`: wave banner ("Wave N", or "Wave N: boss incoming" when the wave has a juggernaut)
+- `tower-hit` extras: a spark at the creature in the damage type's colour (physical bone, explosive orange, magic violet); a cannon shot adds an orange ring at its target, and each splash hit shows only its own impact (spark plus orange ring, no extra bolt or recoil, and it does not count against the per-snapshot effects budget), a frost hit adds an ice-blue ring
+- `creature-defeated` extras: kills worth 20 points or more (tank, juggernaut) add a second white burst and a wider glow in the owner's colour
+- `creature-split`: a green ring and puff where the splitter died
+- `creature-attack`: the tower shake lasts longer the harder the hit (up to twice as long)
+- Visual effects setting: the settings dialog has a "Visual effects" toggle (default on, stored with the other settings, spec/08). Off keeps only the essential cues (shot, kill burst and points, tower flash and shake, explosion, wave-clear banner) and drops the extras listed above and the wave-start banner. It is independent of `prefers-reduced-motion`, which always applies
 - `tower-hit` and `creature-defeated` carry the cell the creature was in. Strong towers can kill a creature within the same batched response that spawned it, so it never appears in a snapshot; the client falls back to that cell so shots and kills are still shown
 - Events of one batched response are spread across the glide time of that response so they do not all fire at once; the number of effects per snapshot is capped
 - With `prefers-reduced-motion` there is no shake, no particle burst and no banner animation; flashes become short static highlights
@@ -131,7 +140,7 @@ Sound effects are procedural Web Audio only: no audio files are downloaded or bu
 
 Settings dialog
 - A "Settings" button sits in the main-menu actions (`#menuSettingsBtn`) and in the match session row (`#settingsBtn`)
-- The dialog is a modal (`role="dialog"`, `aria-modal="true"`, labelled by its title) with an effects volume slider (0-100, default 70, with a visible value label), a mute toggle (`aria-pressed`) and a Close button
+- The dialog is a modal (`role="dialog"`, `aria-modal="true"`, labelled by its title) with an effects volume slider (0-100, default 70, with a visible value label), a music volume slider (0-100, default 40) and a music on/off toggle (default off), a "Mute sound" toggle (`aria-pressed`, silences effects and music), a "Visual effects" toggle (default on) and a Close button
 - Esc, Close or a click on the backdrop dismisses it; focus returns to the button that opened it
 - While the dialog is open the rest of the page is `inert` (no Tab or pointer access behind it) and game hotkeys are ignored (Esc closes the dialog only)
 - Moving the slider plays a short preview blip (not when muted); the blip is throttled
@@ -139,8 +148,8 @@ Settings dialog
 - Settings persist in `localStorage` (see 08-data-persistence.md) and apply immediately
 
 Next-wave preview and HUD
-- During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical), 1x Swarm (weak: explosive), 1x Armored (weak: magic), 1x Tank (weak: physical)" (each archetype's weaknesses are the damage types whose multiplier is above 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
-- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed; the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (polish later). The picker is a segmented control with no new hotkey
+- During prep (placement phase) the phase banner shows what the coming wave brings, for example "Next wave 3: 2x Runner (weak: physical, resists: magic), 1x Swarm (weak: explosive, resists: physical), ..." (weaknesses are the damage types whose multiplier is above 1 and resistances those below 1, from the shared data); it is hidden during combat and after the match ends. The composition comes from the shared wave rule, never a client copy
+- Phase 3: the preview lists the new archetypes (splitter, juggernaut) with their weaknesses and tags a boss wave "boss". Placement shows a three-button tower type picker (Arrow, Cannon, Frost) with a one-line stat blurb each, before the tower is placed (picking a type updates the range circle of the placement ghost; the pick resets to Arrow when the active player changes and on a new match or rematch); the type is shown as an icon on the tower. Touch two-step placement carries the chosen type. Sound cues exist for the new creatures and towers (see the event to sound table). The picker is a segmented control with no new hotkey
 - The battlefield meta line shows how many creatures of the current wave are still to spawn, next to the active count
 - The ended status text names the winner (never the raw id)
 
@@ -174,7 +183,9 @@ Engine rules
 - If Web Audio is unavailable or throws, audio is a permanent no-op and nothing else is affected
 - Output goes through a master gain, a compressor and fixed headroom. The master gain is the volume squared (perceptual curve); muted means gain 0 and no nodes are created
 - Nothing plays while the document is hidden, while the context is not running, or on a fresh load, reconnect or event backlog (same suppression as visual effects: no previous snapshot, or more than 300 new events)
-- Sounds are throttled per id (minimum interval, maximum simultaneous voices) and by a global voice cap. Priority sounds (wave start, wave clear, win, lose, tower destroyed) are never throttled or capped
+- Sounds are throttled per id (minimum interval, maximum simultaneous voices) and by a global voice cap of 12. Priority sounds (wave start, wave clear, win, lose, tower destroyed, boss spawn, boss defeated) are never throttled or capped
+- Busy waves: when more than 2 shot sounds land in one snapshot every shot cue plays at 70% intensity, so eight towers firing together stay soft. Cannon shots are a low thump, frost shots a quiet two-note chime, arrow shots the original click (now quieter); splash hits of one blast share a single boom
+- Music (optional, procedural): a quiet looping bass-and-arpeggio pattern made from oscillators, no audio files. It is off by default (`musicEnabled`), has its own volume (`musicVolume`, default 0.4, squared like the effects volume and mixed well below the effects), and is independent of the effects volume. It starts only after the audio unlock, only while the tab is visible and the context is running, and makes no nodes when muted, when music is off or when Web Audio is missing. Priority sounds duck it to 30% for about a second. Muting stops it at once
 - Tower pitch is derived deterministically from the player number; no randomness
 - Cues from one batched response are spread across the glide time of that response, like visual effects
 
@@ -183,6 +194,12 @@ Event to sound table
 | --- | --- | --- |
 | `tower-hit`, `tower-miss` | `tower-shot` | at most one per tower id, at most 4 per snapshot; a miss draws the shot flying past the creature with a floating "miss" |
 | `creature-defeated` | `creature-kill` | at most 3 per snapshot |
+| `tower-hit` from a cannon / frost tower | `cannon-shot` / `frost-shot` | same per-tower and per-snapshot caps as `tower-shot`, which stays the arrow sound |
+| `tower-hit` with `splash` | `cannon-splash` | at most one per snapshot, does not count against the shot cap |
+| `tower-hit` on a juggernaut | `boss-hit` | at most one per snapshot, in addition to the shot sound; the creature is found from the snapshots and spawn events |
+| `creature-split` | `creature-split` | at most one per snapshot |
+| `creature-spawned` (juggernaut) | `boss-spawn` | priority, once per snapshot |
+| `creature-defeated` (juggernaut) | `boss-defeated` | priority, replaces `creature-kill` |
 | `creature-attack` | `tower-damaged` | |
 | `tower-destroyed` | `tower-destroyed` | priority |
 | `wave-start` event or phase change into `wave` | `wave-start` | once per snapshot |

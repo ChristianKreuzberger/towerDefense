@@ -323,3 +323,113 @@ test("delayed cues are cancelled when muted before they start", () => {
   settings.set({ muted: true });
   assert.ok(fake.disconnected.length > 0);
 });
+
+function setupMusic(opts: { muted?: boolean; musicEnabled?: boolean; hidden?: () => boolean } = {}) {
+  const fake = fakeContext();
+  const settings = createSettingsStore(null);
+  settings.set({ musicEnabled: opts.musicEnabled ?? true, muted: opts.muted ?? false });
+  const timers = { started: 0, stopped: 0, tick: null as null | (() => void) };
+  const engine = createSoundEngine({
+    settings,
+    createContext: () => fake.ctx as unknown as AudioContext,
+    now: () => 1000,
+    isHidden: opts.hidden ?? (() => false),
+    visibilityTarget: undefined,
+    startTimer: (callback) => {
+      timers.started += 1;
+      timers.tick = callback;
+      return timers.started;
+    },
+    stopTimer: () => {
+      timers.stopped += 1;
+    }
+  });
+  return { fake, settings, engine, timers };
+}
+
+test("music is off by default: unlocking creates no music nodes and no timer", () => {
+  const { fake, engine, timers } = setupMusic({ musicEnabled: false });
+  engine.unlock();
+  assert.equal(voices(fake.created), 0);
+  assert.equal(timers.started, 0);
+});
+
+test("music starts after unlock when enabled and schedules oscillators", () => {
+  const { fake, engine, timers } = setupMusic();
+  engine.unlock();
+  assert.equal(timers.started, 1);
+  assert.ok(voices(fake.created) > 0);
+  const before = voices(fake.created);
+  fake.ctx.currentTime = 2;
+  timers.tick?.();
+  assert.ok(voices(fake.created) > before);
+});
+
+test("muted music makes no nodes, and muting stops the timer", () => {
+  const muted = setupMusic({ muted: true });
+  muted.engine.unlock();
+  assert.equal(voices(muted.fake.created), 0);
+  assert.equal(muted.timers.started, 0);
+
+  const live = setupMusic();
+  live.engine.unlock();
+  live.settings.set({ muted: true });
+  assert.equal(live.timers.stopped, 1);
+  const count = voices(live.fake.created);
+  live.fake.ctx.currentTime = 5;
+  live.timers.tick?.();
+  assert.ok(voices(live.fake.created) >= count);
+  live.settings.set({ muted: false });
+  assert.equal(live.timers.started, 2);
+});
+
+test("music volume is independent of the effects volume", () => {
+  const { fake, settings, engine } = setupMusic();
+  engine.unlock();
+  settings.set({ musicVolume: 0.5, effectsVolume: 0.2 });
+  // Master (effects) gain is the squared effects volume; the music bus is its own squared volume times the music level.
+  assert.ok(fake.masterTargets.some((value) => Math.abs(value - 0.04) < 1e-9));
+  assert.ok(fake.masterTargets.some((value) => Math.abs(value - 0.5 * 0.5 * 0.35) < 1e-9));
+  fake.masterTargets.length = 0;
+  settings.set({ effectsVolume: 0.9 });
+  assert.ok(fake.masterTargets.some((value) => Math.abs(value - 0.81) < 1e-9));
+  assert.ok(fake.masterTargets.some((value) => Math.abs(value - 0.5 * 0.5 * 0.35) < 1e-9), "music level unchanged by effects volume");
+});
+
+test("a hidden tab does not start music", () => {
+  const { engine, timers } = setupMusic({ hidden: () => true });
+  engine.unlock();
+  assert.equal(timers.started, 0);
+});
+
+test("a priority cue ducks the music, a normal cue does not", () => {
+  const { fake, engine } = setupMusic();
+  engine.unlock();
+  const before = fake.masterTargets.length;
+  engine.play({ id: "ui-click" });
+  assert.equal(fake.masterTargets.length, before);
+  engine.play({ id: "win" });
+  assert.ok(fake.masterTargets.length > before);
+});
+
+test("new creature and tower cues make voices and respect mute", () => {
+  for (const id of ["cannon-shot", "frost-shot", "cannon-splash", "creature-split", "boss-hit", "boss-spawn", "boss-defeated"] as const) {
+    const live = setup();
+    live.engine.unlock();
+    live.engine.play({ id });
+    assert.ok(voices(live.fake.created) > 0, id);
+    const silent = setup({ muted: true });
+    silent.engine.unlock();
+    silent.engine.play({ id });
+    assert.equal(voices(silent.fake.created), 0, id);
+  }
+});
+
+test("boss cues are priority and the global cap is 12 for ordinary sounds", () => {
+  const { fake, engine } = setup();
+  engine.unlock();
+  engine.play({ id: "boss-spawn" });
+  const one = voices(fake.created);
+  engine.play({ id: "boss-spawn" });
+  assert.equal(voices(fake.created), one * 2);
+});

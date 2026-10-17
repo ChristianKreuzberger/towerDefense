@@ -1,4 +1,4 @@
-import { TOWER_TYPES, TOWER_TYPE_STATS, TICKS_PER_SECOND, type TowerType } from "@tower-defense/shared";
+import { MAX_TOWER_LEVEL, TOWER_TYPES, TOWER_TYPE_STATS, TICKS_PER_SECOND, getTowerStats, type DamageType, type TowerType, type TowerUpgrades } from "@tower-defense/shared";
 
 export const TOWER_TYPE_LABEL: Record<TowerType, string> = { arrow: "Arrow", cannon: "Cannon", frost: "Frost" };
 
@@ -20,3 +20,35 @@ export function describeTowerType(type: TowerType): string {
 }
 
 export const TOWER_TYPE_OPTIONS: readonly TowerType[] = TOWER_TYPES;
+
+export interface TowerTooltipInput {
+  upgrades: TowerUpgrades;
+  towerType: TowerType;
+  damageType: DamageType;
+  hp: number;
+  maxHp: number;
+}
+
+// Rows for the hover tooltip. Uses the tower's own type: arrow numbers would be wrong for a cannon or frost tower.
+export function towerTooltipRows(tower: TowerTooltipInput): Array<[string, string]> {
+  const stats = getTowerStats(tower.upgrades, tower.towerType);
+  const typeStats = TOWER_TYPE_STATS[tower.towerType];
+  const trackLevel = (level: number): string => `${level}/${MAX_TOWER_LEVEL}`;
+  const rows: Array<[string, string]> = [
+    ["Tower", TOWER_TYPE_LABEL[tower.towerType]],
+    ["Level", String(stats.level)],
+    ["Health", `${tower.hp}/${tower.maxHp}`],
+    ["Range", `${stats.range} cells (${trackLevel(tower.upgrades.range)})`],
+    ["Damage", `${stats.damagePerShot} per shot (${trackLevel(tower.upgrades.damage)})`],
+    ["Type", tower.damageType],
+    ["DPS", String(Math.round(stats.damagePerSecond * 10) / 10)],
+    ["Accuracy", `${Math.round(stats.accuracy * 100)}% (${trackLevel(tower.upgrades.accuracy)})`]
+  ];
+  if (typeStats.splashRadius > 0) {
+    rows.push(["Splash", `${Math.round(typeStats.splashFactor * 100)}% damage within ${typeStats.splashRadius} cells`]);
+  }
+  if (typeStats.slowBaseTicks > 0) {
+    rows.push(["Slow", `to ${Math.round(typeStats.slowSpeedFactor * 100)}% speed for ${typeStats.slowBaseTicks + tower.upgrades.damage} ticks`]);
+  }
+  return rows;
+}
