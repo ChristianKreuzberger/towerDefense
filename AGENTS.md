@@ -28,7 +28,7 @@ Roles only, no line numbers. Big files cost the most to read: open the part you 
 
 ## Commands
 
-Run from the repo root. Node 20.
+Run from the repo root. Node 22 (see `.nvmrc`).
 - Build: `npm run build` (needed before typecheck, test and baseline commands; tests run compiled `dist/*.test.js`)
 - Typecheck: `npm run typecheck`
 - Lint: `npm run lint`
